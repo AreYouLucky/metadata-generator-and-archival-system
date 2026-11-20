@@ -81,52 +81,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
-     * Projects this user owns as an encoder.
+     * Records this user created as an encoder.
      *
-     * @return HasMany<Project, $this>
+     * @return HasMany<Record, $this>
      */
-    public function projects(): HasMany
+    public function records(): HasMany
     {
-        return $this->hasMany(Project::class);
-    }
-
-    /**
-     * @return HasMany<Work, $this>
-     */
-    public function works(): HasMany
-    {
-        return $this->hasMany(Work::class);
-    }
-
-    /**
-     * @return HasMany<Batch, $this>
-     */
-    public function batches(): HasMany
-    {
-        return $this->hasMany(Batch::class);
-    }
-
-    /**
-     * @return HasMany<ExportSchema, $this>
-     */
-    public function exportSchemas(): HasMany
-    {
-        return $this->hasMany(ExportSchema::class);
-    }
-
-    /**
-     * @return HasMany<YoutubeAccount, $this>
-     */
-    public function youtubeAccounts(): HasMany
-    {
-        return $this->hasMany(YoutubeAccount::class);
-    }
-
-    /**
-     * @return HasMany<UsageRecord, $this>
-     */
-    public function usageRecords(): HasMany
-    {
-        return $this->hasMany(UsageRecord::class);
+        return $this->hasMany(Record::class, 'created_by');
     }
 }

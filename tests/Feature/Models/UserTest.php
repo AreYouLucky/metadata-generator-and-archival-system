@@ -3,7 +3,7 @@
 namespace Tests\Feature\Models;
 
 use App\Enums\UserRole;
-use App\Models\Project;
+use App\Models\Record;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,10 +44,10 @@ class UserTest extends TestCase
         $this->assertTrue($user->is_active);
     }
 
-    public function test_deleting_an_encoder_who_owns_projects_is_rejected(): void
+    public function test_deleting_an_encoder_who_created_records_is_rejected(): void
     {
         $encoder = User::factory()->encoder()->create();
-        Project::factory()->for($encoder)->create();
+        Record::factory()->for($encoder, 'creator')->create();
 
         $this->expectException(QueryException::class);
 

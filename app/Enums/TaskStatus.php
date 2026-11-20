@@ -3,7 +3,7 @@
 namespace App\Enums;
 
 /**
- * State of a background task such as a clip, translation, batch or publication.
+ * State of a background task such as a transcript or translation.
  */
 enum TaskStatus: string
 {

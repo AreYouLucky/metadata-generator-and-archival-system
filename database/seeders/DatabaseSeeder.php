@@ -2,8 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\CatalogueEvent;
-use App\Models\Category;
+use App\Models\ProductionAgency;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -13,11 +12,13 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database with one account per role and sample
-     * browse data. Development only: every account uses the password "password".
+     * Seed Philippine locations, one account per role and a sample agency.
+     * Development only: every account uses the password "password".
      */
     public function run(): void
     {
+        $this->call(LocationSeeder::class);
+
         User::factory()->admin()->create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
@@ -33,14 +34,14 @@ class DatabaseSeeder extends Seeder
             'email' => 'user@example.com',
         ]);
 
-        foreach (['News', 'Documentaries', 'Events', 'Interviews'] as $index => $name) {
-            Category::factory()->create([
-                'name' => $name,
-                'slug' => str($name)->slug()->toString(),
-                'sort_order' => $index,
-            ]);
-        }
+        $agency = ProductionAgency::factory()->create([
+            'name' => 'Department of Science and Technology',
+            'acronym' => 'DOST',
+        ]);
 
-        CatalogueEvent::factory()->count(3)->create();
+        ProductionAgency::factory()->unitOf($agency)->create([
+            'name' => 'Science and Technology Information Institute',
+            'acronym' => 'STII',
+        ]);
     }
 }
