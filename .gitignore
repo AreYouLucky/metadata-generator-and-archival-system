@@ -38,8 +38,16 @@ yarn-error.log
 /.kiro
 /.pi
 /.mcp.json
-/AGENTS.md
 /CLAUDE.md
 /boost.json
 /opencode.json
 /opencode.jsonc
+
+# Python AI service
+/ai-service/.venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+/ai-service/.env
