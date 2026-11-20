@@ -1,5 +1,7 @@
 # Metadata Generator and Archival System
 
+https://claude.ai/artifact/PbdfWN27oYKpk5pEL6wCKv
+
 A web app for building a video archive. Encoders upload videos; the system transcribes them,
 analyses them with AI, and produces editable metadata (titles, descriptions, tags, chapters,
 quotes) plus a full archival record with checksums. An admin approves each record, and approved
@@ -13,15 +15,16 @@ videos appear in a public catalogue that anyone can browse by date, event and ca
 
 ## Who uses it
 
-| Role | What they do |
-|---|---|
-| **Admin** | Manages users, reviews and approves content, monitors usage and sets limits, manages categories and events. Has access to every feature, on every project. |
-| **Encoder** | Uploads videos, reviews and edits the transcript and metadata, completes the archival record, submits it for approval. |
-| **User** (public) | Browses, searches and watches approved videos, organised by date, event, category and series. Guests can browse too unless login is required. |
+| Role              | What they do                                                                                                                                               |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Admin**         | Manages users, reviews and approves content, monitors usage and sets limits, manages categories and events. Has access to every feature, on every project. |
+| **Encoder**       | Uploads videos, reviews and edits the transcript and metadata, completes the archival record, submits it for approval.                                     |
+| **User** (public) | Browses, searches and watches approved videos, organised by date, event, category and series. Guests can browse too unless login is required.              |
 
 ## What it does
 
 **Processing**
+
 - Upload (drag-and-drop, paste, URL import, batches), with checksums and full technical metadata
   captured at ingest.
 - Transcription with timestamps, language detection and speaker labels.
@@ -31,11 +34,13 @@ videos appear in a public catalogue that anyone can browse by date, event and ca
   platform presets (YouTube, TikTok, Instagram, LinkedIn, generic).
 
 **Workspace**
+
 - Video player synced with the transcript: click to seek, pause to copy the current line,
   search, inline editing, captions, keyboard shortcuts.
 - Translations, chat with the video (answers cite timestamps), clip cutting.
 
 **Archive**
+
 - Five kinds of metadata per video: descriptive, technical, administrative/rights,
   preservation/provenance and structural.
 - MD5 and SHA-256 checksums, scheduled fixity checks, and an append-only log of everything that
@@ -44,6 +49,7 @@ videos appear in a public catalogue that anyone can browse by date, event and ca
 - Shot and scene segments with SMPTE timecode in and out.
 
 **Distribution**
+
 - Admin approval before anything goes public.
 - Public catalogue: browse by date, event, category and series, then watch with captions,
   chapters and transcript.
@@ -70,14 +76,14 @@ videos appear in a public catalogue that anyone can browse by date, event and ca
 - **Python** is a stateless worker for media and AI work. It never touches the database; it reads
   and writes files in shared storage and reports back to Laravel through HMAC-signed callbacks.
 
-| Layer | Technology |
-|---|---|
-| Web app | Laravel 13, Inertia v3, React 19, TypeScript, Tailwind 4, shadcn/ui |
-| Realtime and queues | Laravel Reverb + Echo, Redis, Laravel Horizon |
-| Database | PostgreSQL with pgvector |
-| AI and media service | Python 3.12+, FastAPI, Celery, ffmpeg/ffprobe |
-| AI providers | Configurable: OpenAI (transcription, embeddings), Anthropic Claude (metadata, vision, chat), or local Whisper |
-| Local development | Docker Compose |
+| Layer                | Technology                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Web app              | Laravel 13, Inertia v3, React 19, TypeScript, Tailwind 4, shadcn/ui                                           |
+| Realtime and queues  | Laravel Reverb + Echo, Redis, Laravel Horizon                                                                 |
+| Database             | PostgreSQL with pgvector                                                                                      |
+| AI and media service | Python 3.12+, FastAPI, Celery, ffmpeg/ffprobe                                                                 |
+| AI providers         | Configurable: OpenAI (transcription, embeddings), Anthropic Claude (metadata, vision, chat), or local Whisper |
+| Local development    | Docker Compose                                                                                                |
 
 ## Getting started
 
@@ -105,16 +111,16 @@ These instructions will be updated when Phase 0 is done.
 
 ## Roadmap
 
-| Phase | Delivers |
-|---|---|
-| 0 — Scaffold | Docker Compose stack, Python service skeleton, signed Laravel ↔ Python calls, realtime test event |
-| 1 — Core app | Roles and user management, upload, checksums, technical metadata, transcription, AI metadata, synced workspace, JSON export |
-| 2 — More AI output | All presets, title options, quotes, translations, SRT/VTT/TXT/CSV/Markdown export, captions, shortcuts |
-| 3 — Archival metadata | Descriptive, rights, provenance and structural records; proxies, versions, fixity checks, embargoes |
-| 4 — Approvals and public catalogue | Approval workflow, usage dashboard and limits, categories and events, public browse and watch pages |
-| 5 — Visual analysis | Shots with timecode, key frames, frame descriptions, OCR, object labels |
-| 6 — Workflow | Batch upload and ZIP download, URL import, speaker labels, local transcription |
-| 7 — Advanced | Clips, chat with the video, public API, YouTube publishing |
+| Phase                              | Delivers                                                                                                                    |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 0 — Scaffold                       | Docker Compose stack, Python service skeleton, signed Laravel ↔ Python calls, realtime test event                           |
+| 1 — Core app                       | Roles and user management, upload, checksums, technical metadata, transcription, AI metadata, synced workspace, JSON export |
+| 2 — More AI output                 | All presets, title options, quotes, translations, SRT/VTT/TXT/CSV/Markdown export, captions, shortcuts                      |
+| 3 — Archival metadata              | Descriptive, rights, provenance and structural records; proxies, versions, fixity checks, embargoes                         |
+| 4 — Approvals and public catalogue | Approval workflow, usage dashboard and limits, categories and events, public browse and watch pages                         |
+| 5 — Visual analysis                | Shots with timecode, key frames, frame descriptions, OCR, object labels                                                     |
+| 6 — Workflow                       | Batch upload and ZIP download, URL import, speaker labels, local transcription                                              |
+| 7 — Advanced                       | Clips, chat with the video, public API, YouTube publishing                                                                  |
 
 Each phase ends with passing tests, an updated README, and sign-off before the next one starts.
 
