@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Enums\UserRole;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Fortify\Features;
 use Tests\TestCase;
@@ -35,5 +37,22 @@ class RegistrationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_registration_ignores_a_submitted_role_and_creates_a_public_user()
+    {
+        $this->post(route('register.store'), [
+            'name' => 'Sneaky User',
+            'email' => 'sneaky@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'role' => 'admin',
+            'is_active' => false,
+        ]);
+
+        $user = User::where('email', 'sneaky@example.com')->firstOrFail();
+
+        $this->assertSame(UserRole::User, $user->role);
+        $this->assertTrue($user->is_active);
     }
 }
