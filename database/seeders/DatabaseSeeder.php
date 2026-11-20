@@ -2,17 +2,21 @@
 
 namespace Database\Seeders;
 
+use App\Models\Genre;
 use App\Models\ProductionAgency;
 use App\Models\User;
+use App\Models\VideoType;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
     /**
-     * Seed Philippine locations, one account per role and a sample agency.
+     * Seed Philippine locations, one account per role, a sample agency, and
+     * starter genres and video types.
      * Development only: every account uses the password "password".
      */
     public function run(): void
@@ -43,5 +47,22 @@ class DatabaseSeeder extends Seeder
             'name' => 'Science and Technology Information Institute',
             'acronym' => 'STII',
         ]);
+
+        $this->seedLookup(Genre::class, ['Documentary', 'News', 'Event Coverage', 'Interview', 'Training', 'Public Service Announcement']);
+        $this->seedLookup(VideoType::class, ['Full Program', 'Raw Footage', 'Highlights', 'Teaser', 'Short Video', 'Livestream Recording']);
+    }
+
+    /**
+     * @param  class-string<Genre|VideoType>  $model
+     * @param  list<string>  $names
+     */
+    private function seedLookup(string $model, array $names): void
+    {
+        foreach ($names as $index => $name) {
+            $model::query()->updateOrCreate(
+                ['slug' => Str::slug($name)],
+                ['name' => $name, 'sort_order' => $index],
+            );
+        }
     }
 }

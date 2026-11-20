@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Rights and access metadata: who owns the record and who may use it.
+ * Release forms themselves are stored as record_attachments.
  */
 return new class extends Migration
 {
@@ -21,8 +22,11 @@ return new class extends Migration
             $table->unsignedSmallInteger('copyright_year')->nullable();
             $table->text('rights_statement')->nullable();
             $table->string('license')->nullable();
+            $table->string('license_url')->nullable();
             $table->string('access_level', 16)->default('restricted')->index();
             $table->text('usage_restrictions')->nullable();
+            $table->jsonb('territories')->nullable();
+            $table->timestamp('embargo_until')->nullable()->index();
             $table->string('permission_status', 16)->default('pending');
             $table->string('release_consent', 16)->default('not_available');
             $table->timestamps();

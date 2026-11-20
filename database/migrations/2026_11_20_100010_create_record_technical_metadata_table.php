@@ -5,8 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * How the record's video file is encoded. Filled automatically by the probe
- * and checksum steps; read-only in the app.
+ * How one record file is encoded. Filled automatically by the probe step
+ * (ffprobe + mediainfo); read-only in the app.
  */
 return new class extends Migration
 {
@@ -17,21 +17,32 @@ return new class extends Migration
     {
         Schema::create('record_technical_metadata', function (Blueprint $table) {
             $table->id();
-            $table->foreignUlid('record_id')->unique()->constrained()->cascadeOnDelete();
-            $table->string('original_filename')->nullable();
-            $table->string('mime_type')->nullable();
+            $table->foreignUlid('record_file_id')->unique()->constrained()->cascadeOnDelete();
             $table->string('file_format')->nullable();
-            $table->unsignedBigInteger('file_size')->nullable();
             $table->decimal('duration', 12, 3)->nullable();
+            $table->unsignedBigInteger('bitrate')->nullable();
+            $table->string('start_timecode', 16)->nullable();
+
+            // Primary video stream
             $table->string('video_codec')->nullable();
-            $table->string('audio_codec')->nullable();
+            $table->string('video_profile')->nullable();
             $table->string('resolution', 32)->nullable();
             $table->string('frame_rate', 32)->nullable();
-            $table->unsignedBigInteger('bitrate')->nullable();
             $table->string('aspect_ratio', 16)->nullable();
+            $table->string('scan_type', 16)->nullable();
+            $table->unsignedTinyInteger('bit_depth')->nullable();
+            $table->string('chroma_subsampling', 16)->nullable();
+            $table->string('color_space', 32)->nullable();
+            $table->string('color_primaries', 32)->nullable();
+            $table->string('color_transfer', 32)->nullable();
+
+            // Primary audio stream, plus every audio track
+            $table->string('audio_codec')->nullable();
             $table->unsignedTinyInteger('audio_channels')->nullable();
             $table->unsignedInteger('audio_sample_rate')->nullable();
-            $table->char('sha256_checksum', 64)->nullable()->index();
+            $table->jsonb('audio_tracks')->nullable();
+
+            $table->jsonb('raw_probe')->nullable();
             $table->timestamps();
         });
     }

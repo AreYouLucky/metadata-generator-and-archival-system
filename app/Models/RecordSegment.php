@@ -19,12 +19,12 @@ use Illuminate\Support\Carbon;
  * @property float $end
  * @property string $text
  * @property string $original_text
- * @property string|null $speaker
+ * @property int|null $record_speaker_id
  * @property bool $is_edited
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['position', 'start', 'end', 'text', 'original_text', 'speaker', 'is_edited'])]
+#[Fillable(['position', 'start', 'end', 'text', 'original_text', 'record_speaker_id', 'is_edited'])]
 class RecordSegment extends Model
 {
     /** @use HasFactory<RecordSegmentFactory> */
@@ -60,5 +60,13 @@ class RecordSegment extends Model
     public function transcript(): BelongsTo
     {
         return $this->belongsTo(RecordTranscript::class, 'record_transcript_id');
+    }
+
+    /**
+     * @return BelongsTo<RecordSpeaker, $this>
+     */
+    public function speaker(): BelongsTo
+    {
+        return $this->belongsTo(RecordSpeaker::class, 'record_speaker_id');
     }
 }

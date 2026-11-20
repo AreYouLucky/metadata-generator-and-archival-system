@@ -5,8 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * One transcript per language (the original plus any translations), each
- * made of timed segments.
+ * Speakers found in a record, one transcript per language (the original plus
+ * any translations), and the timed segments of each transcript.
  */
 return new class extends Migration
 {
@@ -15,6 +15,16 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::create('record_speakers', function (Blueprint $table) {
+            $table->id();
+            $table->foreignUlid('record_id')->constrained()->cascadeOnDelete();
+            $table->string('label', 16);
+            $table->string('display_name')->nullable();
+            $table->timestamps();
+
+            $table->unique(['record_id', 'label']);
+        });
+
         Schema::create('record_transcripts', function (Blueprint $table) {
             $table->id();
             $table->foreignUlid('record_id')->constrained()->cascadeOnDelete();
@@ -36,7 +46,7 @@ return new class extends Migration
             $table->decimal('end', 12, 3);
             $table->text('text');
             $table->text('original_text');
-            $table->string('speaker', 32)->nullable();
+            $table->foreignId('record_speaker_id')->nullable()->constrained()->nullOnDelete();
             $table->boolean('is_edited')->default(false);
             $table->timestamps();
 
@@ -56,5 +66,6 @@ return new class extends Migration
     {
         Schema::dropIfExists('record_segments');
         Schema::dropIfExists('record_transcripts');
+        Schema::dropIfExists('record_speakers');
     }
 };

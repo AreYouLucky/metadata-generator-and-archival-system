@@ -12,16 +12,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * An entry in a record's append-only audit log. Rows are never updated or deleted.
+ * An entry in a record's append-only audit log, including review notes. Rows are never updated or deleted.
  *
  * @property int $id
  * @property string $record_id
+ * @property string|null $record_file_id
  * @property AuditAction $action
  * @property int|null $performed_by
  * @property Carbon $performed_at
  * @property string|null $remarks
  */
-#[Fillable(['record_id', 'action', 'performed_by', 'performed_at', 'remarks'])]
+#[Fillable(['record_id', 'record_file_id', 'action', 'performed_by', 'performed_at', 'remarks'])]
 class VideoAuditLog extends Model
 {
     /** @use HasFactory<VideoAuditLogFactory> */

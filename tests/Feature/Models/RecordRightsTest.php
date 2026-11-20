@@ -37,4 +37,20 @@ class RecordRightsTest extends TestCase
 
         $this->assertSame($expected, $rights->allowsPublicAccess());
     }
+
+    public function test_an_embargo_in_force_blocks_public_access(): void
+    {
+        $rights = RecordRights::factory()->publicAccess()->make(['embargo_until' => now()->addMinute()]);
+
+        $this->assertTrue($rights->isEmbargoed());
+        $this->assertFalse($rights->allowsPublicAccess());
+    }
+
+    public function test_public_access_resumes_once_the_embargo_has_passed(): void
+    {
+        $rights = RecordRights::factory()->publicAccess()->make(['embargo_until' => now()->subMinute()]);
+
+        $this->assertFalse($rights->isEmbargoed());
+        $this->assertTrue($rights->allowsPublicAccess());
+    }
 }

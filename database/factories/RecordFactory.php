@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\ProcessingStatus;
+use App\Enums\ReviewStatus;
 use App\Enums\SecurityClassification;
 use App\Models\Record;
 use App\Models\User;
@@ -28,18 +29,33 @@ class RecordFactory extends Factory
             'date_recorded' => fake()->dateTimeBetween('-5 years', 'now'),
             'security_classification' => SecurityClassification::Unclassified,
             'processing_status' => ProcessingStatus::Queued,
-            'is_approved' => false,
+            'review_status' => ReviewStatus::Draft,
         ];
     }
 
     /**
-     * A processed record that an admin has approved.
+     * A processed record submitted for approval.
+     */
+    public function submitted(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'processing_status' => ProcessingStatus::Ready,
+            'review_status' => ReviewStatus::Submitted,
+            'submitted_at' => now(),
+        ]);
+    }
+
+    /**
+     * A processed record that an admin has approved and published.
      */
     public function approved(): static
     {
         return $this->state(fn (array $attributes) => [
             'processing_status' => ProcessingStatus::Ready,
-            'is_approved' => true,
+            'review_status' => ReviewStatus::Approved,
+            'submitted_at' => now()->subDays(2),
+            'reviewed_at' => now()->subDay(),
+            'published_at' => now()->subDay(),
         ]);
     }
 }

@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Cast and production credits: producer, director, videographer, editor,
- * presenter/host and other contributors.
+ * presenter/host, cast and other contributors.
  */
 return new class extends Migration
 {
