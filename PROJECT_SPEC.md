@@ -220,8 +220,10 @@ ultralytics            # YOLO object detection — NOTE: AGPL-3.0 license, check
 pillow
 numpy
 
-# Phase 6+ (optional extras: [local], [diarization], [import])
-faster-whisper         # local transcription
+# Phase 1: local transcription (optional extra: [local]; the default provider here)
+faster-whisper         # local transcription on the NVIDIA GPU (CTranslate2)
+
+# Phase 6+ (optional extras: [diarization], [import])
 pyannote.audio         # speaker diarization (needs Hugging Face token + model terms accepted)
 yt-dlp                 # URL import
 
@@ -303,12 +305,15 @@ Pipeline options (chosen on upload): `diarization`, `visual_analysis`, `ocr`, `o
   newer model returns segment timestamps, prefer it and log it in `DECISIONS.md`).
 - The OpenAI upload limit is 25 MB. If the audio is larger, split it into ~10-minute chunks
   with ~2 s overlap, transcribe each, offset timestamps, and de-duplicate the overlap.
-- **local**: `faster-whisper` (model size from env, default `small`), word timestamps off by default.
+- **local** (this project's default): `faster-whisper` on the NVIDIA GPU. Model, device and compute
+  type from env (`large-v3`, `cuda`, `int8_float16` fit the dev laptop's 6 GB RTX 3050; fall back to
+  `medium` or CPU `int8` if memory runs out). Segment timestamps on, word timestamps off by default.
+  No upload limit, so no chunking is needed; the audio never leaves the machine.
 - Normalise all providers to the same `TranscriptSegment` schema.
 
 ### LLM details
 
-- Provider is configurable: `LLM_PROVIDER=anthropic|openai`, model from env.
+- Provider is configurable: `LLM_PROVIDER=openai|anthropic`, model from env. This project uses OpenAI for every AI task (see DECISIONS.md).
 - Always request **structured JSON** (tool use / structured output), validate with Pydantic,
   retry once with the validation error if parsing fails.
 - Long transcripts: if over the model's comfortable context, summarise in chunks first (map),
@@ -1040,9 +1045,11 @@ LARAVEL_CALLBACK_BASE=http://web
 STORAGE_ROOT=/data/storage
 REDIS_URL=redis://redis:6379/1
 
-TRANSCRIPTION_PROVIDER=openai      # openai | local | assemblyai
-LOCAL_WHISPER_MODEL=small
-LLM_PROVIDER=anthropic             # anthropic | openai
+TRANSCRIPTION_PROVIDER=local       # local | openai | assemblyai (owner: local on the GPU)
+LOCAL_WHISPER_MODEL=large-v3       # medium if GPU memory runs out
+LOCAL_WHISPER_DEVICE=cuda          # cuda | cpu
+LOCAL_WHISPER_COMPUTE_TYPE=int8_float16   # int8 on CPU
+LLM_PROVIDER=openai                # openai | anthropic (owner uses OpenAI)
 LLM_MODEL=                         # set to a current model id
 VISION_MODEL=                      # vision-capable model id
 EMBEDDING_PROVIDER=openai
@@ -1085,8 +1092,8 @@ summary of what to try manually. The schema in §8 already exists; each phase bu
   Encoders see only their own records; admins see all.
 - Upload (dropzone + paste) creating a `record` and its master `record_file`.
 - Pipeline stages: `probe` (`record_technical_metadata`), `checksum` (MD5 + SHA-256, logged in
-  `video_audit_logs`), `extract_audio`, `transcribe` (OpenAI, with chunking for > 25 MB), language
-  detection, `generate_metadata` (generic + youtube presets; titles, description, summary, tags,
+  `video_audit_logs`), `extract_audio`, `transcribe` (local faster-whisper on the GPU by default; the OpenAI provider,
+  with chunking for > 25 MB, stays available behind the same interface), language detection, `generate_metadata` (generic + youtube presets; titles, description, summary, tags,
   keywords, hashtags, chapters). Progress in `record_stages`; `usage_records` written for every
   transcription and LLM call.
 - If the uploaded master can't play in a browser (e.g. ProRes, MXF), the workspace shows a notice;
@@ -1175,7 +1182,7 @@ summary of what to try manually. The schema in §8 already exists; each phase bu
   left out).
 - URL import via yt-dlp (show a notice: only import videos you have the rights to).
 - Speaker diarization (pyannote or AssemblyAI) into `record_speakers` + speaker rename + colours.
-- Local transcription provider (faster-whisper) behind the same interface.
+- AssemblyAI transcription provider (optional). The local provider moved to Phase 1.
 - Record history polish: search, filters, delete, retry failed stage, cancel.
 - **Done when:** upload 3 videos as a batch, watch them process, download one ZIP; import from a
   URL; see and rename speakers.

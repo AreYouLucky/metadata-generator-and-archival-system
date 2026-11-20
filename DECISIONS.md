@@ -3,6 +3,31 @@
 Choices made while building, and any deviation from [PROJECT_SPEC.md](PROJECT_SPEC.md). Newest
 phase first.
 
+## Phase 1 — Core app (decided before starting)
+
+- **Mixed AI providers (owner's choice).** Transcription runs **locally** with `faster-whisper` on
+  the dev laptop's NVIDIA RTX 3050 (6 GB). OpenAI handles metadata, translation, frame descriptions
+  and embeddings. Reasons:
+  - Transcription is about 85–90% of the OpenAI bill: roughly $0.27–0.36 per video hour, against
+    $0.01–0.03 for metadata.
+  - Local transcription keeps the audio of possibly restricted recordings on the machine.
+  - The small models that fit in 6 GB are clearly weaker at metadata (structured JSON, Filipino and
+    Taglish).
+- **Provider changes from the spec:**
+  - `TRANSCRIPTION_PROVIDER` defaults to `local` (the spec had `openai`), and the local provider
+    moves from Phase 6 to Phase 1. Defaults are `large-v3`, `cuda`, `int8_float16`, with `medium`
+    or CPU `int8` as fallbacks.
+  - `LLM_PROVIDER` defaults to `openai` (the spec had `anthropic`).
+  - Every provider stays swappable behind the same interface. The OpenAI transcription provider is
+    still built, so it can be switched on per environment.
+- **Consequences:**
+  - The AI worker needs GPU access. Use `docker-compose.gpu.yml`; it needs a current NVIDIA driver
+    and Docker Desktop's WSL2 GPU support.
+  - Production needs a GPU server, or switches transcription to `openai`.
+  - The CUDA-enabled image is much larger, so the first build will be slow on the dev connection.
+  - OpenAI model IDs are set from OpenAI's current docs at the start of Phase 1, not from memory.
+  - `OPENAI_API_KEY` lives only in `ai-service/.env`.
+
 ## Phase 0 — Scaffold
 
 ### Infrastructure
