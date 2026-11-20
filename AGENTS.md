@@ -1,118 +1,58 @@
 # Project Conventions (owner's house style)
 
-These rules come from the project owner and take precedence over the generic guidelines below.
-The folders described here are pre-approved; creating them does not need extra approval.
+These rules come from the owner and override the generic guidelines below. The folders listed here are pre-approved.
 
-## Database safety: never wipe the database
+## Database safety
+- **Never** run `migrate:fresh`, `migrate:refresh`, `migrate:reset`, `migrate:rollback` or `db:wipe`. Apply migrations with `php artisan migrate`; if one fails or the schema looks wrong, stop and tell the owner.
+- The only allowed reset is `RefreshDatabase` in tests.
 
-- AI agents must **never** run `php artisan migrate:fresh`. The same applies to the other commands that wipe or roll back data: `migrate:refresh`, `migrate:reset`, `migrate:rollback` and `db:wipe`.
-- Use `php artisan migrate` to apply new migrations. If a migration fails or the schema looks wrong, stop and tell the owner instead of resetting the database.
-- Tests get a clean database through `RefreshDatabase` on the test connection. That is the only place a database reset is allowed.
+## Security and optimisation come first
+Part of every change, not a later clean-up. If the quick fix and the secure/efficient one differ, pick the latter and mention the trade-off.
 
-## Always prioritise security and optimisation
+**Security**
+- Every route is in the right role middleware group. Every action touching a record checks ownership via a Policy (`$this->authorize()` / `Gate`). Never trust an ID from the request.
+- Validate every input (query strings and route values too) in a FormRequest; whitelist with `Rule::in` / enums.
+- `$fillable` on every model. Use `$request->validated()`, never `$request->all()`.
+- No raw SQL with user input; `DB::raw` / `whereRaw` only with bindings.
+- Uploads: validate MIME and size, generate the stored filename, keep private files off the public disk, serve them through an authorised controller or a temporary signed URL.
+- Secrets live in `.env`, read via `config()`. Never log them, never commit `.env`, never prefix them with `VITE_` (those reach the browser).
+- No `dangerouslySetInnerHTML` with user or AI content unless sanitised.
+- Rate-limit login, the public API and anything that triggers paid AI work or heavy processing.
+- Service-to-service callbacks verify the HMAC signature and timestamp first.
+- Responses carry only the fields the page needs (API Resources / `select()`), never whole models.
 
-Treat security and performance as part of every change, not a later clean-up. If a quick solution
-and a secure or efficient one differ, choose the secure and efficient one and mention the trade-off.
+**Optimisation**
+- No N+1: eager-load (`with()`, `withCount()`), select only needed columns.
+- Index every foreign key and every `where` / `orderBy` / join column, in the same migration.
+- Paginate every list; `chunk()` / `lazy()` for batches. Queue slow work (files, external APIs, email, exports).
+- Cache expensive or repeated results and invalidate them on change.
+- Frontend: TanStack Query with sensible `staleTime`, invalidate only affected keys; lazy-load heavy pages, virtualise long lists, debounce search and autosave, avoid needless re-renders.
+- Don't add a dependency for what a few lines or an installed package already does.
 
-### Security
+## Organise by role, `all` for shared code
+- Roles: `admin`, `encoder`, `user` (public viewer). Admins pass every role check and reach encoder features through `role:encoder,admin`, so encoder pages are not duplicated under `admin/` (see `PROJECT_SPEC.md` §1).
+- Routes: `web.php` only `require`s `all.php`, `admin.php`, `encoder.php`, `user.php`; each wraps its routes in that role's middleware group.
+- One folder per role (plus `All`/`all` for anything shared by several roles) in `app/Http/Controllers/`, `app/Http/Requests/` (mirrors Controllers), `resources/js/pages/` and `resources/js/components/`. PHP folders are PascalCase (`Controllers/Admin`), JS folders lowercase (`pages/admin`).
+- Leave `components/ui/` (shadcn) and `lib/utils.ts` (`cn()`) as shipped.
+- Decide first: used by one role → that role's folder; by several → `all`.
 
-- **Authorise every action.** Each route sits in the correct role middleware group. Every controller action that touches a record checks ownership through a Policy (`$this->authorize()` / `Gate`). Never trust an ID from the request.
-- **Validate every input** in a FormRequest (see below), including query strings and route-bound values. Whitelist allowed values (`Rule::in`, enums) instead of blacklisting.
-- **Mass assignment:** set `$fillable` on every model. Never pass `$request->all()` to `create()` or `update()`; use `$request->validated()`.
-- **No raw SQL with user input.** Use Eloquent or the query builder with bindings. `DB::raw` / `whereRaw` only with bound parameters.
-- **Uploads:** validate MIME type and size, generate the stored filename yourself (never use the client's name as the path), keep private files off the public disk, and serve them through an authorised controller or temporary signed URL.
-- **Secrets:** keys only in `.env` and read via `config()`. Never expose them to the frontend (only `VITE_`-prefixed values reach the browser, so never prefix a secret with `VITE_`), never log them, never commit `.env`.
-- **Output:** never use `dangerouslySetInnerHTML` with user or AI content unless it is sanitised first.
-- **Rate-limit** login, public API and any endpoint that triggers paid AI work or heavy processing.
-- **Signed internal calls:** service-to-service callbacks must verify the HMAC signature and timestamp before doing anything.
-- **Data in responses:** return only the fields the page needs (API Resources or `select()`), never whole models with hidden or internal fields.
-
-### Optimisation
-
-- **No N+1 queries:** eager-load relations (`with()`, `withCount()`), and select only the columns you need.
-- **Index** every foreign key and every column used in `where`, `orderBy` or joins, in the same migration that adds it.
-- **Paginate** every list. Never `->get()` an unbounded table for display. Use `chunk()` / `lazy()` for batch processing.
-- **Queue slow work** (file processing, external API calls, emails, exports) instead of doing it in the request.
-- **Cache** expensive or repeated results (config lookups, AI responses, aggregates) and invalidate them on change.
-- **Frontend:** use TanStack Query caching (sensible `staleTime`, invalidate only the affected keys), lazy-load heavy pages and components, virtualise long lists, debounce search and autosave inputs, and avoid unnecessary re-renders.
-- **Don't add a dependency** for something a few lines of code or an existing package already does.
-
-## Organise by role, with `all` for shared code
-
-Every user role gets its own route file and its own folder in controllers, requests, pages and
-components. Anything used by more than one role goes in an `all` folder (or `all.php` for routes).
-
-```
-routes/
-├── web.php              # bootstraps only: requires the role route files below
-├── all.php              # routes shared by every authenticated role
-├── admin.php            # one file per role (admin.php, user.php, ...)
-└── ...
-app/Http/
-├── Controllers/
-│   ├── All/             # controllers shared across roles
-│   ├── Admin/           # one folder per role
-│   └── ...
-└── Requests/
-    ├── All/             # shared FormRequests
-    ├── Admin/           # one folder per role, mirroring Controllers/
-    └── ...
-resources/js/
-├── pages/
-│   ├── all/             # pages shared across roles
-│   ├── admin/           # one folder per role
-│   └── ...
-├── components/
-│   ├── ui/              # shadcn/ui primitives (starter kit, leave as is)
-│   ├── all/             # shared feature components
-│   ├── admin/           # one folder per role
-│   └── ...
-├── hooks/               # TanStack Query hooks that wrap the axios calls
-└── lib/
-    ├── utils.ts         # starter kit `cn()` helper, leave as is
-    └── utilities.ts     # common helper functions go here
-```
-
-- **Roles in this project:** `admin`, `encoder`, `user` (public viewer). Route files: `routes/admin.php`, `routes/encoder.php`, `routes/user.php`, `routes/all.php`. Admins pass every role check: they reach encoder features through the encoder route group's `role:encoder,admin` middleware, so encoder pages are not duplicated under `admin/`. See `PROJECT_SPEC.md` §1 "Roles".
-- Each role route file wraps its routes in that role's middleware group. `web.php` loads them with `require __DIR__.'/admin.php';` etc.
-- PHP folders and namespaces are PascalCase (`Controllers/Admin`, `App\Http\Controllers\Admin`). JS folders are lowercase (`pages/admin`).
-- When adding something new, decide first: is it used by one role (put it in that role's folder) or by several (put it in `all`)?
-
-## One component per file: sub-components go in `partials/`
-
-- A `.tsx` file holds exactly one component. Never define a second full component in the same file.
-- When a page or component needs sub-components, put each one in its own file in a `partials/` folder next to the parent, and import it.
-
-```
-pages/admin/
-├── project-workspace.tsx        # the page component only
-└── partials/
-    ├── transcript-list.tsx      # one sub-component per file
-    └── metadata-form.tsx
-components/all/
-├── video-player.tsx
-└── partials/
-    └── player-controls.tsx
-```
-
-- Tiny inline JSX inside a component (a `.map()` row, a conditional block) is fine. Once it has its own props, state or handlers, move it to `partials/`.
+## One component per file
+- A `.tsx` file holds one component. Sub-components go in their own files in a `partials/` folder next to the parent (e.g. `pages/admin/partials/metadata-form.tsx`).
+- Tiny inline JSX (a `.map()` row, a conditional) is fine; once it has its own props, state or handlers, move it to `partials/`.
 
 ## Validation: always a FormRequest
+- FormRequests live in `app/Http/Requests/{Role}/` (or `All/`), created with `php artisan make:request Admin/StoreSomethingRequest`. Controllers type-hint them and use `$request->validated()`; no inline `$request->validate()`.
 
-- All input validation lives in FormRequest classes under `app/Http/Requests/{Role}/` (or `All/`). Create them with `php artisan make:request Admin/StoreSomethingRequest`.
-- Controllers type-hint the FormRequest and use `$request->validated()`. No inline `$request->validate()` in controllers.
-
-## Frontend data fetching: TanStack Query + axios in hooks
-
-- Server calls from React go through axios, wrapped in TanStack Query hooks (`useQuery` / `useMutation`) in `resources/js/hooks/`. Components and pages call the hooks, never axios directly.
-- Name hooks after what they do, e.g. `useProjects`, `useUpdateSegment`.
-- Build request URLs with Wayfinder (`@/actions/...` / `@/routes/...`, e.g. `store.url()`) and pass them to axios. Do not hardcode URL strings.
-- After a mutation, invalidate the related query keys so the UI refreshes.
-- Inertia v3 no longer ships axios, so `axios` and `@tanstack/react-query` must be installed explicitly (see `package.json`).
+## Frontend data fetching
+- React calls the server only through TanStack Query hooks (`useQuery` / `useMutation`) in `resources/js/hooks/`, named for what they do (`useProjects`, `useUpdateSegment`). Components never call axios directly.
+- Hooks use the shared axios instance and Wayfinder URLs (`@/actions/...`, `@/routes/...`, e.g. `store.url()`); never hardcode URLs. Invalidate related query keys after a mutation.
+- Inertia v3 doesn't ship axios: `axios` and `@tanstack/react-query` are explicit dependencies.
 
 ## Shared helpers
+- Reusable non-React helpers (formatting, parsing, time) go in `resources/js/lib/utilities.ts`. Check it before writing a new one.
 
-- Reusable, non-React helper functions (formatting, parsing, time/duration helpers, etc.) go in `resources/js/lib/utilities.ts`. Check it before writing a new helper.
+## Local setup
+- Laravel runs on the host with `composer run dev`; Docker runs Redis and the Python AI service (`docker compose up -d`). Details in `README.md`, reasons in `DECISIONS.md`.
 
 <laravel-boost-guidelines>
 === foundation rules ===

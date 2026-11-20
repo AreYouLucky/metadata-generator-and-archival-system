@@ -7,9 +7,10 @@ analyses them with AI, and produces editable metadata (titles, descriptions, tag
 quotes) plus a full archival record with checksums. An admin approves each record, and approved
 videos appear in a public catalogue that anyone can browse by date, event and category.
 
-> **Status:** planning complete, build not started. This repository currently contains the
-> Laravel 13 React starter kit. The full design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is
-> built phase by phase (see [Roadmap](#roadmap)).
+> **Status:** Phase 0 (scaffold) done: the Docker stack, the database schema, signed
+> Laravel ↔ Python calls, live updates and the welcome, login and registration pages. The full
+> design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built phase by phase (see
+> [Roadmap](#roadmap)).
 
 ---
 
@@ -87,27 +88,103 @@ videos appear in a public catalogue that anyone can browse by date, event and ca
 
 ## Getting started
 
-### Right now (starter kit only)
+Laravel runs directly on your machine with `composer run dev`. Docker runs only what can't run on
+Windows: **Redis** (queues, cache, Celery broker) and the **Python AI service** (API and worker).
 
-Requirements: PHP 8.3+, Composer, Node.js 22+.
+Requirements: PHP 8.3+ with Composer (for example XAMPP), Node.js 22+, PostgreSQL, and Docker
+Desktop.
+
+### First-time setup
+
+1. Create the database and its owner in PostgreSQL:
+   ```sql
+   CREATE USER mgas WITH PASSWORD 'choose-a-password';
+   CREATE DATABASE mgas OWNER mgas;
+   ```
+2. Install and configure:
+   ```bash
+   composer install
+   npm install
+   cp .env.example .env    # fill in DB_*, INTERNAL_SHARED_SECRET and the REVERB_* keys
+   php artisan key:generate
+   ```
+3. Start Docker Desktop, then build and start Redis and the AI service:
+   ```bash
+   docker compose up -d --build
+   ```
+4. Create the tables and seed data:
+   ```bash
+   php artisan migrate --seed
+   ```
+
+### Every day
 
 ```bash
-composer run setup   # installs dependencies, creates .env, generates the app key, migrates, builds assets
-composer run dev     # starts the Laravel server, queue worker and Vite
+docker compose up -d     # Redis + AI service (if they aren't already running)
+composer run dev         # Laravel, queue worker, Reverb, scheduler and Vite
 ```
 
-The app runs at `http://localhost:8000` using SQLite.
+Open `http://localhost:8000`. Stop with Ctrl+C. `docker compose stop` stops the containers.
 
-### After Phase 0 (planned)
+If you edit `.env`, restart `composer run dev`. Its processes keep the values they started
+with.
 
-The whole stack (Laravel, Vite, Horizon, Reverb, scheduler, PostgreSQL, Redis, the Python API and
-worker, optional MinIO) will start with:
+`composer run dev` starts:
 
-```bash
-docker compose up
-```
+| Process     | Command                                    | Notes                                                    |
+| ----------- | ------------------------------------------ | -------------------------------------------------------- |
+| `server`    | `php artisan serve`                        | `http://localhost:8000`                                  |
+| `queue`     | `php artisan queue:listen` (Windows)       | Horizon replaces it on Linux/macOS, where `pcntl` exists |
+| `reverb`    | `php artisan reverb:start`                 | WebSockets on `REVERB_SERVER_PORT` (8081 here, because XAMPP Apache uses 8080) |
+| `scheduler` | `php artisan schedule:work`                |                                                          |
+| `vite`      | `npm run dev`                              |                                                          |
 
-These instructions will be updated when Phase 0 is done.
+### Accounts
+
+The seeders load all Philippine regions, provinces, cities and barangays, the starter genres and
+video types, and these accounts:
+
+| Account               | Role    | Password                                   |
+| --------------------- | ------- | ------------------------------------------ |
+| `ADMIN_EMAIL` in .env | admin   | `ADMIN_PASSWORD`, or `password` when blank |
+| `encoder@example.com` | encoder | `password` (local and testing only)        |
+| `user@example.com`    | user    | `password` (local and testing only)        |
+
+Outside `local`/`testing`, `UserSeeder` creates only the admin and refuses to run without
+`ADMIN_PASSWORD`.
+
+> Never run `php artisan migrate:fresh`, `migrate:refresh`, `migrate:reset`, `migrate:rollback` or
+> `db:wipe`. Use `php artisan migrate` for new migrations.
+
+### Docker services
+
+| Service     | What it runs                                                                        | Host port        |
+| ----------- | ----------------------------------------------------------------------------------- | ---------------- |
+| `redis`     | Laravel queues (db 0), Celery broker (db 1) and results (db 2), Laravel cache (db 3) | `127.0.0.1:6379` |
+| `ai-api`    | FastAPI (`/health`, signed `/ping`)                                                 | `127.0.0.1:8001` |
+| `ai-worker` | Celery worker; calls Laravel back at `host.docker.internal:8000`                    | —                |
+
+Uploaded media are stored in `storage/app/media`, which is mounted into the AI containers at
+`/data/storage`. Optional profiles:
+- `--profile docker-laravel` runs Laravel in containers too (`web`, `horizon`, `reverb`,
+  `scheduler`). Set `LARAVEL_CALLBACK_BASE=http://web:8000`. It's slow when the project is on a
+  Windows drive.
+- `--profile docker-db` runs PostgreSQL 17 + pgvector on port 5433.
+- `--profile s3` runs MinIO.
+- For an NVIDIA GPU, add `-f docker-compose.gpu.yml`.
+
+### Check that everything is connected
+
+Log in as the admin and open **System status** in the sidebar (`/admin/system`):
+
+1. **AI service** shows *Reachable*: Laravel called the Python `/health` endpoint with a signed
+   request.
+2. **Broadcast from Laravel** adds a ping to the list: queue → Reverb → your browser.
+3. **Round trip through the AI service**: Laravel → signed `/ping` → Celery worker → signed
+   callback to `/internal/ping` → queue → Reverb → your browser.
+
+If a ping never arrives, check the `queue` and `reverb` output of `composer run dev` and
+`docker compose logs ai-worker`.
 
 ## Roadmap
 
@@ -127,10 +204,16 @@ Each phase ends with passing tests, an updated README, and sign-off before the n
 ## Testing and code quality
 
 ```bash
-composer test        # Pint style check, PHPStan, and the PHP test suite
+composer test        # Pint style check, PHPStan, and the PHP test suite (SQLite in memory)
 npm run check        # frontend lint and format check
 npm run types:check  # TypeScript type check
+
+docker compose exec ai-api pytest        # Python tests
+docker compose exec ai-api ruff check .  # Python lint (and: mypy app)
 ```
+
+Both test suites check the same fixed HMAC signature, so a change to the signing scheme on one
+side fails the other side's tests.
 
 ## Project documents
 
@@ -139,7 +222,7 @@ npm run types:check  # TypeScript type check
 - [AGENTS.md](AGENTS.md) — coding conventions for anyone (human or AI) working in the repo:
   role-based folders, one component per file, FormRequest validation, TanStack Query hooks,
   security and performance rules.
-- `DECISIONS.md` — will record any deviation from the spec (created in Phase 0).
+- [DECISIONS.md](DECISIONS.md) — choices made during the build and any deviation from the spec.
 
 ## Security and privacy
 

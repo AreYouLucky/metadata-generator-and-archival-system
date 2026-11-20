@@ -38,6 +38,16 @@ return [
             'report' => false,
         ],
 
+        // Private video storage shared with the AI service (same path in every
+        // container). Files are served only through authorised controllers.
+        'media' => [
+            'driver' => 'local',
+            'root' => env('MEDIA_ROOT', storage_path('app/media')),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

@@ -1,4 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
+import { Info } from 'lucide-react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -16,7 +17,7 @@ type Props = {
 export default function Register({ passwordRules }: Props) {
     return (
         <>
-            <Head title="Register" />
+            <Head title="Create account" />
             <Form
                 {...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
@@ -25,9 +26,9 @@ export default function Register({ passwordRules }: Props) {
             >
                 {({ processing, errors }) => (
                     <>
-                        <div className="grid gap-6">
+                        <div className="grid gap-5">
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                                <Label htmlFor="name">Full name</Label>
                                 <Input
                                     id="name"
                                     type="text"
@@ -36,12 +37,9 @@ export default function Register({ passwordRules }: Props) {
                                     tabIndex={1}
                                     autoComplete="name"
                                     name="name"
-                                    placeholder="Full name"
+                                    placeholder="Juan dela Cruz"
                                 />
-                                <InputError
-                                    message={errors.name}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.name} />
                             </div>
 
                             <div className="grid gap-2">
@@ -53,7 +51,7 @@ export default function Register({ passwordRules }: Props) {
                                     tabIndex={2}
                                     autoComplete="email"
                                     name="email"
-                                    placeholder="email@example.com"
+                                    placeholder="you@example.com"
                                 />
                                 <InputError message={errors.email} />
                             </div>
@@ -66,7 +64,7 @@ export default function Register({ passwordRules }: Props) {
                                     tabIndex={3}
                                     autoComplete="new-password"
                                     name="password"
-                                    placeholder="Password"
+                                    placeholder="Choose a password"
                                     passwordrules={passwordRules}
                                 />
                                 <InputError message={errors.password} />
@@ -82,7 +80,7 @@ export default function Register({ passwordRules }: Props) {
                                     tabIndex={4}
                                     autoComplete="new-password"
                                     name="password_confirmation"
-                                    placeholder="Confirm password"
+                                    placeholder="Type it again"
                                     passwordrules={passwordRules}
                                 />
                                 <InputError
@@ -90,9 +88,17 @@ export default function Register({ passwordRules }: Props) {
                                 />
                             </div>
 
+                            <p className="flex gap-2.5 rounded-lg bg-muted px-3 py-2.5 text-xs text-muted-foreground">
+                                <Info className="mt-px size-4 shrink-0" />
+                                This creates a viewer account for browsing the
+                                public catalogue. Encoder and admin accounts are
+                                set up by an administrator.
+                            </p>
+
                             <Button
                                 type="submit"
-                                className="mt-2 w-full"
+                                size="lg"
+                                className="w-full"
                                 tabIndex={5}
                                 data-test="register-user-button"
                             >
@@ -101,12 +107,12 @@ export default function Register({ passwordRules }: Props) {
                             </Button>
                         </div>
 
-                        <div className="text-center text-sm text-muted-foreground">
+                        <p className="text-center text-sm text-muted-foreground">
                             Already have an account?{' '}
                             <TextLink href={login()} tabIndex={6}>
                                 Log in
                             </TextLink>
-                        </div>
+                        </p>
                     </>
                 )}
             </Form>
@@ -115,6 +121,6 @@ export default function Register({ passwordRules }: Props) {
 }
 
 Register.layout = {
-    title: 'Create an account',
-    description: 'Enter your details below to create your account',
+    title: 'Create your account',
+    description: 'Sign up to browse the published recordings.',
 };

@@ -32,5 +32,10 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="AI_SERVICE_URL" value="http://ai-api.test"/>
+        <env name="INTERNAL_SHARED_SECRET" value="test-secret"/>
+        <env name="ADMIN_EMAIL" value="admin@example.com"/>
+        <env name="ADMIN_PASSWORD" value=""/>
+        <env name="ALLOW_PUBLIC_REGISTRATION" value="true"/>
     </php>
 </phpunit>

@@ -51,4 +51,42 @@ return [
 
     'allow_public_registration' => (bool) env('ALLOW_PUBLIC_REGISTRATION', true),
 
+    /*
+    |--------------------------------------------------------------------------
+    | AI service and signed internal calls
+    |--------------------------------------------------------------------------
+    |
+    | Every request between Laravel and the Python service, in both directions,
+    | carries `X-Timestamp` and `X-Signature: sha256=HMAC(secret, ts.body)`.
+    | Requests older (or further in the future) than the max age are rejected,
+    | and each signature is accepted only once inside that window.
+    |
+    */
+
+    'ai_service' => [
+        'url' => rtrim((string) env('AI_SERVICE_URL', 'http://ai-api:8000'), '/'),
+        'timeout_seconds' => (int) env('AI_SERVICE_TIMEOUT', 10),
+    ],
+
+    'internal' => [
+        'shared_secret' => env('INTERNAL_SHARED_SECRET'),
+        'signature_max_age_seconds' => (int) env('INTERNAL_SIGNATURE_MAX_AGE', 300),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | First admin account (UserSeeder)
+    |--------------------------------------------------------------------------
+    |
+    | Outside local/testing the seeder refuses to run without ADMIN_PASSWORD,
+    | so a production database never gets a known default password.
+    |
+    */
+
+    'admin' => [
+        'name' => env('ADMIN_NAME', 'System Administrator'),
+        'email' => env('ADMIN_EMAIL', 'admin@example.com'),
+        'password' => env('ADMIN_PASSWORD'),
+    ],
+
 ];

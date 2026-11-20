@@ -247,7 +247,7 @@ System packages in the Python image: `ffmpeg`, `libmediainfo0v5` (or distro equi
 | `reverb`    | `php artisan reverb:start`                                                 |
 | `scheduler` | `php artisan schedule:work`                                                |
 | `postgres`  | `pgvector/pgvector` image                                                  |
-| `redis`     | Redis (Laravel queues = db 0, Celery broker = db 1, Celery results = db 2) |
+| `redis`     | Redis (Laravel queues = db 0, Celery broker = db 1, Celery results = db 2, Laravel cache = db 3) |
 | `ai-api`    | `uvicorn app.main:app` (FastAPI)                                           |
 | `ai-worker` | `celery -A app.worker worker`                                              |
 | `minio`     | Optional S3-compatible storage for prod-like dev                           |

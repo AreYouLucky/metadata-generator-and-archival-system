@@ -161,7 +161,8 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Public sign-up creates `user` (viewer) accounts only; admins create encoders.
+        ...((bool) env('ALLOW_PUBLIC_REGISTRATION', true) ? [Features::registration()] : []),
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([
