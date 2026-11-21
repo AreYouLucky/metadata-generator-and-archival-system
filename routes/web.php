@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
-Route::get('/', fn () => Inertia::render('welcome', [
+Route::get('/', fn () => Inertia::render('public/welcome-page/welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ]))->name('home');
 

@@ -14,7 +14,7 @@ class SystemStatusController extends Controller
      */
     public function __invoke(): Response
     {
-        return Inertia::render('admin/system-status', [
+        return Inertia::render('admin/system-status-page/system-status', [
             'horizonUrl' => url((string) config('horizon.path')),
         ]);
     }

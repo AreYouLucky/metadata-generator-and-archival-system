@@ -1,4 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
+import { ArrowLeft } from 'lucide-react';
+import AppearanceToggle from '@/components/all/appearance-toggle';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { home } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
@@ -15,30 +17,51 @@ export default function AuthSplitLayout({
         <div className="grid min-h-svh bg-background lg:grid-cols-[1.1fr_1fr]">
             <AuthShowcase />
 
-            <div className="flex flex-col px-4 py-8 sm:px-8">
-                <Link
-                    href={home()}
-                    className="flex items-center gap-2.5 font-semibold lg:hidden"
-                >
-                    <span className="flex size-8 items-center justify-center rounded-md bg-brand text-brand-foreground">
-                        <AppLogoIcon className="size-5 fill-current" />
-                    </span>
-                    <span className="truncate text-sm">{name}</span>
-                </Link>
+            <div className="relative flex flex-col overflow-hidden px-4 py-6 sm:px-10 lg:p-10">
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute -top-40 -right-40 size-96 rounded-full bg-brand/10 blur-3xl"
+                />
 
-                <div className="flex flex-1 items-center justify-center py-10">
-                    <div className="w-full max-w-sm space-y-8">
+                <div className="relative flex items-center justify-between gap-4">
+                    <Link
+                        href={home()}
+                        className="flex min-w-0 items-center gap-2.5 font-semibold lg:hidden"
+                    >
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-brand text-brand-foreground">
+                            <AppLogoIcon className="size-5 fill-current" />
+                        </span>
+                        <span className="truncate text-sm">{name}</span>
+                    </Link>
+                    <div className="ml-auto flex items-center gap-2">
+                        <Link
+                            href={home()}
+                            className="group flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
+                            Back to home
+                        </Link>
+                        <AppearanceToggle />
+                    </div>
+                </div>
+
+                <div className="relative flex flex-1 items-center justify-center py-10">
+                    <div className="w-full max-w-md animate-in space-y-8 duration-700 fill-mode-both fade-in slide-in-from-bottom-4">
                         <div className="space-y-2">
-                            <h1 className="text-2xl font-semibold tracking-tight">
+                            <h1 className="text-3xl font-semibold tracking-tight">
                                 {title}
                             </h1>
-                            <p className="text-sm text-balance text-muted-foreground">
+                            <p className="text-base text-balance text-muted-foreground">
                                 {description}
                             </p>
                         </div>
                         {children}
                     </div>
                 </div>
+
+                <p className="relative text-center text-xs text-muted-foreground">
+                    Recordings are published only after review.
+                </p>
             </div>
         </div>
     );

@@ -46,6 +46,7 @@ export default function Login({
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email address</Label>
                                 <Input
+                                    className="h-11 px-3.5 md:text-base"
                                     id="email"
                                     type="email"
                                     name="email"
@@ -72,6 +73,7 @@ export default function Login({
                                     )}
                                 </div>
                                 <PasswordInput
+                                    className="h-11 pl-3.5 md:text-base"
                                     id="password"
                                     name="password"
                                     required
@@ -99,7 +101,7 @@ export default function Login({
                             <Button
                                 type="submit"
                                 size="lg"
-                                className="mt-2 w-full"
+                                className="mt-2 h-11 w-full text-base"
                                 tabIndex={4}
                                 disabled={processing}
                                 data-test="login-button"

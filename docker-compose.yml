@@ -20,151 +20,161 @@
 name: mgas
 
 x-laravel: &laravel
-  build:
-    context: .
-    dockerfile: docker/php/Dockerfile
-  image: mgas-php:dev
-  profiles: ["docker-laravel"]
-  restart: unless-stopped
-  # Container values override .env (Laravel never overwrites existing env vars).
-  environment: &laravel-env
-    DB_CONNECTION: pgsql
-    DB_HOST: ${DOCKER_DB_HOST:-host.docker.internal}
-    DB_PORT: ${DOCKER_DB_PORT:-5432}
-    REDIS_CLIENT: phpredis
-    REDIS_HOST: redis
-    REDIS_DB: "0"
-    REDIS_CACHE_DB: "3"
-    QUEUE_CONNECTION: redis
-    CACHE_STORE: redis
-    BROADCAST_CONNECTION: reverb
-    REVERB_HOST: reverb
-    REVERB_PORT: "8080"
-    REVERB_SCHEME: http
-    AI_SERVICE_URL: http://ai-api:8000
-    MEDIA_ROOT: /data/storage
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
-  volumes:
-    - .:/var/www/html
-    - ./storage/app/media:/data/storage
-    - ./docker/php/php.ini:/usr/local/etc/php/conf.d/zz-dev.ini:ro
-  depends_on:
-    redis:
-      condition: service_healthy
+    build:
+        context: .
+        dockerfile: docker/php/Dockerfile
+    image: mgas-php:dev
+    profiles: ['docker-laravel']
+    restart: unless-stopped
+    # Container values override .env (Laravel never overwrites existing env vars).
+    environment: &laravel-env
+        DB_CONNECTION: pgsql
+        DB_HOST: ${DOCKER_DB_HOST:-host.docker.internal}
+        DB_PORT: ${DOCKER_DB_PORT:-5432}
+        REDIS_CLIENT: phpredis
+        REDIS_HOST: redis
+        REDIS_DB: '0'
+        REDIS_CACHE_DB: '3'
+        QUEUE_CONNECTION: redis
+        CACHE_STORE: redis
+        BROADCAST_CONNECTION: reverb
+        REVERB_HOST: reverb
+        REVERB_PORT: '8080'
+        REVERB_SCHEME: http
+        AI_SERVICE_URL: http://ai-api:8000
+        MEDIA_ROOT: /data/storage
+    extra_hosts:
+        - 'host.docker.internal:host-gateway'
+    volumes:
+        - .:/var/www/html
+        - ./storage/app/media:/data/storage
+        - ./docker/php/php.ini:/usr/local/etc/php/conf.d/zz-dev.ini:ro
+    depends_on:
+        redis:
+            condition: service_healthy
 
 x-ai: &ai
-  build: ./ai-service
-  image: mgas-ai:dev
-  restart: unless-stopped
-  env_file:
-    - path: ./ai-service/.env
-      required: false
-  environment:
-    INTERNAL_SHARED_SECRET: ${INTERNAL_SHARED_SECRET:?Set INTERNAL_SHARED_SECRET in .env}
-    LARAVEL_CALLBACK_BASE: ${LARAVEL_CALLBACK_BASE:-http://host.docker.internal:8000}
-    REDIS_URL: redis://redis:6379/1
-    CELERY_RESULT_URL: redis://redis:6379/2
-    STORAGE_ROOT: /data/storage
-    REPLAY_GUARD: redis
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
-  volumes:
-    - ./ai-service/app:/srv/app
-    - ./ai-service/tests:/srv/tests
-    - ./storage/app/media:/data/storage
-  depends_on:
-    redis:
-      condition: service_healthy
+    build: ./ai-service
+    image: mgas-ai:dev
+    restart: unless-stopped
+    env_file:
+        - path: ./ai-service/.env
+          required: false
+    environment:
+        INTERNAL_SHARED_SECRET: ${INTERNAL_SHARED_SECRET:?Set INTERNAL_SHARED_SECRET in .env}
+        LARAVEL_CALLBACK_BASE: ${LARAVEL_CALLBACK_BASE:-http://host.docker.internal:8000}
+        REDIS_URL: redis://redis:6379/1
+        CELERY_RESULT_URL: redis://redis:6379/2
+        STORAGE_ROOT: /data/storage
+        REPLAY_GUARD: redis
+    extra_hosts:
+        - 'host.docker.internal:host-gateway'
+    volumes:
+        - ./ai-service/app:/srv/app
+        - ./ai-service/tests:/srv/tests
+        - ./storage/app/media:/data/storage
+    depends_on:
+        redis:
+            condition: service_healthy
 
 services:
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
+    redis:
+        image: redis:7-alpine
+        restart: unless-stopped
+        command: redis-server --appendonly yes
+        ports:
+            - '127.0.0.1:6379:6379'
+        volumes:
+            - redisdata:/data
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 5s
+            timeout: 3s
+            retries: 20
 
-  ai-api:
-    <<: *ai
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    ports:
-      - "127.0.0.1:8001:8000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+    ai-api:
+        <<: *ai
+        command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        ports:
+            - '127.0.0.1:8001:8000'
+        healthcheck:
+            test:
+                [
+                    'CMD',
+                    'python',
+                    '-c',
+                    "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 10
 
-  ai-worker:
-    <<: *ai
-    command: celery -A app.worker worker --loglevel=info --concurrency=2
+    ai-worker:
+        <<: *ai
+        command: celery -A app.worker worker --loglevel=info --concurrency=2
 
-  web:
-    <<: *laravel
-    # --no-reload keeps the container's environment (without it, serve re-reads
-    # .env and DB_HOST/REDIS_HOST point at 127.0.0.1) and enables the workers.
-    command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
-    environment:
-      <<: *laravel-env
-      PHP_CLI_SERVER_WORKERS: "4"
-    ports:
-      - "8000:8000"
+    web:
+        <<: *laravel
+        # --no-reload keeps the container's environment (without it, serve re-reads
+        # .env and DB_HOST/REDIS_HOST point at 127.0.0.1) and enables the workers.
+        command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
+        environment:
+            <<: *laravel-env
+            PHP_CLI_SERVER_WORKERS: '4'
+        ports:
+            - '8000:8000'
 
-  horizon:
-    <<: *laravel
-    command: php artisan horizon
+    horizon:
+        <<: *laravel
+        command: php artisan horizon
 
-  reverb:
-    <<: *laravel
-    command: php artisan reverb:start --host=0.0.0.0 --port=8080
-    ports:
-      # Browsers connect on the host port (VITE_REVERB_PORT); containers use reverb:8080.
-      - "${REVERB_HOST_PORT:-8080}:8080"
+    reverb:
+        <<: *laravel
+        command: php artisan reverb:start --host=0.0.0.0 --port=8080
+        ports:
+            # Browsers connect on the host port (VITE_REVERB_PORT); containers use reverb:8080.
+            - '${REVERB_HOST_PORT:-8080}:8080'
 
-  scheduler:
-    <<: *laravel
-    command: php artisan schedule:work
+    scheduler:
+        <<: *laravel
+        command: php artisan schedule:work
 
-  postgres:
-    image: pgvector/pgvector:pg17
-    profiles: ["docker-db"]
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DB_DATABASE:-mgas}
-      POSTGRES_USER: ${DB_USERNAME:-mgas}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-    ports:
-      - "127.0.0.1:5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      interval: 5s
-      timeout: 5s
-      retries: 20
+    postgres:
+        image: pgvector/pgvector:pg17
+        profiles: ['docker-db']
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DB_DATABASE:-mgas}
+            POSTGRES_USER: ${DB_USERNAME:-mgas}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+        ports:
+            - '127.0.0.1:5433:5432'
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"',
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 20
 
-  minio:
-    image: minio/minio
-    profiles: ["s3"]
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-dev-password}
-    ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
-    volumes:
-      - miniodata:/data
+    minio:
+        image: minio/minio
+        profiles: ['s3']
+        command: server /data --console-address ":9001"
+        environment:
+            MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+            MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-dev-password}
+        ports:
+            - '127.0.0.1:9000:9000'
+            - '127.0.0.1:9001:9001'
+        volumes:
+            - miniodata:/data
 
 volumes:
-  pgdata:
-  redisdata:
-  miniodata:
+    pgdata:
+    redisdata:
+    miniodata:

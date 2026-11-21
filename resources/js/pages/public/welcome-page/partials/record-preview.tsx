@@ -1,4 +1,11 @@
-import { CalendarDays, Clock, MapPin, Play, ShieldCheck } from 'lucide-react';
+import {
+    CalendarDays,
+    Clock,
+    Languages,
+    MapPin,
+    Play,
+    ShieldCheck,
+} from 'lucide-react';
 
 const TRANSCRIPT = [
     {
@@ -22,11 +29,12 @@ const TAGS = ['science week', 'opening ceremony', 'innovation', 'Cebu'];
 export default function RecordPreview() {
     return (
         <div className="relative mx-auto w-full max-w-lg" aria-hidden>
-            <div className="absolute -inset-4 rounded-3xl bg-brand/10 blur-2xl" />
+            <div className="absolute -inset-4 rounded-3xl bg-brand/25 blur-2xl" />
 
-            <div className="relative overflow-hidden rounded-2xl border bg-card shadow-xl shadow-black/5">
+            <div className="relative overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-2xl shadow-black/30">
                 <div className="relative aspect-video bg-ink">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_35%,oklch(0.55_0.1_205/0.45),transparent_55%),radial-gradient(circle_at_75%_70%,oklch(0.6_0.12_60/0.3),transparent_50%)]" />
+                    <div className="absolute inset-x-0 top-0 h-1/4 animate-scan bg-linear-to-b from-transparent via-brand-glow/20 to-transparent" />
                     <div className="absolute inset-x-0 top-0 flex justify-between p-3 font-mono text-[11px] text-white/80">
                         <span className="flex items-center gap-1.5">
                             <span className="size-1.5 rounded-full bg-red-500" />
@@ -35,12 +43,13 @@ export default function RecordPreview() {
                         <span>00:12:47:08</span>
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="flex size-12 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/30 backdrop-blur">
+                        <span className="relative flex size-12 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/30 backdrop-blur">
+                            <span className="absolute inset-0 animate-ping rounded-full bg-white/20 [animation-duration:2.5s]" />
                             <Play className="size-5 translate-x-0.5 fill-current" />
                         </span>
                     </div>
                     <div className="absolute inset-x-3 bottom-3 h-1 overflow-hidden rounded-full bg-white/20">
-                        <div className="h-full w-[18%] rounded-full bg-brand" />
+                        <div className="h-full animate-progress rounded-full bg-brand-glow [animation-duration:12s]" />
                     </div>
                 </div>
 
@@ -103,15 +112,20 @@ export default function RecordPreview() {
                 </div>
             </div>
 
-            <div className="absolute -bottom-5 -left-3 hidden w-52 rounded-xl border bg-card p-3 shadow-lg sm:block">
+            <div className="absolute -top-4 -right-3 hidden animate-float items-center gap-2 rounded-xl border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-lg sm:flex">
+                <span className="flex size-6 items-center justify-center rounded-md bg-brand-muted text-brand">
+                    <Languages className="size-3.5" />
+                </span>
+                Transcribed · EN / FIL
+            </div>
+
+            <div className="absolute -bottom-5 -left-3 hidden w-52 animate-float rounded-xl border bg-card p-3 text-foreground shadow-lg [animation-delay:-3s] sm:block">
                 <div className="flex items-center justify-between text-xs">
                     <span className="font-medium">Generating chapters</span>
-                    <span className="text-muted-foreground tabular-nums">
-                        72%
-                    </span>
+                    <span className="flex size-2 animate-pulse rounded-full bg-brand" />
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full w-[72%] animate-pulse rounded-full bg-brand" />
+                    <div className="h-full animate-progress rounded-full bg-brand" />
                 </div>
             </div>
         </div>

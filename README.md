@@ -97,25 +97,25 @@ Desktop.
 ### First-time setup
 
 1. Create the database and its owner in PostgreSQL:
-   ```sql
-   CREATE USER mgas WITH PASSWORD 'choose-a-password';
-   CREATE DATABASE mgas OWNER mgas;
-   ```
+    ```sql
+    CREATE USER mgas WITH PASSWORD 'choose-a-password';
+    CREATE DATABASE mgas OWNER mgas;
+    ```
 2. Install and configure:
-   ```bash
-   composer install
-   npm install
-   cp .env.example .env    # fill in DB_*, INTERNAL_SHARED_SECRET and the REVERB_* keys
-   php artisan key:generate
-   ```
+    ```bash
+    composer install
+    npm install
+    cp .env.example .env    # fill in DB_*, INTERNAL_SHARED_SECRET and the REVERB_* keys
+    php artisan key:generate
+    ```
 3. Start Docker Desktop, then build and start Redis and the AI service:
-   ```bash
-   docker compose up -d --build
-   ```
+    ```bash
+    docker compose up -d --build
+    ```
 4. Create the tables and seed data:
-   ```bash
-   php artisan migrate --seed
-   ```
+    ```bash
+    php artisan migrate --seed
+    ```
 
 ### Every day
 
@@ -131,13 +131,13 @@ with.
 
 `composer run dev` starts:
 
-| Process     | Command                                    | Notes                                                    |
-| ----------- | ------------------------------------------ | -------------------------------------------------------- |
-| `server`    | `php artisan serve`                        | `http://localhost:8000`                                  |
-| `queue`     | `php artisan queue:listen` (Windows)       | Horizon replaces it on Linux/macOS, where `pcntl` exists |
-| `reverb`    | `php artisan reverb:start`                 | WebSockets on `REVERB_SERVER_PORT` (8081 here, because XAMPP Apache uses 8080) |
-| `scheduler` | `php artisan schedule:work`                |                                                          |
-| `vite`      | `npm run dev`                              |                                                          |
+| Process     | Command                              | Notes                                                                          |
+| ----------- | ------------------------------------ | ------------------------------------------------------------------------------ |
+| `server`    | `php artisan serve`                  | `http://localhost:8000`                                                        |
+| `queue`     | `php artisan queue:listen` (Windows) | Horizon replaces it on Linux/macOS, where `pcntl` exists                       |
+| `reverb`    | `php artisan reverb:start`           | WebSockets on `REVERB_SERVER_PORT` (8081 here, because XAMPP Apache uses 8080) |
+| `scheduler` | `php artisan schedule:work`          |                                                                                |
+| `vite`      | `npm run dev`                        |                                                                                |
 
 ### Accounts
 
@@ -158,14 +158,15 @@ Outside `local`/`testing`, `UserSeeder` creates only the admin and refuses to ru
 
 ### Docker services
 
-| Service     | What it runs                                                                        | Host port        |
-| ----------- | ----------------------------------------------------------------------------------- | ---------------- |
+| Service     | What it runs                                                                         | Host port        |
+| ----------- | ------------------------------------------------------------------------------------ | ---------------- |
 | `redis`     | Laravel queues (db 0), Celery broker (db 1) and results (db 2), Laravel cache (db 3) | `127.0.0.1:6379` |
-| `ai-api`    | FastAPI (`/health`, signed `/ping`)                                                 | `127.0.0.1:8001` |
-| `ai-worker` | Celery worker; calls Laravel back at `host.docker.internal:8000`                    | —                |
+| `ai-api`    | FastAPI (`/health`, signed `/ping`)                                                  | `127.0.0.1:8001` |
+| `ai-worker` | Celery worker; calls Laravel back at `host.docker.internal:8000`                     | —                |
 
 Uploaded media are stored in `storage/app/media`, which is mounted into the AI containers at
 `/data/storage`. Optional profiles:
+
 - `--profile docker-laravel` runs Laravel in containers too (`web`, `horizon`, `reverb`,
   `scheduler`). Set `LARAVEL_CALLBACK_BASE=http://web:8000`. It's slow when the project is on a
   Windows drive.
@@ -177,7 +178,7 @@ Uploaded media are stored in `storage/app/media`, which is mounted into the AI c
 
 Log in as the admin and open **System status** in the sidebar (`/admin/system`):
 
-1. **AI service** shows *Reachable*: Laravel called the Python `/health` endpoint with a signed
+1. **AI service** shows _Reachable_: Laravel called the Python `/health` endpoint with a signed
    request.
 2. **Broadcast from Laravel** adds a ping to the list: queue → Reverb → your browser.
 3. **Round trip through the AI service**: Laravel → signed `/ping` → Celery worker → signed

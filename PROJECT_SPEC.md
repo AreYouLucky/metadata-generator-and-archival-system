@@ -21,14 +21,14 @@ metadata (descriptive, technical, administrative/rights, preservation/provenance
 
 ### Terminology
 
-| Term | Meaning | Table |
-|---|---|---|
-| **Record** | One archived video and everything known about it. | `records` |
-| **Project** | An event or programme that groups records (e.g. a conference, a campaign). | `projects` |
-| **Project series** | A series or sub-event inside a project (e.g. one session, one episode run). | `project_series` |
-| **Record file** | One stored file of a record: master, mezzanine, proxy or access copy. | `record_files` |
-| **Work** | The reels or parts of one work; each part is its own record. | `works` |
-| **Agency / unit** | The producing agency and its production unit (division). | `production_agencies` |
+| Term               | Meaning                                                                     | Table                 |
+| ------------------ | --------------------------------------------------------------------------- | --------------------- |
+| **Record**         | One archived video and everything known about it.                           | `records`             |
+| **Project**        | An event or programme that groups records (e.g. a conference, a campaign).  | `projects`            |
+| **Project series** | A series or sub-event inside a project (e.g. one session, one episode run). | `project_series`      |
+| **Record file**    | One stored file of a record: master, mezzanine, proxy or access copy.       | `record_files`        |
+| **Work**           | The reels or parts of one work; each part is its own record.                | `works`               |
+| **Agency / unit**  | The producing agency and its production unit (division).                    | `production_agencies` |
 
 Core user flow:
 
@@ -51,11 +51,11 @@ Core user flow:
 
 ### Roles
 
-| Role | Who | Can do |
-|---|---|---|
-| `admin` | System managers | Everything an encoder can do, on **every** record, plus: manage users (create encoders and admins, change roles, deactivate), review and approve or reject submitted records, view usage and set limits, manage agencies and units, genres and video types. |
-| `encoder` | Staff who add content | Upload and process videos, edit transcripts and metadata, complete the archival record, create projects and series, submit records for approval. Sees and edits only the records they created. |
-| `user` | Public viewers | Browse, search and watch approved public records, organised by date, project (event), series, genre, video type, agency and region. No access to the workspace or to internal metadata. |
+| Role      | Who                   | Can do                                                                                                                                                                                                                                                      |
+| --------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `admin`   | System managers       | Everything an encoder can do, on **every** record, plus: manage users (create encoders and admins, change roles, deactivate), review and approve or reject submitted records, view usage and set limits, manage agencies and units, genres and video types. |
+| `encoder` | Staff who add content | Upload and process videos, edit transcripts and metadata, complete the archival record, create projects and series, submit records for approval. Sees and edits only the records they created.                                                              |
+| `user`    | Public viewers        | Browse, search and watch approved public records, organised by date, project (event), series, genre, video type, agency and region. No access to the workspace or to internal metadata.                                                                     |
 
 - Guests (not logged in) can also browse the public catalogue unless
   `PUBLIC_CATALOGUE_REQUIRES_LOGIN=true`. Public sign-up creates `user` accounts only; encoders and
@@ -78,20 +78,20 @@ Core user flow:
 
 ## 2. Tech stack
 
-| Layer              | Choice                                                                                                                     |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| Main app           | **Laravel 13** with the official **React starter kit** (Inertia + React + TypeScript + Tailwind + shadcn/ui)               |
-| Frontend           | React + TypeScript via **Inertia.js**, Tailwind CSS, shadcn/ui, lucide-react, TanStack Query + axios (see AGENTS.md)      |
-| Realtime           | **Laravel Reverb** (WebSockets) + **Laravel Echo** on the frontend                                                         |
-| Laravel queues     | **Redis** + **Laravel Horizon**                                                                                            |
-| Database           | **PostgreSQL** with the **pgvector** extension (Laravel's native `vector` column and `whereVectorSimilarTo`)               |
-| AI / media service | **Python 3.12+**, **FastAPI**, **Celery** (Redis broker)                                                                   |
-| Media tools        | **ffmpeg / ffprobe** (installed in the Python container)                                                                   |
-| File storage       | Shared volume in dev; S3-compatible (S3 / Cloudflare R2 / MinIO) in prod                                                   |
-| Auth               | Starter kit auth (Fortify) + **Laravel Sanctum** (public API tokens)                                                       |
-| Local dev          | **Docker Compose**                                                                                                         |
-| Tests              | PHPUnit (Laravel), pytest (Python), Vitest (optional, frontend)                                                            |
-| Lint/format        | Laravel Pint, PHPStan (level 7), ESLint + Prettier, ruff + mypy                                                            |
+| Layer              | Choice                                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Main app           | **Laravel 13** with the official **React starter kit** (Inertia + React + TypeScript + Tailwind + shadcn/ui)         |
+| Frontend           | React + TypeScript via **Inertia.js**, Tailwind CSS, shadcn/ui, lucide-react, TanStack Query + axios (see AGENTS.md) |
+| Realtime           | **Laravel Reverb** (WebSockets) + **Laravel Echo** on the frontend                                                   |
+| Laravel queues     | **Redis** + **Laravel Horizon**                                                                                      |
+| Database           | **PostgreSQL** with the **pgvector** extension (Laravel's native `vector` column and `whereVectorSimilarTo`)         |
+| AI / media service | **Python 3.12+**, **FastAPI**, **Celery** (Redis broker)                                                             |
+| Media tools        | **ffmpeg / ffprobe** (installed in the Python container)                                                             |
+| File storage       | Shared volume in dev; S3-compatible (S3 / Cloudflare R2 / MinIO) in prod                                             |
+| Auth               | Starter kit auth (Fortify) + **Laravel Sanctum** (public API tokens)                                                 |
+| Local dev          | **Docker Compose**                                                                                                   |
+| Tests              | PHPUnit (Laravel), pytest (Python), Vitest (optional, frontend)                                                      |
+| Lint/format        | Laravel Pint, PHPStan (level 7), ESLint + Prettier, ruff + mypy                                                      |
 
 ### Responsibility split
 
@@ -241,18 +241,18 @@ System packages in the Python image: `ffmpeg`, `libmediainfo0v5` (or distro equi
 
 ## 5. Docker Compose services
 
-| Service     | Purpose                                                                    |
-| ----------- | -------------------------------------------------------------------------- |
-| `web`       | Laravel (PHP-FPM + nginx, or `php artisan serve` in dev)                   |
-| `vite`      | Vite dev server (dev only)                                                 |
-| `horizon`   | `php artisan horizon`                                                      |
-| `reverb`    | `php artisan reverb:start`                                                 |
-| `scheduler` | `php artisan schedule:work`                                                |
-| `postgres`  | `pgvector/pgvector` image                                                  |
+| Service     | Purpose                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| `web`       | Laravel (PHP-FPM + nginx, or `php artisan serve` in dev)                                         |
+| `vite`      | Vite dev server (dev only)                                                                       |
+| `horizon`   | `php artisan horizon`                                                                            |
+| `reverb`    | `php artisan reverb:start`                                                                       |
+| `scheduler` | `php artisan schedule:work`                                                                      |
+| `postgres`  | `pgvector/pgvector` image                                                                        |
 | `redis`     | Redis (Laravel queues = db 0, Celery broker = db 1, Celery results = db 2, Laravel cache = db 3) |
-| `ai-api`    | `uvicorn app.main:app` (FastAPI)                                           |
-| `ai-worker` | `celery -A app.worker worker`                                              |
-| `minio`     | Optional S3-compatible storage for prod-like dev                           |
+| `ai-api`    | `uvicorn app.main:app` (FastAPI)                                                                 |
+| `ai-worker` | `celery -A app.worker worker`                                                                    |
+| `minio`     | Optional S3-compatible storage for prod-like dev                                                 |
 
 - `web`, `horizon`, `ai-api`, `ai-worker` all mount the **same storage volume** at the same
   path (e.g. `/data/storage`) so file paths can be passed between services.
@@ -275,21 +275,21 @@ chain of stages. Each stage:
 Laravel stores each stage's state in `record_stages`, stores results, and broadcasts
 `RecordProgressUpdated` / `RecordStageCompleted` on the private channel `records.{id}` via Reverb.
 
-| #   | Stage               | What it does                                                    | Depends on                           | Phase |
-| --- | ------------------- | --------------------------------------------------------------- | ------------------------------------ | ----- |
-| 1   | `probe`             | ffprobe + mediainfo → `record_technical_metadata` for the file (§11), plus container tags (creation time, GPS location, start timecode) | —                                    | 1     |
-| 2   | `checksum`          | MD5 + SHA-256 of the stored file in one streaming pass; compare with an expected checksum if the encoder supplied one | —                                    | 1     |
-| 3   | `extract_audio`     | ffmpeg → mono 16 kHz MP3 (~48 kbps)                             | probe                                | 1     |
-| 4   | `transcribe`        | Segments with timestamps + detected language → original `record_transcripts` | extract_audio                        | 1     |
-| 5   | `diarize`           | Speaker labels per segment (S1, S2…) → `record_speakers`        | transcribe                           | 6     |
+| #   | Stage               | What it does                                                                                                                                                                 | Depends on                           | Phase |
+| --- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ----- |
+| 1   | `probe`             | ffprobe + mediainfo → `record_technical_metadata` for the file (§11), plus container tags (creation time, GPS location, start timecode)                                      | —                                    | 1     |
+| 2   | `checksum`          | MD5 + SHA-256 of the stored file in one streaming pass; compare with an expected checksum if the encoder supplied one                                                        | —                                    | 1     |
+| 3   | `extract_audio`     | ffmpeg → mono 16 kHz MP3 (~48 kbps)                                                                                                                                          | probe                                | 1     |
+| 4   | `transcribe`        | Segments with timestamps + detected language → original `record_transcripts`                                                                                                 | extract_audio                        | 1     |
+| 5   | `diarize`           | Speaker labels per segment (S1, S2…) → `record_speakers`                                                                                                                     | transcribe                           | 6     |
 | 6   | `proxy`             | ffmpeg → browser-playable access copy (H.264/AAC MP4, ≤ `PROXY_MAX_HEIGHT`) when the master can't play in a browser; stored as a `proxy` record file, probed and checksummed | probe                                | 3     |
-| 7   | `scenes`            | Shot-change timestamps (PySceneDetect) → `record_scenes` with timecode in/out | probe                            | 5     |
-| 8   | `frames`            | Extract key frames (scene starts + every N seconds) → `record_frames` | probe, scenes                        | 5     |
-| 9   | `vision`            | Frame descriptions via vision LLM                               | frames                               | 5     |
-| 10  | `ocr`               | On-screen text per frame (EasyOCR)                              | frames                               | 5     |
-| 11  | `objects`           | Object labels + face **count** per frame (YOLO)                 | frames                               | 5     |
-| 12  | `embed`             | Chunk transcript (~30–60 s windows) → embeddings                | transcribe                           | 7     |
-| 13  | `generate_metadata` | LLM → `record_metadata` (titles, description, tags, chapters, etc.); from Phase 3 also suggested subjects, keywords and location | transcribe (+ vision/ocr if enabled) | 1     |
+| 7   | `scenes`            | Shot-change timestamps (PySceneDetect) → `record_scenes` with timecode in/out                                                                                                | probe                                | 5     |
+| 8   | `frames`            | Extract key frames (scene starts + every N seconds) → `record_frames`                                                                                                        | probe, scenes                        | 5     |
+| 9   | `vision`            | Frame descriptions via vision LLM                                                                                                                                            | frames                               | 5     |
+| 10  | `ocr`               | On-screen text per frame (EasyOCR)                                                                                                                                           | frames                               | 5     |
+| 11  | `objects`           | Object labels + face **count** per frame (YOLO)                                                                                                                              | frames                               | 5     |
+| 12  | `embed`             | Chunk transcript (~30–60 s windows) → embeddings                                                                                                                             | transcribe                           | 7     |
+| 13  | `generate_metadata` | LLM → `record_metadata` (titles, description, tags, chapters, etc.); from Phase 3 also suggested subjects, keywords and location                                             | transcribe (+ vision/ocr if enabled) | 1     |
 
 `probe` and `checksum` also run on every additional record file (mezzanine, proxy, clip), so each
 file has its own technical record and checksums.
@@ -341,21 +341,21 @@ All requests in both directions are signed:
 `X-Timestamp`. Reject requests older than 5 minutes. Laravel's `VerifyInternalSignature`
 middleware and Python's `security.py` implement the same scheme.
 
-| Method | Path                    | Body (summary)                                                                             | Returns                                                |
-| ------ | ----------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| GET    | `/health`               | —                                                                                          | `{status, version, gpu: bool}`                         |
-| POST   | `/jobs/process`         | `{record_id, record_file_id, video_path, options, callback_url}`                           | `{job_id}` (202)                                       |
-| POST   | `/jobs/{job_id}/cancel` | —                                                                                          | `{ok}`                                                 |
-| POST   | `/generate/metadata`    | `{record_id, transcript, language, preset, custom_prompt?, visual_context?, title_count}`  | `AiMetadata`                                           |
-| POST   | `/generate/titles`      | `{transcript_summary, preset, count, avoid: string[]}`                                     | `{titles: string[]}`                                   |
-| POST   | `/translate`            | `{segments, source_language, target_language}`                                             | `{segments}` (async job + callback for long ones)      |
-| POST   | `/embed`                | `{texts: string[]}`                                                                        | `{vectors: number[][]}`                                |
-| POST   | `/chat`                 | `{question, context_chunks: [{start,end,text}], history}`                                  | `{answer, citations: [{start,end}]}`                   |
-| POST   | `/clips`                | `{record_id, video_path, start, end, output_path}`                                         | `{job_id}` → callback                                  |
-| POST   | `/import-url`           | `{record_id, url, output_dir, callback_url}`                                               | `{job_id}` → callback with file path + source metadata |
-| POST   | `/frames/capture`       | `{video_path, time_sec, output_path}`                                                      | `{path}` (custom thumbnail at a timestamp)             |
-| POST   | `/jobs/ingest-file`     | `{record_id, record_file_id, path, role, expected_checksums?, callback_url}`               | `{job_id}` → callback with probe + checksums (+ proxy if needed) for an added file |
-| POST   | `/jobs/fixity`          | `{record_file_id, path, expected: {md5, sha256}, callback_url}`                            | `{job_id}` → callback with actual checksums + match result |
+| Method | Path                    | Body (summary)                                                                            | Returns                                                                            |
+| ------ | ----------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| GET    | `/health`               | —                                                                                         | `{status, version, gpu: bool}`                                                     |
+| POST   | `/jobs/process`         | `{record_id, record_file_id, video_path, options, callback_url}`                          | `{job_id}` (202)                                                                   |
+| POST   | `/jobs/{job_id}/cancel` | —                                                                                         | `{ok}`                                                                             |
+| POST   | `/generate/metadata`    | `{record_id, transcript, language, preset, custom_prompt?, visual_context?, title_count}` | `AiMetadata`                                                                       |
+| POST   | `/generate/titles`      | `{transcript_summary, preset, count, avoid: string[]}`                                    | `{titles: string[]}`                                                               |
+| POST   | `/translate`            | `{segments, source_language, target_language}`                                            | `{segments}` (async job + callback for long ones)                                  |
+| POST   | `/embed`                | `{texts: string[]}`                                                                       | `{vectors: number[][]}`                                                            |
+| POST   | `/chat`                 | `{question, context_chunks: [{start,end,text}], history}`                                 | `{answer, citations: [{start,end}]}`                                               |
+| POST   | `/clips`                | `{record_id, video_path, start, end, output_path}`                                        | `{job_id}` → callback                                                              |
+| POST   | `/import-url`           | `{record_id, url, output_dir, callback_url}`                                              | `{job_id}` → callback with file path + source metadata                             |
+| POST   | `/frames/capture`       | `{video_path, time_sec, output_path}`                                                     | `{path}` (custom thumbnail at a timestamp)                                         |
+| POST   | `/jobs/ingest-file`     | `{record_id, record_file_id, path, role, expected_checksums?, callback_url}`              | `{job_id}` → callback with probe + checksums (+ proxy if needed) for an added file |
+| POST   | `/jobs/fixity`          | `{record_file_id, path, expected: {md5, sha256}, callback_url}`                           | `{job_id}` → callback with actual checksums + match result                         |
 
 Chat flow (keeps Python DB-free): Laravel → `/embed` (question) → Laravel queries pgvector for
 top-k chunks → Laravel → `/chat` with those chunks → answer with timestamp citations.
@@ -367,7 +367,7 @@ top-k chunks → Laravel → `/chat` with those chunks → answer with timestamp
 ### Data model (migrations)
 
 All tables below already exist as migrations; later phases build features on them. Tables marked
-*(added in Phase N)* are created in that phase. Records, projects, series, files, works and
+_(added in Phase N)_ are created in that phase. Records, projects, series, files, works and
 attachments use ULID primary keys (they appear in URLs); everything else uses big integers.
 
 **People, lookups and locations**
@@ -394,26 +394,26 @@ attachments use ULID primary keys (they appear in URLs); everything else uses bi
 **Records**
 
 - `records` — one archived video:
-  - Ownership and grouping: `created_by` (encoder), `accession_number?` (unique),
-    `project_id?`, `project_series_id?`, `work_id?`, `part_number?`, `part_label?`, `agency_id?`,
-    `division_id?` (a production unit).
-  - Descriptive: `title`, `alternative_title?`, `description?`, `genre_id?`, `video_type_id?`,
-    `language?`, `language_confidence?`, `country_origin?`, `date_recorded?`,
-    `date_recorded_precision?` (`day|month|year|circa`), `date_recorded_source?`, `date_published?`,
-    `season_number?`, `episode_number?`.
-  - Location: `location?` (free text), `region_id?`, `prov_id?`, `city_id?`, `brgy_id?`,
-    `latitude?`, `longitude?`, `location_source?`.
-  - Thumbnail: `thumbnail_path?` (uploaded image) or `thumbnail_frame_id?` (one of its frames).
-  - Archival management: `security_classification` (`unclassified|restricted|confidential|secret|
-    top_secret`, default `unclassified`), `retention_period?`, `archival_value?`
-    (`permanent|temporary`), `disposition_date?`, `disposition_action?`
-    (`retain|transfer|destroy|review`).
-  - Processing: `processing_status` (`queued|processing|ready|failed|cancelled`),
-    `processing_error?`.
-  - Approval: `review_status` (`draft|submitted|approved|rejected|changes_requested`),
-    `submitted_at?`, `reviewed_by?`, `reviewed_at?`, `published_at?`.
-  - Timestamps and soft deletes. Workflow fields (accession number, processing, approval) are set
-    explicitly by the system or an admin, never mass-assigned.
+    - Ownership and grouping: `created_by` (encoder), `accession_number?` (unique),
+      `project_id?`, `project_series_id?`, `work_id?`, `part_number?`, `part_label?`, `agency_id?`,
+      `division_id?` (a production unit).
+    - Descriptive: `title`, `alternative_title?`, `description?`, `genre_id?`, `video_type_id?`,
+      `language?`, `language_confidence?`, `country_origin?`, `date_recorded?`,
+      `date_recorded_precision?` (`day|month|year|circa`), `date_recorded_source?`, `date_published?`,
+      `season_number?`, `episode_number?`.
+    - Location: `location?` (free text), `region_id?`, `prov_id?`, `city_id?`, `brgy_id?`,
+      `latitude?`, `longitude?`, `location_source?`.
+    - Thumbnail: `thumbnail_path?` (uploaded image) or `thumbnail_frame_id?` (one of its frames).
+    - Archival management: `security_classification` (`unclassified|restricted|confidential|secret|
+      top_secret`, default `unclassified`), `retention_period?`, `archival_value?`
+      (`permanent|temporary`), `disposition_date?`, `disposition_action?`
+      (`retain|transfer|destroy|review`).
+    - Processing: `processing_status` (`queued|processing|ready|failed|cancelled`),
+      `processing_error?`.
+    - Approval: `review_status` (`draft|submitted|approved|rejected|changes_requested`),
+      `submitted_at?`, `reviewed_by?`, `reviewed_at?`, `published_at?`.
+    - Timestamps and soft deletes. Workflow fields (accession number, processing, approval) are set
+      explicitly by the system or an admin, never mass-assigned.
 - `record_files` — `record_id`, `role` (`master|mezzanine|proxy|access`), `storage_location`,
   `original_filename?`, `mime_type?`, `file_size?`, `md5_checksum?`, `sha256_checksum?`,
   `expected_md5?`, `expected_sha256?`, `checksum_status` (`pending|ok|mismatch`).
@@ -469,14 +469,14 @@ attachments use ULID primary keys (they appear in URLs); everything else uses bi
 
 **Added in their phase**
 
-- `export_schemas` *(Phase 2)* — `user_id`, `name`, `fields (jsonb: dot-paths)`, `is_default`.
-- `batches` *(Phase 6)* — `created_by`, `name?`, `status`, `total`, `completed`, `failed`,
+- `export_schemas` _(Phase 2)_ — `user_id`, `name`, `fields (jsonb: dot-paths)`, `is_default`.
+- `batches` _(Phase 6)_ — `created_by`, `name?`, `status`, `total`, `completed`, `failed`,
   `zip_path?`; records get `batch_id?`.
-- `transcript_chunks` *(Phase 7)* — `record_id`, `start`, `end`, `text`,
+- `transcript_chunks` _(Phase 7)_ — `record_id`, `start`, `end`, `text`,
   `embedding vector(EMBEDDING_DIMENSIONS)` with an HNSW index.
-- `chat_messages` *(Phase 7)* — `record_id`, `user_id`, `role`, `content`, `citations (jsonb)`.
-- `clips` *(Phase 7)* — `record_id`, `start`, `end`, `title?`, `path?`, `status`.
-- `youtube_accounts`, `youtube_publications` *(Phase 7)* — connected channels (encrypted tokens) and
+- `chat_messages` _(Phase 7)_ — `record_id`, `user_id`, `role`, `content`, `citations (jsonb)`.
+- `clips` _(Phase 7)_ — `record_id`, `start`, `end`, `title?`, `path?`, `status`.
+- `youtube_accounts`, `youtube_publications` _(Phase 7)_ — connected channels (encrypted tokens) and
   publish attempts.
 
 **Access (policies on every model):** encoders see and edit only the records they created (and only
@@ -749,17 +749,36 @@ Pages are grouped by role folder (see AGENTS.md).
 {
     "schemaVersion": "1.0",
     "generatedAt": "2026-01-01T12:00:00Z",
-    "generator": { "app": "metadata-generator-and-archival-system", "version": "0.1.0" },
+    "generator": {
+        "app": "metadata-generator-and-archival-system",
+        "version": "0.1.0"
+    },
     "record": {
         "id": "01J...",
         "accessionNumber": "ACC-2026-00042",
         "title": "Regional S&T Fair opening ceremony",
         "alternativeTitle": null,
-        "project": { "id": "01J...", "title": "Regional S&T Fair 2026", "date": "2026-07-10" },
+        "project": {
+            "id": "01J...",
+            "title": "Regional S&T Fair 2026",
+            "date": "2026-07-10"
+        },
         "series": { "id": "01J...", "title": "Day 1", "date": "2026-07-10" },
-        "work": { "id": "01J...", "title": "...", "partNumber": 1, "partLabel": "Reel 1", "totalParts": 3 },
-        "agency": { "name": "Department of Science and Technology", "acronym": "DOST" },
-        "productionUnit": { "name": "Science and Technology Information Institute", "acronym": "STII" },
+        "work": {
+            "id": "01J...",
+            "title": "...",
+            "partNumber": 1,
+            "partLabel": "Reel 1",
+            "totalParts": 3
+        },
+        "agency": {
+            "name": "Department of Science and Technology",
+            "acronym": "DOST"
+        },
+        "productionUnit": {
+            "name": "Science and Technology Information Institute",
+            "acronym": "STII"
+        },
         "reviewStatus": "approved",
         "publishedAt": "2026-07-20T09:00:00Z"
     },
@@ -769,7 +788,11 @@ Pages are grouped by role folder (see AGENTS.md).
         "videoType": "Full Program",
         "language": { "code": "en", "confidence": 0.98 },
         "countryOfOrigin": "PH",
-        "dateRecorded": { "value": "2026-07-10", "precision": "day", "source": "manual" },
+        "dateRecorded": {
+            "value": "2026-07-10",
+            "precision": "day",
+            "source": "manual"
+        },
         "datePublished": null,
         "season": null,
         "episode": null,
@@ -783,8 +806,17 @@ Pages are grouped by role folder (see AGENTS.md).
             "longitude": 123.8854,
             "source": "manual"
         },
-        "subjects": [{ "subject": "Jane Doe", "type": "person", "source": "transcript", "confirmed": true }],
-        "keywords": [{ "keyword": "innovation", "source": "ai", "confirmed": true }]
+        "subjects": [
+            {
+                "subject": "Jane Doe",
+                "type": "person",
+                "source": "transcript",
+                "confirmed": true
+            }
+        ],
+        "keywords": [
+            { "keyword": "innovation", "source": "ai", "confirmed": true }
+        ]
     },
     "contributors": [
         { "role": "producer", "name": "..." },
@@ -820,7 +852,14 @@ Pages are grouped by role folder (see AGENTS.md).
                     "codec": "pcm_s24le",
                     "channels": 2,
                     "sampleRate": 48000,
-                    "tracks": [{ "index": 1, "codec": "pcm_s24le", "channels": 2, "language": "eng" }]
+                    "tracks": [
+                        {
+                            "index": 1,
+                            "codec": "pcm_s24le",
+                            "channels": 2,
+                            "language": "eng"
+                        }
+                    ]
                 }
             }
         ]
@@ -846,7 +885,11 @@ Pages are grouped by role folder (see AGENTS.md).
     },
     "provenance": {
         "ingestedAt": "2026-07-11T11:58:00Z",
-        "sourceCarrier": { "type": "camera_card", "label": "Card A", "id": "CF-0014" },
+        "sourceCarrier": {
+            "type": "camera_card",
+            "label": "Card A",
+            "id": "CF-0014"
+        },
         "transfer": {
             "date": "2026-07-11",
             "facility": "...",
@@ -855,10 +898,21 @@ Pages are grouped by role folder (see AGENTS.md).
             "settings": "Direct card offload"
         },
         "auditLog": [
-            { "action": "uploaded", "fileId": "01J...", "performedBy": "Encoder", "performedAt": "2026-07-11T11:58:00Z", "remarks": null }
+            {
+                "action": "uploaded",
+                "fileId": "01J...",
+                "performedBy": "Encoder",
+                "performedAt": "2026-07-11T11:58:00Z",
+                "remarks": null
+            }
         ],
         "fixityChecks": [
-            { "fileId": "01J...", "algorithm": "sha256", "matched": true, "checkedAt": "2026-10-01T02:00:00Z" }
+            {
+                "fileId": "01J...",
+                "algorithm": "sha256",
+                "matched": true,
+                "checkedAt": "2026-10-01T02:00:00Z"
+            }
         ]
     },
     "structure": {
@@ -866,13 +920,27 @@ Pages are grouped by role folder (see AGENTS.md).
             { "fileId": "01J...", "role": "master" },
             { "fileId": "01J...", "role": "proxy" }
         ],
-        "attachments": [{ "id": "01J...", "kind": "sidecar", "name": "tape-log.xml", "sha256": "..." }],
+        "attachments": [
+            {
+                "id": "01J...",
+                "kind": "sidecar",
+                "name": "tape-log.xml",
+                "sha256": "..."
+            }
+        ],
         "transcripts": [
             { "language": "en", "original": true },
             { "language": "fil", "original": false }
         ],
         "segments": [
-            { "kind": "shot", "start": 0, "end": 18.4, "tcIn": "01:00:00:00", "tcOut": "01:00:18:10", "label": null }
+            {
+                "kind": "shot",
+                "start": 0,
+                "end": 18.4,
+                "tcIn": "01:00:00:00",
+                "tcOut": "01:00:18:10",
+                "label": null
+            }
         ]
     },
     "speakers": [{ "id": "S1", "name": "Host" }],
@@ -888,7 +956,12 @@ Pages are grouped by role folder (see AGENTS.md).
     ],
     "translations": {
         "fil": [
-            { "id": 1, "start": 0.0, "end": 4.2, "text": "Maligayang pagdating..." }
+            {
+                "id": 1,
+                "start": 0.0,
+                "end": 4.2,
+                "text": "Maligayang pagdating..."
+            }
         ]
     },
     "ai": {
@@ -947,13 +1020,13 @@ Unconfirmed subjects and keywords are left out of public-facing exports.
 Every record carries a catalogue record in five categories. The table says what each one answers,
 which fields hold it, and how the system fills it in.
 
-| Category | Question it answers | Where it lives | How we capture it |
-|---|---|---|---|
-| **Descriptive** | What is this? | `records` (title, alternative title, description, genre, video type, language, country of origin, date recorded + precision, season/episode, location + region/province/city/barangay + GPS), `record_subjects`, `record_keywords`, `projects` / `project_series` | AI suggests description, subjects, keywords and language. Container tags suggest date recorded and GPS. The encoder confirms suggestions and fills in project, series, genre, video type and location. |
-| **Technical** | How is it encoded? | `record_files` (format, size, checksums) and `record_technical_metadata` (codecs, profile, resolution, frame rate, aspect ratio, scan type, bit depth, chroma, colour, audio tracks, sample rate, duration, start timecode) | Automatic: the `probe` stage for every record file. Read-only in the UI. |
-| **Administrative / rights** | Who owns it and how can it be used? | `record_rights`, `record_contributors`, `record_attachments` (release forms), `records` (accession number, agency, production unit, security classification, retention period, archival value, disposition) | Manual entry in the Rights, Credits and Archival tabs. Accession number auto-assigned at ingest from `ACCESSION_NUMBER_FORMAT` (editable, unique). Embargo and classification enforced server-side. |
-| **Preservation / provenance** | What has happened to it? | `record_files` checksums, `fixity_checks`, `record_provenance`, `video_audit_logs` | Checksums and ingest date are automatic (`checksum` stage). Source carrier and transfer details are manual. Uploads, transcodes, migrations, replacements and checksum results are logged automatically in `video_audit_logs`. |
-| **Structural** | How do the pieces relate? | `record_files` (master, mezzanine, proxy, access), `works` (reels/parts), `record_attachments` (sidecars), `record_transcripts` (subtitles by language), `record_scenes` | Files tracked per role (proxy generated automatically). Reels/parts grouped into a work. Shot segments come from the `scenes` stage with timecode in/out; scenes are user-defined groups of shots. |
+| Category                      | Question it answers                 | Where it lives                                                                                                                                                                                                                                                    | How we capture it                                                                                                                                                                                                              |
+| ----------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Descriptive**               | What is this?                       | `records` (title, alternative title, description, genre, video type, language, country of origin, date recorded + precision, season/episode, location + region/province/city/barangay + GPS), `record_subjects`, `record_keywords`, `projects` / `project_series` | AI suggests description, subjects, keywords and language. Container tags suggest date recorded and GPS. The encoder confirms suggestions and fills in project, series, genre, video type and location.                         |
+| **Technical**                 | How is it encoded?                  | `record_files` (format, size, checksums) and `record_technical_metadata` (codecs, profile, resolution, frame rate, aspect ratio, scan type, bit depth, chroma, colour, audio tracks, sample rate, duration, start timecode)                                       | Automatic: the `probe` stage for every record file. Read-only in the UI.                                                                                                                                                       |
+| **Administrative / rights**   | Who owns it and how can it be used? | `record_rights`, `record_contributors`, `record_attachments` (release forms), `records` (accession number, agency, production unit, security classification, retention period, archival value, disposition)                                                       | Manual entry in the Rights, Credits and Archival tabs. Accession number auto-assigned at ingest from `ACCESSION_NUMBER_FORMAT` (editable, unique). Embargo and classification enforced server-side.                            |
+| **Preservation / provenance** | What has happened to it?            | `record_files` checksums, `fixity_checks`, `record_provenance`, `video_audit_logs`                                                                                                                                                                                | Checksums and ingest date are automatic (`checksum` stage). Source carrier and transfer details are manual. Uploads, transcodes, migrations, replacements and checksum results are logged automatically in `video_audit_logs`. |
+| **Structural**                | How do the pieces relate?           | `record_files` (master, mezzanine, proxy, access), `works` (reels/parts), `record_attachments` (sidecars), `record_transcripts` (subtitles by language), `record_scenes`                                                                                          | Files tracked per role (proxy generated automatically). Reels/parts grouped into a work. Shot segments come from the `scenes` stage with timecode in/out; scenes are user-defined groups of shots.                             |
 
 ### Rules
 
@@ -1073,7 +1146,7 @@ Never expose API keys to the frontend. Never commit `.env` files.
 
 Each phase must end with: migrations run cleanly, tests pass, `README.md` updated, and a short
 summary of what to try manually. The schema in §8 already exists; each phase builds features on it
-(and creates the few tables marked *added in Phase N*).
+(and creates the few tables marked _added in Phase N_).
 
 ### Phase 0 — Scaffold
 

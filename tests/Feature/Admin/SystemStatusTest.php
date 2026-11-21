@@ -23,7 +23,7 @@ class SystemStatusTest extends TestCase
             ->get(route('admin.system.show'))
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->component('admin/system-status')
+                ->component('admin/system-status-page/system-status')
                 ->has('horizonUrl'));
     }
 

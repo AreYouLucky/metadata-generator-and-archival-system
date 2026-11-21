@@ -8,25 +8,25 @@ phase first.
 - **Mixed AI providers (owner's choice).** Transcription runs **locally** with `faster-whisper` on
   the dev laptop's NVIDIA RTX 3050 (6 GB). OpenAI handles metadata, translation, frame descriptions
   and embeddings. Reasons:
-  - Transcription is about 85–90% of the OpenAI bill: roughly $0.27–0.36 per video hour, against
-    $0.01–0.03 for metadata.
-  - Local transcription keeps the audio of possibly restricted recordings on the machine.
-  - The small models that fit in 6 GB are clearly weaker at metadata (structured JSON, Filipino and
-    Taglish).
+    - Transcription is about 85–90% of the OpenAI bill: roughly $0.27–0.36 per video hour, against
+      $0.01–0.03 for metadata.
+    - Local transcription keeps the audio of possibly restricted recordings on the machine.
+    - The small models that fit in 6 GB are clearly weaker at metadata (structured JSON, Filipino and
+      Taglish).
 - **Provider changes from the spec:**
-  - `TRANSCRIPTION_PROVIDER` defaults to `local` (the spec had `openai`), and the local provider
-    moves from Phase 6 to Phase 1. Defaults are `large-v3`, `cuda`, `int8_float16`, with `medium`
-    or CPU `int8` as fallbacks.
-  - `LLM_PROVIDER` defaults to `openai` (the spec had `anthropic`).
-  - Every provider stays swappable behind the same interface. The OpenAI transcription provider is
-    still built, so it can be switched on per environment.
+    - `TRANSCRIPTION_PROVIDER` defaults to `local` (the spec had `openai`), and the local provider
+      moves from Phase 6 to Phase 1. Defaults are `large-v3`, `cuda`, `int8_float16`, with `medium`
+      or CPU `int8` as fallbacks.
+    - `LLM_PROVIDER` defaults to `openai` (the spec had `anthropic`).
+    - Every provider stays swappable behind the same interface. The OpenAI transcription provider is
+      still built, so it can be switched on per environment.
 - **Consequences:**
-  - The AI worker needs GPU access. Use `docker-compose.gpu.yml`; it needs a current NVIDIA driver
-    and Docker Desktop's WSL2 GPU support.
-  - Production needs a GPU server, or switches transcription to `openai`.
-  - The CUDA-enabled image is much larger, so the first build will be slow on the dev connection.
-  - OpenAI model IDs are set from OpenAI's current docs at the start of Phase 1, not from memory.
-  - `OPENAI_API_KEY` lives only in `ai-service/.env`.
+    - The AI worker needs GPU access. Use `docker-compose.gpu.yml`; it needs a current NVIDIA driver
+      and Docker Desktop's WSL2 GPU support.
+    - Production needs a GPU server, or switches transcription to `openai`.
+    - The CUDA-enabled image is much larger, so the first build will be slow on the dev connection.
+    - OpenAI model IDs are set from OpenAI's current docs at the start of Phase 1, not from memory.
+    - `OPENAI_API_KEY` lives only in `ai-service/.env`.
 
 ## Phase 0 — Scaffold
 
@@ -43,21 +43,20 @@ phase first.
   drive, every PHP file read crosses Docker Desktop's slow file share: pages took 6–13 s, or about
   1 s with a 60 s opcache revalidation that delays code changes. On the host, pages take about
   0.5 s and edits show up immediately. Consequences:
-  - Laravel talks to Redis through `predis/predis` (pure PHP), because XAMPP's PHP has no
-    `phpredis` extension. The Docker image still uses `phpredis`.
-  - Horizon needs `pcntl`, which Windows lacks. `AppServiceProvider::configureDevCommands()` drops
-    it from `composer run dev` on Windows, so the framework's `queue:listen` runs instead, and adds
-    `schedule:work`. Horizon is still installed, admin-gated and used in containers and in
-    production.
-  - The AI worker calls Laravel back at `host.docker.internal:8000` (`LARAVEL_CALLBACK_BASE`).
-  - Media are shared through `storage/app/media` (bind-mounted at `/data/storage` in the AI
-    containers) instead of a named volume. From Phase 1, Laravel sends paths relative to that root.
-  - Reverb listens on 8081 (`REVERB_SERVER_PORT`/`VITE_REVERB_PORT`) because XAMPP Apache uses
-    8080.
-  - The spec's Laravel containers are kept under the `docker-laravel` profile. They use
-    `artisan serve --no-reload`, because without it serve drops the container's environment and
-    re-reads `.env`. They also use the opcache settings in `docker/php/php.ini`.
-  - Production still needs PHP-FPM/Octane behind a web server, with Horizon.
+    - Laravel talks to Redis through `predis/predis` (pure PHP), because XAMPP's PHP has no
+      `phpredis` extension. The Docker image still uses `phpredis`.
+    - Horizon needs `pcntl`, which Windows lacks. `AppServiceProvider::configureDevCommands()` drops
+      it from `composer run dev` on Windows, so the framework's `queue:listen` runs instead, and adds
+      `schedule:work`. Horizon is still installed, admin-gated and used in containers and in
+      production.
+    - The AI worker calls Laravel back at `host.docker.internal:8000` (`LARAVEL_CALLBACK_BASE`).
+    - Media are shared through `storage/app/media` (bind-mounted at `/data/storage` in the AI
+      containers) instead of a named volume. From Phase 1, Laravel sends paths relative to that root.
+    - Reverb listens on 8081 (`REVERB_SERVER_PORT`/`VITE_REVERB_PORT`) because XAMPP Apache uses 8080.
+    - The spec's Laravel containers are kept under the `docker-laravel` profile. They use
+      `artisan serve --no-reload`, because without it serve drops the container's environment and
+      re-reads `.env`. They also use the opcache settings in `docker/php/php.ini`.
+    - Production still needs PHP-FPM/Octane behind a web server, with Horizon.
 - **Composer `config.platform` declares `ext-pcntl` and `ext-posix`.** Horizon needs them, but they
   don't exist on Windows. They are installed in the Docker image, which is the only place Horizon
   runs.

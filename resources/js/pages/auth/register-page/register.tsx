@@ -30,6 +30,7 @@ export default function Register({ passwordRules }: Props) {
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Full name</Label>
                                 <Input
+                                    className="h-11 px-3.5 md:text-base"
                                     id="name"
                                     type="text"
                                     required
@@ -45,6 +46,7 @@ export default function Register({ passwordRules }: Props) {
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email address</Label>
                                 <Input
+                                    className="h-11 px-3.5 md:text-base"
                                     id="email"
                                     type="email"
                                     required
@@ -59,6 +61,7 @@ export default function Register({ passwordRules }: Props) {
                             <div className="grid gap-2">
                                 <Label htmlFor="password">Password</Label>
                                 <PasswordInput
+                                    className="h-11 pl-3.5 md:text-base"
                                     id="password"
                                     required
                                     tabIndex={3}
@@ -75,6 +78,7 @@ export default function Register({ passwordRules }: Props) {
                                     Confirm password
                                 </Label>
                                 <PasswordInput
+                                    className="h-11 pl-3.5 md:text-base"
                                     id="password_confirmation"
                                     required
                                     tabIndex={4}
@@ -98,7 +102,7 @@ export default function Register({ passwordRules }: Props) {
                             <Button
                                 type="submit"
                                 size="lg"
-                                className="w-full"
+                                className="h-11 w-full text-base"
                                 tabIndex={5}
                                 data-test="register-user-button"
                             >
