@@ -1,7 +1,9 @@
 # Local development services.
 #
 # Default (Laravel runs on Windows with `composer run dev`):
-#   docker compose up -d        -> redis, ai-api, ai-worker
+#   docker compose up -d        -> redis, ai-api, ai-worker, ai-worker-gpu
+#   GPU transcription (default provider):
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 #
 # Laravel itself runs on the host, using the host PostgreSQL. The AI containers
 # call it back on host.docker.internal:8000, and both sides share uploaded
@@ -67,12 +69,20 @@ x-ai: &ai
         CELERY_RESULT_URL: redis://redis:6379/2
         STORAGE_ROOT: /data/storage
         REPLAY_GUARD: redis
+        # Plain HTTPS model downloads: the Xet downloader stalls inside Docker/WSL
+        # and left the first transcription waiting on the model forever.
+        HF_HUB_DISABLE_XET: '1'
+        # /srv belongs to root; the tools run as the app user.
+        RUFF_CACHE_DIR: /tmp/ruff-cache
+        MYPY_CACHE_DIR: /tmp/mypy-cache
     extra_hosts:
         - 'host.docker.internal:host-gateway'
     volumes:
         - ./ai-service/app:/srv/app
         - ./ai-service/tests:/srv/tests
         - ./storage/app/media:/data/storage
+        # Downloaded Whisper models (large-v3-turbo is ~1.6 GB): kept across rebuilds.
+        - whispermodels:/srv/models
     depends_on:
         redis:
             condition: service_healthy
@@ -109,9 +119,16 @@ services:
             timeout: 5s
             retries: 10
 
+    # Probing, checksums, audio extraction and LLM calls.
     ai-worker:
         <<: *ai
-        command: celery -A app.worker worker --loglevel=info --concurrency=2
+        command: celery -A app.worker worker -Q celery -n default@%h --loglevel=info --concurrency=2
+
+    # Transcription only, one job at a time so two models never share the 6 GB GPU.
+    # docker-compose.gpu.yml gives it the GPU; without it, set LOCAL_WHISPER_DEVICE=cpu.
+    ai-worker-gpu:
+        <<: *ai
+        command: celery -A app.worker worker -Q gpu -n gpu@%h --loglevel=info --concurrency=1
 
     web:
         <<: *laravel
@@ -178,3 +195,4 @@ volumes:
     pgdata:
     redisdata:
     miniodata:
+    whispermodels:

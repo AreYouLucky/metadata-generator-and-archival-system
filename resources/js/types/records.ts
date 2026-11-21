@@ -1,0 +1,159 @@
+/**
+ * Record, workspace and pipeline types. The `AiMetadata` shape mirrors the
+ * `ai` block of PROJECT_SPEC §10 and ai-service/app/schemas/metadata.py.
+ */
+
+export type ProcessingStatus =
+    | 'queued'
+    | 'processing'
+    | 'ready'
+    | 'failed'
+    | 'cancelled';
+
+export type ReviewStatus =
+    | 'draft'
+    | 'submitted'
+    | 'approved'
+    | 'rejected'
+    | 'changes_requested';
+
+export type StageStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+
+export type PipelineStageName =
+    | 'checksum'
+    | 'probe'
+    | 'extract_audio'
+    | 'transcribe'
+    | 'generate_metadata';
+
+export type PresetName = 'generic' | 'youtube';
+
+export type RecordListItem = {
+    id: string;
+    title: string;
+    processing_status: ProcessingStatus;
+    review_status: ReviewStatus;
+    duration: number | null;
+    project: string | null;
+    series: string | null;
+    created_at: string | null;
+    creator: string | null;
+};
+
+export type RecordFilters = {
+    q: string;
+    processing_status: ProcessingStatus | null;
+    review_status: ReviewStatus | null;
+    sort: 'newest' | 'oldest' | 'title';
+};
+
+export type PresetRules = {
+    name: PresetName;
+    label: string;
+    title_max: number | null;
+    description_max: number;
+    tags_max_count: number | null;
+    tags_max_chars: number | null;
+    hashtags_min: number;
+    hashtags_max: number;
+    chapters: boolean;
+    guidance: string;
+};
+
+export type WorkspaceRecord = {
+    id: string;
+    title: string;
+    project: { id: string; title: string } | null;
+    series: string | null;
+    language: string | null;
+    language_confidence: number | null;
+    processing_status: ProcessingStatus;
+    processing_error: string | null;
+    review_status: ReviewStatus;
+    created_at: string | null;
+    can_edit: boolean;
+};
+
+export type WorkspaceMedia = {
+    url: string;
+    mime_type: string | null;
+    /** null until the probe stage has run. */
+    playable: boolean | null;
+    duration: number | null;
+    /** Set once the audio stage has written the waveform peaks. */
+    has_waveform: boolean;
+};
+
+/** records/{id}/waveform.json, written by the AI service's audio stage. */
+export type Waveform = {
+    version: number;
+    peaks_per_second: number;
+    /** Peak level per bucket, 0-100. */
+    peaks: number[];
+};
+
+export type StageState = {
+    stage: PipelineStageName;
+    label: string;
+    status: StageStatus;
+    progress: number;
+    message: string | null;
+};
+
+export type TranscriptSegment = {
+    id: number;
+    start: number;
+    end: number;
+    text: string;
+    is_edited: boolean;
+};
+
+export type WorkspaceTranscript = {
+    language: string;
+    segments: TranscriptSegment[];
+};
+
+export type Chapter = {
+    start: number;
+    title: string;
+};
+
+export type AiMetadata = {
+    titles: string[];
+    selectedTitle: string | null;
+    description: string | null;
+    summary: string | null;
+    tags: string[];
+    keywords: string[];
+    hashtags: string[];
+    chapters: Chapter[];
+};
+
+export type ActiveMetadata = {
+    id: number;
+    preset: PresetName;
+    model: string;
+    custom_prompt: string | null;
+    created_at: string | null;
+    payload: AiMetadata;
+};
+
+export type MetadataHistoryItem = {
+    id: number;
+    preset: PresetName;
+    model: string;
+    custom_prompt: string | null;
+    is_active: boolean;
+    created_at: string | null;
+};
+
+/** Reverb payloads on the private `records.{id}` channel. */
+export type RecordProgressEvent = {
+    processing_status: ProcessingStatus;
+    stage: Omit<StageState, 'label'>;
+};
+
+export type RecordStageCompletedEvent = {
+    stage: PipelineStageName;
+    processing_status: ProcessingStatus;
+};

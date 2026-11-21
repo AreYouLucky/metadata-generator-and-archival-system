@@ -1,0 +1,116 @@
+"""OpenAI Responses API with Structured Outputs (`client.responses.parse(text_format=...)`).
+
+Prompt order is fixed for OpenAI's automatic prompt caching: static instructions first,
+then the transcript, then the per-request part (preset, custom prompt). A re-run over the
+same transcript then bills most input tokens at the cached rate.
+"""
+
+from typing import Any
+
+import openai
+from openai import OpenAI
+from openai.types.responses import EasyInputMessageParam, ResponseInputParam
+from openai.types.shared_params import Reasoning
+from pydantic import ValidationError
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+from app.config import ReasoningEffort, Settings, get_settings
+from app.providers.llm.base import LlmError, LlmUsage, T
+
+_TRANSIENT = (
+    openai.APIConnectionError,
+    openai.APITimeoutError,
+    openai.RateLimitError,
+    openai.InternalServerError,
+)
+
+
+class OpenAILlmProvider:
+    def __init__(self, settings: Settings | None = None, client: Any = None) -> None:
+        self.settings = settings or get_settings()
+        self.client = client or OpenAI(
+            api_key=self.settings.openai_api_key.get_secret_value(),
+            timeout=self.settings.openai_timeout_seconds,
+        )
+
+    def complete(
+        self,
+        *,
+        model: str,
+        instructions: str,
+        messages: list[str],
+        schema: type[T],
+        reasoning_effort: ReasoningEffort,
+        max_output_tokens: int,
+    ) -> tuple[T, LlmUsage]:
+        usage = LlmUsage(model=model)
+        conversation: ResponseInputParam = [
+            EasyInputMessageParam(role="system", content=instructions),
+            *(EasyInputMessageParam(role="user", content=message) for message in messages),
+        ]
+
+        # Structured Outputs guarantees the schema, but a refusal or a cut-off answer
+        # can still fail: retry once, telling the model what went wrong.
+        for attempt in range(2):
+            response = self._send(model, conversation, schema, reasoning_effort, max_output_tokens)
+            _add_usage(usage, response)
+            try:
+                parsed = _parsed(response, schema)
+                return parsed, usage
+            except (LlmError, ValidationError) as error:
+                if attempt == 1:
+                    raise LlmError(f"The model did not return valid metadata: {error}") from error
+                conversation.append(
+                    EasyInputMessageParam(
+                        role="user",
+                        content="Your previous answer could not be used "
+                        f"({str(error)[:300]}). Answer again with valid JSON only, "
+                        "keeping every field short enough to fit.",
+                    )
+                )
+        raise LlmError("unreachable")  # pragma: no cover
+
+    @retry(
+        retry=retry_if_exception_type(_TRANSIENT),
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=2, max=60),
+        reraise=True,
+    )
+    def _send(
+        self,
+        model: str,
+        conversation: ResponseInputParam,
+        schema: type[T],
+        reasoning_effort: ReasoningEffort,
+        max_output_tokens: int,
+    ) -> Any:
+        return self.client.responses.parse(
+            model=model,
+            input=conversation,
+            text_format=schema,
+            reasoning=Reasoning(effort=reasoning_effort),
+            max_output_tokens=max_output_tokens,
+        )
+
+
+def _parsed(response: Any, schema: type[T]) -> T:
+    if getattr(response, "status", None) == "incomplete":
+        details = getattr(response, "incomplete_details", None)
+        reason = getattr(details, "reason", None) or "unknown"
+        raise LlmError(f"the answer was cut off ({reason})")
+    parsed = getattr(response, "output_parsed", None)
+    if parsed is None:
+        raise LlmError("the model refused or returned no structured output")
+    if isinstance(parsed, schema):
+        return parsed
+    return schema.model_validate(parsed)
+
+
+def _add_usage(usage: LlmUsage, response: Any) -> None:
+    raw = getattr(response, "usage", None)
+    if raw is None:
+        return
+    input_details = getattr(raw, "input_tokens_details", None)
+    usage.input_tokens += int(getattr(raw, "input_tokens", 0) or 0)
+    usage.cached_tokens += int(getattr(input_details, "cached_tokens", 0) or 0)
+    usage.output_tokens += int(getattr(raw, "output_tokens", 0) or 0)

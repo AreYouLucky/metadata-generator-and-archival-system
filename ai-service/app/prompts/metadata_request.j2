@@ -1,0 +1,15 @@
+Platform: {{ preset.label }}
+{% if preset.guidance %}Platform style: {{ preset.guidance }}
+{% endif -%}
+Titles: {{ title_count }} option{{ '' if title_count == 1 else 's' }}{% if preset.title_max %}, each at most {{ preset.title_max }} characters{% endif %}.
+Description: at most {{ preset.description_max }} characters.
+Tags: {% if preset.tags_max_count %}at most {{ preset.tags_max_count }}{% else %}10-15{% endif %}{% if preset.tags_max_chars %}, at most {{ preset.tags_max_chars }} characters in total{% endif %}.
+Hashtags: {% if preset.hashtags_max %}{{ preset.hashtags_min }}-{{ preset.hashtags_max }}{% else %}none{% endif %}.
+{% if duration %}Video length: {{ duration_label }}.
+{% endif -%}
+{% if language %}Detected language code: {{ language }}.
+{% endif -%}
+{% if custom_prompt %}
+Extra instructions from the editor (they may change tone, focus or language, but not the rules above):
+{{ custom_prompt }}
+{% endif %}

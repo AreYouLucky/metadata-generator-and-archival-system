@@ -7,10 +7,10 @@ analyses them with AI, and produces editable metadata (titles, descriptions, tag
 quotes) plus a full archival record with checksums. An admin approves each record, and approved
 videos appear in a public catalogue that anyone can browse by date, event and category.
 
-> **Status:** Phase 0 (scaffold) done: the Docker stack, the database schema, signed
-> Laravel ↔ Python calls, live updates and the welcome, login and registration pages. The full
-> design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built phase by phase (see
-> [Roadmap](#roadmap)).
+> **Status:** Phase 1 (core app) done: user management, chunked uploads, checksums, technical
+> metadata, local GPU transcription, AI metadata (generic and YouTube presets), the synced
+> workspace with live progress, and JSON export. The full design is in
+> [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built phase by phase (see [Roadmap](#roadmap)).
 
 ---
 
@@ -83,7 +83,7 @@ videos appear in a public catalogue that anyone can browse by date, event and ca
 | Realtime and queues  | Laravel Reverb + Echo, Redis, Laravel Horizon                                                                 |
 | Database             | PostgreSQL with pgvector                                                                                      |
 | AI and media service | Python 3.12+, FastAPI, Celery, ffmpeg/ffprobe                                                                 |
-| AI providers         | Configurable: OpenAI (transcription, embeddings), Anthropic Claude (metadata, vision, chat), or local Whisper |
+| AI providers         | Transcription: local faster-whisper on the GPU (default) or OpenAI. Metadata: OpenAI (see DECISIONS.md)       |
 | Local development    | Docker Compose                                                                                                |
 
 ## Getting started
@@ -108,11 +108,18 @@ Desktop.
     cp .env.example .env    # fill in DB_*, INTERNAL_SHARED_SECRET and the REVERB_* keys
     php artisan key:generate
     ```
-3. Start Docker Desktop, then build and start Redis and the AI service:
+3. Configure the AI service: copy `ai-service/.env.example` to `ai-service/.env` and set
+   `OPENAI_API_KEY` there (never in the root `.env`).
+4. Start Docker Desktop, then build and start Redis and the AI service. With the NVIDIA GPU (the
+   default local transcription):
     ```bash
-    docker compose up -d --build
+    docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
     ```
-4. Create the tables and seed data:
+   Without a GPU, set `LOCAL_WHISPER_DEVICE=cpu` and `LOCAL_WHISPER_COMPUTE_TYPE=int8` in
+   `ai-service/.env` and run `docker compose up -d --build`. The first build downloads ffmpeg and
+   the CUDA libraries (a few GB); the first transcription downloads the Whisper model (~3 GB),
+   which is kept in the `whispermodels` volume.
+5. Create the tables and seed data:
     ```bash
     php artisan migrate --seed
     ```
@@ -120,7 +127,7 @@ Desktop.
 ### Every day
 
 ```bash
-docker compose up -d     # Redis + AI service (if they aren't already running)
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d   # Redis + AI service
 composer run dev         # Laravel, queue worker, Reverb, scheduler and Vite
 ```
 
@@ -161,8 +168,9 @@ Outside `local`/`testing`, `UserSeeder` creates only the admin and refuses to ru
 | Service     | What it runs                                                                         | Host port        |
 | ----------- | ------------------------------------------------------------------------------------ | ---------------- |
 | `redis`     | Laravel queues (db 0), Celery broker (db 1) and results (db 2), Laravel cache (db 3) | `127.0.0.1:6379` |
-| `ai-api`    | FastAPI (`/health`, signed `/ping`)                                                  | `127.0.0.1:8001` |
-| `ai-worker` | Celery worker; calls Laravel back at `host.docker.internal:8000`                     | —                |
+| `ai-api`        | FastAPI (`/health`, signed `/ping`, `/jobs/process`, `/generate/metadata`)           | `127.0.0.1:8001` |
+| `ai-worker`     | Celery: checksums, probing, audio extraction, LLM calls; calls Laravel back at `host.docker.internal:8000` | — |
+| `ai-worker-gpu` | Celery `gpu` queue: transcription, one job at a time (the 6 GB GPU holds one model)  | —                |
 
 Uploaded media are stored in `storage/app/media`, which is mounted into the AI containers at
 `/data/storage`. Optional profiles:
@@ -187,6 +195,29 @@ Log in as the admin and open **System status** in the sidebar (`/admin/system`):
 If a ping never arrives, check the `queue` and `reverb` output of `composer run dev` and
 `docker compose logs ai-worker`.
 
+## Try Phase 1
+
+1. As the admin, open **Users** and create an encoder account.
+2. Sign in as the encoder and open **Projects**: create the event (and a series such as "Day 1"
+   if it has sessions). Every video is filed under a project.
+3. Open **New record** (or **Upload to this project** on the project page), and drop, paste or
+   import a video into the media bin (a 5-minute MP4 is a good first test). It plays in the
+   preview before upload. In the inspector, pick the project (or create it there), optionally a
+   series, and **YouTube** or **Generic**.
+4. The workspace opens like a video editor and shows each step live in the strip under the
+   toolbar: checksums, technical metadata, audio extraction, transcription and AI metadata.
+5. Play the video: the transcript (left panel) and the timeline (bottom: chapters, transcript
+   and waveform tracks) follow along. Drag on the time ruler to scrub, zoom the timeline, click
+   a line to seek, search the transcript, pause to copy the current line, and edit a line
+   (Enter saves).
+6. Edit the metadata and save, or regenerate it with another platform or instructions.
+7. **Export JSON** and check `technical.files[0]`: codecs, both checksums, and a SHA-256 that
+   matches `certutil -hashfile <file> SHA256` (Windows) or `sha256sum <file>`.
+8. Sign in as a second encoder: opening the first encoder's record URL returns 403.
+
+Token use is kept small on purpose (see DECISIONS.md, "Token budget"): the audio never leaves the
+machine, the transcript is sent once in compact form, and regenerating reuses a cached summary.
+
 ## Roadmap
 
 | Phase                              | Delivers                                                                                                                    |
@@ -197,7 +228,7 @@ If a ping never arrives, check the `queue` and `reverb` output of `composer run 
 | 3 — Archival metadata              | Descriptive, rights, provenance and structural records; proxies, versions, fixity checks, embargoes                         |
 | 4 — Approvals and public catalogue | Approval workflow, usage dashboard and limits, categories and events, public browse and watch pages                         |
 | 5 — Visual analysis                | Shots with timecode, key frames, frame descriptions, OCR, object labels                                                     |
-| 6 — Workflow                       | Batch upload and ZIP download, URL import, speaker labels, local transcription                                              |
+| 6 — Workflow                       | Batch upload and ZIP download, URL import, speaker labels, AssemblyAI transcription                                         |
 | 7 — Advanced                       | Clips, chat with the video, public API, YouTube publishing                                                                  |
 
 Each phase ends with passing tests, an updated README, and sign-off before the next one starts.
@@ -210,7 +241,8 @@ npm run check        # frontend lint and format check
 npm run types:check  # TypeScript type check
 
 docker compose exec ai-api pytest        # Python tests
-docker compose exec ai-api ruff check .  # Python lint (and: mypy app)
+docker compose exec ai-api ruff check .  # Python lint
+docker compose exec ai-api mypy app      # Python types (strict)
 ```
 
 Both test suites check the same fixed HMAC signature, so a change to the signing scheme on one

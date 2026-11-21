@@ -61,6 +61,12 @@ class AppServiceProvider extends ServiceProvider
     protected function configureRateLimiting(): void
     {
         RateLimiter::for('internal', fn (Request $request): Limit => Limit::perMinute(600)->by($request->ip()));
+
+        // Anything that starts paid AI work or heavy processing (new records, regenerations).
+        RateLimiter::for('ai', fn (Request $request): Limit => Limit::perMinute(10)->by($request->user()?->id ?: $request->ip()));
+
+        // Chunked uploads: one request per 8 MB chunk.
+        RateLimiter::for('uploads', fn (Request $request): Limit => Limit::perMinute(600)->by($request->user()?->id ?: $request->ip()));
     }
 
     /**

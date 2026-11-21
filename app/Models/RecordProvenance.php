@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Enums\SourceCarrier;
+use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * Where a record came from: source carrier and transfer details.

@@ -21,19 +21,19 @@ metadata (descriptive, technical, administrative/rights, preservation/provenance
 
 ### Terminology
 
-| Term               | Meaning                                                                     | Table                 |
-| ------------------ | --------------------------------------------------------------------------- | --------------------- |
-| **Record**         | One archived video and everything known about it.                           | `records`             |
-| **Project**        | An event or programme that groups records (e.g. a conference, a campaign).  | `projects`            |
-| **Project series** | A series or sub-event inside a project (e.g. one session, one episode run). | `project_series`      |
-| **Record file**    | One stored file of a record: master, mezzanine, proxy or access copy.       | `record_files`        |
-| **Work**           | The reels or parts of one work; each part is its own record.                | `works`               |
-| **Agency / unit**  | The producing agency and its production unit (division).                    | `production_agencies` |
+| Term               | Meaning                                                                                                            | Table                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| **Record**         | One archived video and everything known about it.                                                                  | `records`             |
+| **Project**        | An event or programme that groups records (e.g. a conference, a campaign).                                         | `projects`            |
+| **Project series** | A series or sub-event inside a project (e.g. one session, one episode run).                                        | `project_series`      |
+| **Record file**    | An extra stored file of a record: mezzanine, proxy or access copy. The master file is stored on the record itself. | `record_files`        |
+| **Work**           | The reels or parts of one work; each part is its own record.                                                       | `works`               |
+| **Agency / unit**  | The producing agency and its production unit (division).                                                           | `production_agencies` |
 
 Core user flow:
 
 1. An encoder uploads a video (drag-and-drop, paste, or URL import) — one or many (batch) — and
-   optionally files it under a project and series.
+   files it under a project (event; required) and optionally one of its series.
 2. Backend stores the file, computes checksums, and captures full technical metadata.
 3. Backend extracts audio, transcribes with timestamps, detects language, labels speakers.
 4. Backend analyses frames: scenes, thumbnails, frame descriptions, on-screen text, objects.
@@ -263,7 +263,7 @@ System packages in the Python image: `ffmpeg`, `libmediainfo0v5` (or distro equi
 
 ## 6. Processing pipeline
 
-Laravel creates a `Record` and its master `RecordFile`, stores the file, then dispatches
+Laravel creates a `Record` (whose columns hold the master file), stores the file, then dispatches
 `StartProcessingJob`, which calls `POST /jobs/process` on the Python service. Python runs a Celery
 chain of stages. Each stage:
 
@@ -275,21 +275,21 @@ chain of stages. Each stage:
 Laravel stores each stage's state in `record_stages`, stores results, and broadcasts
 `RecordProgressUpdated` / `RecordStageCompleted` on the private channel `records.{id}` via Reverb.
 
-| #   | Stage               | What it does                                                                                                                                                                 | Depends on                           | Phase |
-| --- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ----- |
-| 1   | `probe`             | ffprobe + mediainfo → `record_technical_metadata` for the file (§11), plus container tags (creation time, GPS location, start timecode)                                      | —                                    | 1     |
-| 2   | `checksum`          | MD5 + SHA-256 of the stored file in one streaming pass; compare with an expected checksum if the encoder supplied one                                                        | —                                    | 1     |
-| 3   | `extract_audio`     | ffmpeg → mono 16 kHz MP3 (~48 kbps)                                                                                                                                          | probe                                | 1     |
-| 4   | `transcribe`        | Segments with timestamps + detected language → original `record_transcripts`                                                                                                 | extract_audio                        | 1     |
-| 5   | `diarize`           | Speaker labels per segment (S1, S2…) → `record_speakers`                                                                                                                     | transcribe                           | 6     |
-| 6   | `proxy`             | ffmpeg → browser-playable access copy (H.264/AAC MP4, ≤ `PROXY_MAX_HEIGHT`) when the master can't play in a browser; stored as a `proxy` record file, probed and checksummed | probe                                | 3     |
-| 7   | `scenes`            | Shot-change timestamps (PySceneDetect) → `record_scenes` with timecode in/out                                                                                                | probe                                | 5     |
-| 8   | `frames`            | Extract key frames (scene starts + every N seconds) → `record_frames`                                                                                                        | probe, scenes                        | 5     |
-| 9   | `vision`            | Frame descriptions via vision LLM                                                                                                                                            | frames                               | 5     |
-| 10  | `ocr`               | On-screen text per frame (EasyOCR)                                                                                                                                           | frames                               | 5     |
-| 11  | `objects`           | Object labels + face **count** per frame (YOLO)                                                                                                                              | frames                               | 5     |
-| 12  | `embed`             | Chunk transcript (~30–60 s windows) → embeddings                                                                                                                             | transcribe                           | 7     |
-| 13  | `generate_metadata` | LLM → `record_metadata` (titles, description, tags, chapters, etc.); from Phase 3 also suggested subjects, keywords and location                                             | transcribe (+ vision/ocr if enabled) | 1     |
+| #   | Stage               | What it does                                                                                                                                                                                                | Depends on                           | Phase |
+| --- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ----- |
+| 1   | `probe`             | ffprobe + mediainfo → `record_technical_metadata` for the file (§11) and the master summary on `records` (file format, size, resolution), plus container tags (creation time, GPS location, start timecode) | —                                    | 1     |
+| 2   | `checksum`          | MD5 + SHA-256 of the stored file in one streaming pass (the master's go on `records`); compare with an expected checksum if the encoder supplied one                                                        | —                                    | 1     |
+| 3   | `extract_audio`     | ffmpeg → mono 16 kHz MP3 (~48 kbps)                                                                                                                                                                         | probe                                | 1     |
+| 4   | `transcribe`        | Segments with timestamps + detected language → original `record_transcripts`                                                                                                                                | extract_audio                        | 1     |
+| 5   | `diarize`           | Speaker labels per segment (S1, S2…) → `record_speakers`                                                                                                                                                    | transcribe                           | 6     |
+| 6   | `proxy`             | ffmpeg → browser-playable access copy (H.264/AAC MP4, ≤ `PROXY_MAX_HEIGHT`) when the master can't play in a browser; stored as a `proxy` record file, probed and checksummed                                | probe                                | 3     |
+| 7   | `scenes`            | Shot-change timestamps (PySceneDetect) → `record_scenes` with timecode in/out                                                                                                                               | probe                                | 5     |
+| 8   | `frames`            | Extract key frames (scene starts + every N seconds) → `record_frames`                                                                                                                                       | probe, scenes                        | 5     |
+| 9   | `vision`            | Frame descriptions via vision LLM                                                                                                                                                                           | frames                               | 5     |
+| 10  | `ocr`               | On-screen text per frame (EasyOCR)                                                                                                                                                                          | frames                               | 5     |
+| 11  | `objects`           | Object labels + face **count** per frame (YOLO)                                                                                                                                                             | frames                               | 5     |
+| 12  | `embed`             | Chunk transcript (~30–60 s windows) → embeddings                                                                                                                                                            | transcribe                           | 7     |
+| 13  | `generate_metadata` | LLM → `record_metadata` (titles, description, tags, chapters, etc.); from Phase 3 also suggested subjects, keywords and location                                                                            | transcribe (+ vision/ocr if enabled) | 1     |
 
 `probe` and `checksum` also run on every additional record file (mezzanine, proxy, clip), so each
 file has its own technical record and checksums.
@@ -306,8 +306,9 @@ Pipeline options (chosen on upload): `diarization`, `visual_analysis`, `ocr`, `o
 - The OpenAI upload limit is 25 MB. If the audio is larger, split it into ~10-minute chunks
   with ~2 s overlap, transcribe each, offset timestamps, and de-duplicate the overlap.
 - **local** (this project's default): `faster-whisper` on the NVIDIA GPU. Model, device and compute
-  type from env (`large-v3`, `cuda`, `int8_float16` fit the dev laptop's 6 GB RTX 3050; fall back to
+  type from env (`large-v3-turbo`, `cuda`, `int8_float16` fit the dev laptop's 6 GB RTX 3050; fall back to
   `medium` or CPU `int8` if memory runs out). Segment timestamps on, word timestamps off by default.
+  Speech chunks are decoded in batches (`LOCAL_WHISPER_BATCH_SIZE`, default 8; 1 turns it off).
   No upload limit, so no chunking is needed; the audio never leaves the machine.
 - Normalise all providers to the same `TranscriptSegment` schema.
 
@@ -366,125 +367,314 @@ top-k chunks → Laravel → `/chat` with those chunks → answer with timestamp
 
 ### Data model (migrations)
 
-All tables below already exist as migrations; later phases build features on them. Tables marked
-_(added in Phase N)_ are created in that phase. Records, projects, series, files, works and
-attachments use ULID primary keys (they appear in URLs); everything else uses big integers.
+The core tables follow the owner's data structure (below, in the owner's order). Tables and
+fields marked _(supporting)_ are not in that structure but keep features of this spec working
+(file versions, pipeline progress, fixity, approvals, visual analysis, usage, later phases).
+Records, projects, series, files, works and attachments use ULID primary keys (they appear in
+URLs); everything else uses big integers. Workflow fields (accession number, processing, approval,
+deletion) are set explicitly by the system or an admin, never mass-assigned.
 
-**People, lookups and locations**
+**Core tables**
 
-- `users` — starter kit, plus `role` (`admin|encoder|user`, default `user`), `is_active`,
-  `daily_processing_minutes_limit?` (null = config default). `role` and `is_active` are never
-  mass-assignable.
-- `regions`, `provinces` (`region_id`), `cities` (`province_id`, cities and municipalities),
-  `barangays` (`city_id`) — Philippine locations seeded by `LocationSeeder` from
-  `database/data/updated_phil.sql`, keeping the original IDs. Read-only in the app.
-- `production_agencies` — `name`, `acronym?`, `parent_id?`. A row with `parent_id` is a production
-  unit (division) of that agency. Admin-managed.
-- `genres`, `video_types` — `name`, `slug`, `sort_order`. Admin-managed lookup lists for consistent
-  classification and public filters.
+| Table                                         | Holds                                                                                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `production_agencies`                         | Producing agencies and their production units                                           |
+| `projects`                                    | Events and programmes (event name / project name)                                       |
+| `project_series`                              | Sessions, days or episode runs inside a project                                         |
+| `records`                                     | One archived video: descriptive fields and the master file                              |
+| `record_metadata`                             | AI generations (titles, description, tags, chapters…)                                   |
+| `record_contributors`                         | Credits: producer, director, videographer, editor, presenter / host, cast, contributors |
+| `record_technical_metadata`                   | How each file is encoded (codecs, resolution, frame rate, checksum…)                    |
+| `record_rights`                               | Rights and access metadata                                                              |
+| `record_subjects`                             | Subjects (people, organisations, places, topics, events)                                |
+| `record_keywords`                             | Keywords                                                                                |
+| `record_transcripts`                          | Transcripts, one per language                                                           |
+| `record_segments`                             | Timed transcript lines                                                                  |
+| `video_audit_logs`                            | The archive audit log (append-only)                                                     |
+| `access_logs`                                 | Views, streams, downloads and exports (append-only)                                     |
+| `regions`, `provinces`, `cities`, `barangays` | Philippine locations from `database/data/updated_phil.sql`                              |
+| `users`                                       | Admins, encoders and public viewers                                                     |
 
-**Grouping**
+#### Locations: `regions`, `provinces`, `cities`, `barangays`
 
-- `projects` — event or programme: `title`, `date?`, `description?`, `location?`, `region_id?`,
-  `prov_id?`, `city_id?`, `brgy_id?`, `agency_id?`, `thumbnail_path?`.
-- `project_series` — sub-event inside a project: `project_id` plus the same fields as `projects`.
-- `works` — `created_by`, `title`, `total_parts?`. Groups the reels/parts of one work; each part is
-  a record with `work_id`, `part_number`, `part_label` (e.g. "Reel 2").
+Loaded by `LocationSeeder` from the owner's `database/data/updated_phil.sql`, keeping its
+original IDs. Read-only in the app. Every location is the chain region → province →
+city/municipality → barangay (NCR's cities sit under the province "Metro Manila").
 
-**Records**
+- `regions` — id, name (e.g. "Region VII"), description (e.g. "Central Visayas")
+- `provinces` — id, region_id, name
+- `cities` — id, province_id, name (cities and municipalities)
+- `barangays` — id, city_id, name
 
-- `records` — one archived video:
-    - Ownership and grouping: `created_by` (encoder), `accession_number?` (unique),
-      `project_id?`, `project_series_id?`, `work_id?`, `part_number?`, `part_label?`, `agency_id?`,
-      `division_id?` (a production unit).
-    - Descriptive: `title`, `alternative_title?`, `description?`, `genre_id?`, `video_type_id?`,
-      `language?`, `language_confidence?`, `country_origin?`, `date_recorded?`,
-      `date_recorded_precision?` (`day|month|year|circa`), `date_recorded_source?`, `date_published?`,
-      `season_number?`, `episode_number?`.
-    - Location: `location?` (free text), `region_id?`, `prov_id?`, `city_id?`, `brgy_id?`,
-      `latitude?`, `longitude?`, `location_source?`.
-    - Thumbnail: `thumbnail_path?` (uploaded image) or `thumbnail_frame_id?` (one of its frames).
-    - Archival management: `security_classification` (`unclassified|restricted|confidential|secret|
-      top_secret`, default `unclassified`), `retention_period?`, `archival_value?`
-      (`permanent|temporary`), `disposition_date?`, `disposition_action?`
-      (`retain|transfer|destroy|review`).
-    - Processing: `processing_status` (`queued|processing|ready|failed|cancelled`),
-      `processing_error?`.
-    - Approval: `review_status` (`draft|submitted|approved|rejected|changes_requested`),
-      `submitted_at?`, `reviewed_by?`, `reviewed_at?`, `published_at?`.
-    - Timestamps and soft deletes. Workflow fields (accession number, processing, approval) are set
-      explicitly by the system or an admin, never mass-assigned.
-- `record_files` — `record_id`, `role` (`master|mezzanine|proxy|access`), `storage_location`,
-  `original_filename?`, `mime_type?`, `file_size?`, `md5_checksum?`, `sha256_checksum?`,
-  `expected_md5?`, `expected_sha256?`, `checksum_status` (`pending|ok|mismatch`).
-- `record_technical_metadata` — one per record file (`record_file_id`): `file_format`, `duration`,
-  `bitrate`, `start_timecode`; primary video stream: `video_codec`, `video_profile`, `resolution`,
-  `frame_rate`, `aspect_ratio`, `scan_type` (`progressive|interlaced_tff|interlaced_bff|unknown`),
-  `bit_depth`, `chroma_subsampling`, `color_space`, `color_primaries`, `color_transfer`; primary
-  audio: `audio_codec`, `audio_channels`, `audio_sample_rate`; `audio_tracks (jsonb)` for every
-  audio track; `raw_probe (jsonb)` with the full ffprobe + mediainfo output.
-- `fixity_checks` — `record_file_id`, `algorithm`, `expected`, `actual?`, `matched?`,
-  `triggered_by` (`ingest|schedule|user`), `checked_at`. **Append-only.**
+Wherever a table has `region_id`, `prov_id`, `city_id` and `brgy_id`, each level is optional but
+must belong to the level above it (validated in the FormRequest, `App\Support\LocationRules`).
+
+#### `production_agencies`
+
+The production side of a record's credits:
+
+- **Producing agency** — a row without a parent: `id`, `name`, `acronym?`
+- **Production unit** — a row with `parent_id` pointing to its agency (one level deep)
+
+The people in the production credits — **producer, director, videographer, editor,
+presenter / host and other contributors** — are stored per record in `record_contributors`
+(below), so one agency's list doesn't fill with names. Admins manage agencies and units; encoders
+pick from the list.
+
+#### `projects` (event name / project name)
+
+- id
+- title — event or project name
+- date — first day of the event
+- end_date _(supporting)_ — last day, for events that run several days; null for one day
+- description
+- location — venue, free text
+- region_id
+- prov_id
+- city_id
+- brgy_id
+- agency_id — producing agency
+- thumbnail_path — cover image (private media disk, served through an authorised route)
+- created_by _(supporting)_ — who created it; only that encoder and admins may edit it
+
+Every record is filed under a project (required at upload).
+
+#### `project_series`
+
+A session, day or episode run inside a project:
+
+- id
+- project_id
+- title — series name (e.g. "Day 1 — Opening")
+- date — first day
+- end_date _(supporting)_ — last day; null for one day
+- description
+- location
+- region_id
+- prov_id
+- city_id
+- brgy_id
+- agency_id
+- thumbnail_path
+
+A record may optionally be filed under one series of its project.
+
+#### `records`
+
+One archived video and its master file.
+
+Identity and grouping:
+
+- id
+- title
+- alternative_title
+- description
+- agency_id — producing agency (`production_agencies`, top level)
+- division_id — production unit (`production_agencies`, a unit of `agency_id`)
+- project_id — required
+- project_series_id _(supporting)_ — optional series of the project
+- accession_number _(supporting)_ — unique, assigned at ingest (Phase 3)
+- work_id, part_number, part_label _(supporting)_ — reels/parts of one work (Phase 3)
+- created_by _(supporting)_ — the encoder who added it
+
+Descriptive:
+
+- location — free text
+- region_id
+- prov_id
+- city_id
+- brgy_id
+- latitude, longitude, location_source _(supporting)_ — GPS from container tags (Phase 3)
+- genre_id — from the admin-managed `genres` list
+- video_type_id — from the admin-managed `video_types` list
+- language (+ language_confidence _(supporting)_, from transcription)
+- country_origin
+- keywords — `record_keywords` (many per record)
+- subject — `record_subjects` (many per record)
+- date_recorded (+ date_recorded_precision `day|month|year|circa` and date_recorded_source
+  _(supporting)_)
+- date_published
+- season_number, episode_number _(supporting)_
+
+Master file (the uploaded original; written at ingest and by the `checksum` and `probe` stages):
+
+- storage_location — path on the private media disk
+- filename — the stored (generated) file name
+- original_filename — the name it was uploaded with
+- mime_type
+- file_format
+- file_size
+- resolution
+- sha256_checksum — the file checksum
+- md5_checksum, expected_md5, expected_sha256, checksum_status `pending|ok|mismatch`
+  _(supporting)_ — fixity at ingest against a supplied manifest
+- thumbnail_id — the chosen frame (`record_frames`, Phase 5)
+- thumbnail_path _(supporting)_ — an uploaded thumbnail instead of a frame
+
+Archival management:
+
+- security_classification `unclassified|restricted|confidential|secret|top_secret`
+  (default `unclassified`)
+- retention_period
+- archival_value `permanent|temporary`
+- disposition_date, disposition_action `retain|transfer|destroy|review` _(supporting)_
+
+Status:
+
+- is_approved — true once an admin approves the record
+- is_deleted — true once the record is deleted (kept for audit; `deleted_at` records when)
+- review_status `draft|submitted|approved|rejected|changes_requested`, submitted_at,
+  reviewed_by, reviewed_at, published_at _(supporting)_ — the approval workflow behind
+  `is_approved` (Phase 4)
+- processing_status `queued|processing|ready|failed|cancelled`, processing_error
+  _(supporting)_ — pipeline state
+- created_at, updated_at, deleted_at
+
+#### `record_technical_metadata`
+
+How a file is encoded; one row per file (the master's row describes the record). Written by the
+`probe` stage, read-only in the app:
+
+- id
+- record_id
+- record_file_id _(supporting)_ — null for the master; set for the extra files in `record_files`
+- original_filename
+- file_format
+- video_codec
+- audio_codec
+- resolution
+- frame_rate
+- bitrate
+- aspect_ratio
+- audio_channels
+- audio_sample_rate
+- file_size
+- duration
+- sha256_checksum
+- video_profile, scan_type `progressive|interlaced_tff|interlaced_bff|unknown`, bit_depth,
+  chroma_subsampling, color_space, color_primaries, color_transfer, start_timecode,
+  audio_tracks (jsonb), raw_probe (jsonb) _(supporting)_ — preservation-grade detail
+
+#### `record_rights` — rights and access metadata
+
+One per record:
+
+| Field              | Column               | Example                                        |
+| ------------------ | -------------------- | ---------------------------------------------- |
+| Copyright holder   | `copyright_holder`   | DOST                                           |
+| Copyright year     | `copyright_year`     | 2026                                           |
+| Rights statement   | `rights_statement`   | Government-produced audiovisual material       |
+| License            | `license`            | Agency-defined license                         |
+| Access level       | `access_level`       | `public` / `internal` / `restricted` (default) |
+| Usage restrictions | `usage_restrictions` | Subject to agency approval                     |
+| Permission status  | `permission_status`  | `pending` / `approved` / `denied`              |
+| Release / consent  | `release_consent`    | `available` / `not_available`                  |
+
+_(supporting)_: `license_url`, `territories (jsonb)`, `embargo_until`.
+
+#### `record_contributors` (cast / production credits)
+
+- id
+- record_id
+- role `producer|director|videographer|editor|presenter|cast|contributor`
+  (`presenter` is shown as "Presenter / Host")
+- name
+- sort_order
+
+#### `record_metadata`
+
+AI generations; history is kept and one is active per record:
+
+- id
+- record_id
+- preset
+- custom_prompt
+- model
+- payload (jsonb; shape = `ai` in §10)
+- is_active
+
+#### `record_subjects`, `record_keywords`
+
+- `record_subjects` — id, record_id, subject, type `person|organisation|place|topic|event`,
+  source `manual|ai|transcript|ocr|…`, is_confirmed
+- `record_keywords` — id, record_id, keyword, source, is_confirmed
+
+AI, OCR and transcript suggestions stay unconfirmed until an encoder confirms them; only confirmed
+ones are public.
+
+#### `record_transcripts`, `record_segments`
+
+- `record_transcripts` — id, record_id, language, is_original (false for translations), status
+- `record_segments` — id, record_transcript_id, position, start, end, text, original_text,
+  record_speaker_id _(supporting)_, is_edited. Indexed by start time; full-text index on `text`.
+
+#### `video_audit_logs` (the archive audit log)
+
+Append-only; stores IDs without foreign keys so history survives a purge:
+
+- id
+- record_id — the archived record ("archive_id")
+- action `uploaded|updated|submitted|approved|changes_requested|rejected|reopened|deleted|
+  restored|transcoded|migrated|replaced|checksum_verified|checksum_failed|exported`
+- performed_by
+- performed_at
+- remarks — review notes and checksum results go here
+- record_file_id _(supporting)_ — the file an event concerns
+
+#### `access_logs`
+
+Append-only: id, record_id, user_id?, action `view|stream|download|export`, ip_address?,
+user_agent?, accessed_at. IP addresses are for audit only and visible to admins only.
+
+#### `users`
+
+Starter kit, plus `role` (`admin|encoder|user`, default `user`), `is_active`,
+`daily_processing_minutes_limit?` (null = config default). `role` and `is_active` are never
+mass-assignable.
+
+**Supporting tables** (not in the owner's structure; they keep the spec's features)
+
+- `genres`, `video_types` — `name`, `slug`, `sort_order`. Admin-managed lists behind
+  `records.genre_id` / `video_type_id` and the public filters.
+- `works` — `created_by`, `title`, `total_parts?`. Groups the reels/parts of one work (Phase 3).
+- `record_files` — the record's **extra** files: `record_id`, `role` (`mezzanine|proxy|access`),
+  `storage_location`, `original_filename?`, `mime_type?`, `file_size?`, `md5_checksum?`,
+  `sha256_checksum?`, `expected_md5?`, `expected_sha256?`, `checksum_status`. The master lives on
+  `records`. Each extra file has its own `record_technical_metadata` row (Phase 3).
+- `fixity_checks` — `record_id`, `record_file_id?` (null = master), `algorithm`, `expected`,
+  `actual?`, `matched?`, `triggered_by` (`ingest|schedule|user`), `checked_at`. Append-only.
 - `record_stages` — `record_id`, `stage` (§6), `status` (`pending|running|done|failed|skipped`),
   `progress (0–100)`, `message?`, `started_at?`, `finished_at?`. Unique per record and stage.
-- `record_metadata` — AI generations: `record_id`, `preset`, `custom_prompt?`, `model`,
-  `payload (jsonb)` (shape = `ai` in §10), `is_active`. History is kept; one active per record.
-- `record_contributors` — credits: `record_id`, `role` (`producer|director|videographer|editor|
-  presenter|cast|contributor`), `name`, `sort_order`.
-- `record_rights` — one per record: `copyright_holder?`, `copyright_year?`, `rights_statement?`,
-  `license?`, `license_url?`, `access_level` (`public|internal|restricted`, default `restricted`),
-  `usage_restrictions?`, `territories (jsonb)?`, `embargo_until?`, `permission_status`
-  (`pending|approved|denied`), `release_consent` (`available|not_available`).
-- `record_subjects` — `record_id`, `subject`, `type` (`person|organisation|place|topic|event`),
-  `source` (`manual|ai|transcript|ocr|...`), `is_confirmed`.
-- `record_keywords` — `record_id`, `keyword`, `source`, `is_confirmed`.
-- `record_speakers` — `record_id`, `label` (S1…), `display_name?`.
-- `record_transcripts` — one per language: `record_id`, `language`, `is_original` (false for
-  translations), `status`.
-- `record_segments` — `record_transcript_id`, `position`, `start`, `end`, `text`, `original_text`,
-  `record_speaker_id?`, `is_edited`. Indexed by start time; full-text index on `text` (PostgreSQL).
-- `record_frames` — `record_id`, `time_sec`, `path`, `is_scene_start`, `description?`, `ocr_text?`,
-  `objects (jsonb)?`, `face_count?` (counts only).
-- `record_scenes` — `record_id`, `kind` (`shot|scene`: shots are detected, scenes are user-defined
-  groups of shots), `start`, `end`, `tc_in?`, `tc_out?`, `label?`, `description?`.
-- `record_provenance` — one per record: `source_carrier?` (`born_digital|camera_card|digibeta|
-  betacam_sp|hdcam|dvcam|minidv|umatic|vhs|film_16mm|film_35mm|other`), `carrier_label?`,
-  `carrier_id?`, `transfer_date?`, `transfer_facility?`, `transfer_operator?`, `transfer_deck?`,
-  `transfer_settings?`, `notes?`.
+- `record_speakers` — `record_id`, `label` (S1…), `display_name?` (Phase 6).
+- `record_frames` — `record_id`, `time_sec`, `path`, `is_scene_start`, `description?`,
+  `ocr_text?`, `objects (jsonb)?`, `face_count?` (counts only) (Phase 5).
+- `record_scenes` — `record_id`, `kind` (`shot|scene`), `start`, `end`, `tc_in?`, `tc_out?`,
+  `label?`, `description?` (Phase 5).
+- `record_provenance` — one per record: `source_carrier?`, `carrier_label?`, `carrier_id?`,
+  `transfer_date?`, `transfer_facility?`, `transfer_operator?`, `transfer_deck?`,
+  `transfer_settings?`, `notes?` (Phase 3).
 - `record_attachments` — private files: `record_id`, `uploaded_by?`, `kind` (`release_form|
   contract|sidecar|subtitle|document|other`), `path`, `original_filename`, `mime_type`,
-  `file_size`, `sha256_checksum`, `description?`. Private disk only.
-
-**Logs and usage**
-
-- `video_audit_logs` — `record_id`, `record_file_id?`, `action` (`uploaded|updated|submitted|
-  approved|changes_requested|rejected|reopened|deleted|restored|transcoded|migrated|replaced|
-  checksum_verified|checksum_failed|exported`), `performed_by?`, `performed_at`, `remarks?` (review
-  notes go here). **Append-only**; stores IDs without foreign keys so history survives a purge.
-- `access_logs` — `record_id`, `user_id?`, `action` (`view|stream|download|export`), `ip_address?`,
-  `user_agent?`, `accessed_at`. **Append-only.**
+  `file_size`, `sha256_checksum`, `description?`. Private disk only (Phase 3).
 - `usage_records` — `user_id?`, `record_id?`, `kind` (`transcription_minutes|llm_input_tokens|
   llm_output_tokens|vision_frames|storage_bytes`), `quantity`, `estimated_cost?`, `occurred_at`.
-  **Append-only.**
-
-**Added in their phase**
-
-- `export_schemas` _(Phase 2)_ — `user_id`, `name`, `fields (jsonb: dot-paths)`, `is_default`.
-- `batches` _(Phase 6)_ — `created_by`, `name?`, `status`, `total`, `completed`, `failed`,
-  `zip_path?`; records get `batch_id?`.
-- `transcript_chunks` _(Phase 7)_ — `record_id`, `start`, `end`, `text`,
-  `embedding vector(EMBEDDING_DIMENSIONS)` with an HNSW index.
-- `chat_messages` _(Phase 7)_ — `record_id`, `user_id`, `role`, `content`, `citations (jsonb)`.
-- `clips` _(Phase 7)_ — `record_id`, `start`, `end`, `title?`, `path?`, `status`.
-- `youtube_accounts`, `youtube_publications` _(Phase 7)_ — connected channels (encrypted tokens) and
-  publish attempts.
+  Append-only.
+- _Added in their phase:_ `export_schemas` (Phase 2) — `user_id`, `name`, `fields (jsonb)`,
+  `is_default`; `batches` (Phase 6) — `created_by`, `name?`, `status`, `total`, `completed`,
+  `failed`, `zip_path?` (records get `batch_id?`); `transcript_chunks` (Phase 7) — `record_id`,
+  `start`, `end`, `text`, `embedding vector(EMBEDDING_DIMENSIONS)` with an HNSW index;
+  `chat_messages` (Phase 7) — `record_id`, `user_id`, `role`, `content`, `citations (jsonb)`;
+  `clips` (Phase 7) — `record_id`, `start`, `end`, `title?`, `path?`, `status`;
+  `youtube_accounts`, `youtube_publications` (Phase 7).
 
 **Access (policies on every model):** encoders see and edit only the records they created (and only
 while `review_status` is `draft` or `changes_requested`); admins see and edit everything; public
-visitors see only records that pass `distribute`.
+visitors see only records that pass `distribute`. Projects and series are shared: every encoder
+can see them and file under them; only the project's creator and admins may edit them. Agencies,
+genres and video types are read by encoders and managed by admins.
 
 **Distribution policy:** a single check (`RecordPolicy::distribute`) decides whether a record may
-leave the archive. It requires `review_status = approved`, `published_at` set, not soft-deleted,
+leave the archive. It requires `is_approved` (with `published_at` set), not `is_deleted`,
 `security_classification = unclassified`, and `record_rights->allowsPublicAccess()` (access level
 `public`, permission `approved`, no embargo in force). The public catalogue, YouTube publishing,
 public-API export and batch ZIPs all use it. Enforce it server-side; hiding buttons is not enough.
@@ -530,7 +720,11 @@ Routes are split into one file per role (see AGENTS.md):
 - `POST /records/{record}/cancel`, `POST /records/{record}/retry?stage=`
 - `POST /records/{record}/submit` — submit for approval (only from `draft` or `changes_requested`).
 - `GET|POST /projects`, `GET|PATCH /projects/{project}`, `POST /projects/{project}/series`,
-  `PATCH /project-series/{series}` — manage projects (events) and their series.
+  `PATCH /project-series/{series}` — manage projects (events) and their series. Project create and
+  edit are multipart (they may carry the thumbnail; edits are sent as POST with `_method=PATCH`).
+  `GET /projects/{project}/thumbnail` serves the cover image behind the policy.
+- `GET /projects/options?q=` — projects with their series for the upload picker;
+  `GET /agencies/options` — agencies with their units for the agency pickers.
 - `POST /works`, `GET /works/{work}`, `PATCH /works/{work}` — group records as reels/parts.
 - `GET /batches/{batch}`, `GET /batches/{batch}/download` (ZIP of all exports + optional thumbnails).
 - `GET /settings/export-schemas`, `GET /settings/api-tokens`, `GET /settings/youtube`.
@@ -611,13 +805,17 @@ Pages are grouped by role folder (see AGENTS.md).
 
 - `pages/encoder/dashboard.tsx` — record history table/grid with thumbnail, title, duration,
   processing status badge, review status badge, created date; search; status filters; "New record".
-- `pages/encoder/records/create.tsx` — tabs: **Upload** (dropzone, multiple files → batch, paste from
-  clipboard), **URL** (one per line). Project and series pickers. Options panel: preset, custom
-  prompt, toggles for diarization / visual analysis / OCR / objects, translation languages.
+- `pages/encoder/records/create.tsx` — **Import media**, laid out like a video editor: media bin
+  (drop, paste or browse; batch from Phase 6; **URL** import from Phase 6), a source monitor that
+  plays the file before upload, and an inspector with the **project picker (required; search or
+  create)**, series picker, agency and production unit, title, preset, custom prompt and (later)
+  toggles for diarization / visual analysis / OCR / objects and translation languages.
 - `pages/encoder/records/show.tsx` — the workspace (layout below), with a "Submit for approval"
   button and the admin's review notes; read-only for encoders once submitted or approved.
-- `pages/encoder/projects/index.tsx`, `pages/encoder/projects/show.tsx` — projects (events), their
-  series and the records filed under them.
+- `pages/encoder/projects/index.tsx`, `pages/encoder/projects/show.tsx` — projects (events) with
+  thumbnail, dates, agency and place; their series and the records filed under them; create and
+  edit forms (title, agency, thumbnail, first and last day, venue, region → province →
+  city/municipality → barangay, description).
 - `pages/encoder/batches/show.tsx` — batch progress list + "Download ZIP".
 - `pages/encoder/settings/*` — export schemas builder, API tokens, YouTube connection.
 
@@ -629,7 +827,8 @@ Pages are grouped by role folder (see AGENTS.md).
 - `pages/admin/records.tsx` — all records, any encoder.
 - `pages/admin/users/index.tsx` + `partials/` — user list, create, change role, deactivate, limits.
 - `pages/admin/usage.tsx` — usage charts and table per encoder/record, date range, CSV download.
-- `pages/admin/agencies.tsx`, `pages/admin/genres.tsx`, `pages/admin/video-types.tsx` — lookups.
+- `pages/admin/agencies.tsx` — producing agencies and their production units (add, rename,
+  delete when unused). `pages/admin/genres.tsx`, `pages/admin/video-types.tsx` — lookups.
 
 **Public (`user` role and guests):**
 
@@ -645,19 +844,26 @@ Pages are grouped by role folder (see AGENTS.md).
 
 ### Workspace layout (`records/show.tsx`)
 
+Laid out like a video editor (CapCut / Vegas style, owner's request), dark in both themes:
+
 ```
-┌───────────────────────────────┬──────────────────────────────┐
-│  VideoPlayer (+ captions)     │  Right panel (Tabs):         │
-│  Timeline: scenes, chapters,  │   Metadata | Archive |       │
-│  speaker colours, waveform    │   Visuals | Translations |   │
-├───────────────────────────────┤   Chat | Clips | Export |    │
-│                               │   Publish                    │
-│  TranscriptPanel              │                              │
-│  [search] [speaker filter]    │                              │
-│  segments (virtualised)       │                              │
-└───────────────────────────────┴──────────────────────────────┘
- PipelineProgress bar (top, while processing)
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Toolbar: project › series, title, status, agency, Export                  │
+│ PipelineProgress strip (while processing or when a stage failed)          │
+├──────────────────┬──────────────────────────────┬────────────────────────┤
+│ TranscriptPanel  │ Preview monitor              │ Inspector (Tabs):      │
+│ [search]         │ VideoPlayer (+ captions)     │  Metadata | Archive |  │
+│ segments         │ Transport: ±5 s, play,       │  Visuals | Translations│
+│ (virtualised)    │ time, mute, full screen      │  | Chat | Clips |      │
+│                  │                              │  Export | Publish      │
+├──────────────────┴──────────────────────────────┴────────────────────────┤
+│ Timeline: ruler (scrub, zoom) · chapters · transcript · audio waveform ·  │
+│ (later) scenes, speakers, clips                                           │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
+
+The waveform comes from `records/{id}/waveform.json` (peaks written by the `extract_audio`
+stage), never by decoding the media in the browser.
 
 ### Key components
 
@@ -761,9 +967,15 @@ Pages are grouped by role folder (see AGENTS.md).
         "project": {
             "id": "01J...",
             "title": "Regional S&T Fair 2026",
-            "date": "2026-07-10"
+            "date": "2026-07-10",
+            "endDate": "2026-07-12"
         },
-        "series": { "id": "01J...", "title": "Day 1", "date": "2026-07-10" },
+        "series": {
+            "id": "01J...",
+            "title": "Day 1",
+            "date": "2026-07-10",
+            "endDate": null
+        },
         "work": {
             "id": "01J...",
             "title": "...",
@@ -779,6 +991,7 @@ Pages are grouped by role folder (see AGENTS.md).
             "name": "Science and Technology Information Institute",
             "acronym": "STII"
         },
+        "isApproved": true,
         "reviewStatus": "approved",
         "publishedAt": "2026-07-20T09:00:00Z"
     },
@@ -1020,13 +1233,13 @@ Unconfirmed subjects and keywords are left out of public-facing exports.
 Every record carries a catalogue record in five categories. The table says what each one answers,
 which fields hold it, and how the system fills it in.
 
-| Category                      | Question it answers                 | Where it lives                                                                                                                                                                                                                                                    | How we capture it                                                                                                                                                                                                              |
-| ----------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Descriptive**               | What is this?                       | `records` (title, alternative title, description, genre, video type, language, country of origin, date recorded + precision, season/episode, location + region/province/city/barangay + GPS), `record_subjects`, `record_keywords`, `projects` / `project_series` | AI suggests description, subjects, keywords and language. Container tags suggest date recorded and GPS. The encoder confirms suggestions and fills in project, series, genre, video type and location.                         |
-| **Technical**                 | How is it encoded?                  | `record_files` (format, size, checksums) and `record_technical_metadata` (codecs, profile, resolution, frame rate, aspect ratio, scan type, bit depth, chroma, colour, audio tracks, sample rate, duration, start timecode)                                       | Automatic: the `probe` stage for every record file. Read-only in the UI.                                                                                                                                                       |
-| **Administrative / rights**   | Who owns it and how can it be used? | `record_rights`, `record_contributors`, `record_attachments` (release forms), `records` (accession number, agency, production unit, security classification, retention period, archival value, disposition)                                                       | Manual entry in the Rights, Credits and Archival tabs. Accession number auto-assigned at ingest from `ACCESSION_NUMBER_FORMAT` (editable, unique). Embargo and classification enforced server-side.                            |
-| **Preservation / provenance** | What has happened to it?            | `record_files` checksums, `fixity_checks`, `record_provenance`, `video_audit_logs`                                                                                                                                                                                | Checksums and ingest date are automatic (`checksum` stage). Source carrier and transfer details are manual. Uploads, transcodes, migrations, replacements and checksum results are logged automatically in `video_audit_logs`. |
-| **Structural**                | How do the pieces relate?           | `record_files` (master, mezzanine, proxy, access), `works` (reels/parts), `record_attachments` (sidecars), `record_transcripts` (subtitles by language), `record_scenes`                                                                                          | Files tracked per role (proxy generated automatically). Reels/parts grouped into a work. Shot segments come from the `scenes` stage with timecode in/out; scenes are user-defined groups of shots.                             |
+| Category                      | Question it answers                 | Where it lives                                                                                                                                                                                                                                                                  | How we capture it                                                                                                                                                                                                              |
+| ----------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Descriptive**               | What is this?                       | `records` (title, alternative title, description, genre, video type, language, country of origin, date recorded + precision, season/episode, location + region/province/city/barangay + GPS), `record_subjects`, `record_keywords`, `projects` / `project_series`               | AI suggests description, subjects, keywords and language. Container tags suggest date recorded and GPS. The encoder confirms suggestions and fills in project, series, genre, video type and location.                         |
+| **Technical**                 | How is it encoded?                  | `records` (master file: format, size, resolution, checksum), `record_files` (extra versions) and `record_technical_metadata` (codecs, profile, resolution, frame rate, aspect ratio, scan type, bit depth, chroma, colour, audio tracks, sample rate, duration, start timecode) | Automatic: the `probe` stage for every record file. Read-only in the UI.                                                                                                                                                       |
+| **Administrative / rights**   | Who owns it and how can it be used? | `record_rights`, `record_contributors`, `record_attachments` (release forms), `records` (accession number, agency, production unit, security classification, retention period, archival value, disposition)                                                                     | Manual entry in the Rights, Credits and Archival tabs. Accession number auto-assigned at ingest from `ACCESSION_NUMBER_FORMAT` (editable, unique). Embargo and classification enforced server-side.                            |
+| **Preservation / provenance** | What has happened to it?            | `records` and `record_files` checksums, `fixity_checks`, `record_provenance`, `video_audit_logs`                                                                                                                                                                                | Checksums and ingest date are automatic (`checksum` stage). Source carrier and transfer details are manual. Uploads, transcodes, migrations, replacements and checksum results are logged automatically in `video_audit_logs`. |
+| **Structural**                | How do the pieces relate?           | `records` (master) and `record_files` (mezzanine, proxy, access), `works` (reels/parts), `record_attachments` (sidecars), `record_transcripts` (subtitles by language), `record_scenes`                                                                                         | Files tracked per role (proxy generated automatically). Reels/parts grouped into a work. Shot segments come from the `scenes` stage with timecode in/out; scenes are user-defined groups of shots.                             |
 
 ### Rules
 
@@ -1119,9 +1332,10 @@ STORAGE_ROOT=/data/storage
 REDIS_URL=redis://redis:6379/1
 
 TRANSCRIPTION_PROVIDER=local       # local | openai | assemblyai (owner: local on the GPU)
-LOCAL_WHISPER_MODEL=large-v3       # medium if GPU memory runs out
+LOCAL_WHISPER_MODEL=large-v3-turbo   # large-v3: a little more accurate, several times slower
 LOCAL_WHISPER_DEVICE=cuda          # cuda | cpu
 LOCAL_WHISPER_COMPUTE_TYPE=int8_float16   # int8 on CPU
+LOCAL_WHISPER_BATCH_SIZE=8         # chunks decoded at once; lower if CUDA runs out of memory, 1 = off
 LLM_PROVIDER=openai                # openai | anthropic (owner uses OpenAI)
 LLM_MODEL=                         # set to a current model id
 VISION_MODEL=                      # vision-capable model id
@@ -1163,7 +1377,14 @@ summary of what to try manually. The schema in §8 already exists; each phase bu
 - Roles: `role` middleware, route files per role (`admin.php`, `encoder.php`, `user.php`,
   `all.php`), admin user management (create encoders and admins, change role, deactivate).
   Encoders see only their own records; admins see all.
-- Upload (dropzone + paste) creating a `record` and its master `record_file`.
+- Projects (events) and series: create, edit, list and project pages, with title, agency,
+  thumbnail, first and last day, venue, the region → province → city/municipality → barangay
+  chain (public cached `/locations/*` lookups + `LocationPicker`) and description. Every upload
+  is filed under a project; the series is optional. Only a project's creator and admins edit it.
+- Agencies: admin page for producing agencies and their production units; agency on projects;
+  agency and production unit on records (defaulting to the project's agency).
+- Upload (editor-style Import media page: media bin with drop, paste and browse, local preview,
+  chunked resumable upload) creating a `record` that holds its master file.
 - Pipeline stages: `probe` (`record_technical_metadata`), `checksum` (MD5 + SHA-256, logged in
   `video_audit_logs`), `extract_audio`, `transcribe` (local faster-whisper on the GPU by default; the OpenAI provider,
   with chunking for > 25 MB, stays available behind the same interface), language detection, `generate_metadata` (generic + youtube presets; titles, description, summary, tags,
@@ -1171,16 +1392,18 @@ summary of what to try manually. The schema in §8 already exists; each phase bu
   transcription and LLM call.
 - If the uploaded master can't play in a browser (e.g. ProRes, MXF), the workspace shows a notice;
   the proxy arrives in Phase 3.
-- Workspace: VideoPlayer, synced TranscriptPanel, click-to-seek, **pause → copy current line**,
-  transcript search, inline editing, MetadataPanel (edit fields, regenerate), PipelineProgress
-  over Reverb.
+- Workspace (editor layout, §9): preview monitor with transport, synced TranscriptPanel,
+  click-to-seek, **pause → copy current line**, transcript search, inline editing, metadata
+  inspector (edit fields, regenerate, generation history), timeline (ruler, zoom, chapters,
+  transcript and waveform tracks), PipelineProgress over Reverb.
 - Dashboard history list.
 - JSON export.
 - **Done when:** upload a 5-minute video → see live progress per stage → transcript syncs with
   playback → pause and copy a line → edit a segment → regenerate metadata → download valid JSON
   whose `technical` block lists the file's codecs and both checksums (checksums match a manually
   computed SHA-256). An admin creates an encoder account, and that encoder cannot open another
-  encoder's record.
+  encoder's record. A multi-day project with agency, thumbnail and barangay is created and edited,
+  and a video uploaded under it shows the project, series and agency.
 
 ### Phase 2 — More AI output and export formats
 
@@ -1196,7 +1419,7 @@ summary of what to try manually. The schema in §8 already exists; each phase bu
 
 ### Phase 3 — Archival metadata
 
-- Projects and series (create, edit, file records under them); works (reels/parts).
+- Works (reels/parts). (Projects, series, locations and agencies moved to Phase 1.)
 - ArchivePanel tabs: Descriptive (genre, video type, date precision, season/episode, subjects and
   keywords with confirm/reject), Location (`LocationPicker` + GPS), Credits (agency, unit,
   contributors), Technical, Rights (incl. embargo, territories, licence URL), Provenance, Archival
@@ -1224,7 +1447,7 @@ summary of what to try manually. The schema in §8 already exists; each phase bu
 - Approval workflow on `records.review_status`, logged with notes in `video_audit_logs`: "Submit for
   approval", admin review queue with video preview and notes, request changes / reject / approve,
   reopen. Submitted and approved records are read-only for encoders.
-- Admin CRUD for agencies and units, genres and video types.
+- Admin CRUD for genres and video types (agencies and units moved to Phase 1).
 - Admin overview and usage dashboard (per encoder / record, date range, CSV download). Daily
   processing limits per encoder, checked before processing starts.
 - Public catalogue in `routes/user.php`: home, browse (date timeline, project, series, genre, video

@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use App\Enums\ScanType;
+use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * How one record file is encoded. Written by the probe step; read-only in the app.
@@ -60,6 +60,20 @@ class RecordTechnicalMetadata extends Model
             'audio_tracks' => 'array',
             'raw_probe' => 'array',
         ];
+    }
+
+    /**
+     * Whether browsers can play the file directly: an MP4/MOV/WebM container with
+     * H.264, VP8/9 or AV1 video and AAC, MP3, Opus or Vorbis audio. ProRes, DNxHD,
+     * MPEG-2, MXF and the like need the proxy (Phase 3).
+     */
+    public function isBrowserPlayable(?string $mimeType): bool
+    {
+        $container = in_array($mimeType, ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v'], true);
+        $video = $this->video_codec === null || in_array($this->video_codec, ['h264', 'vp8', 'vp9', 'av1'], true);
+        $audio = $this->audio_codec === null || in_array($this->audio_codec, ['aac', 'mp3', 'opus', 'vorbis'], true);
+
+        return $container && $video && $audio;
     }
 
     /**

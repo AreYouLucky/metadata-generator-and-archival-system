@@ -4,10 +4,10 @@ namespace App\Models;
 
 use App\Enums\PipelineStage;
 use App\Enums\StageStatus;
+use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * Progress of one processing step for a record.

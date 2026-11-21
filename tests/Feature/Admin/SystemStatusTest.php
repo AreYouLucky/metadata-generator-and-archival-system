@@ -38,11 +38,13 @@ class SystemStatusTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_a_deactivated_admin_is_refused(): void
+    public function test_a_deactivated_admin_is_signed_out(): void
     {
         $this->actingAs(User::factory()->admin()->inactive()->create())
             ->get(route('admin.system.show'))
-            ->assertForbidden();
+            ->assertRedirect(route('login'));
+
+        $this->assertGuest();
     }
 
     public function test_guests_are_sent_to_the_login_page(): void
@@ -62,12 +64,12 @@ class SystemStatusTest extends TestCase
 
     public function test_the_ai_health_endpoint_returns_the_service_status(): void
     {
-        Http::fake(['ai-api.test/health' => Http::response(['status' => 'ok', 'version' => '0.1.0', 'gpu' => false])]);
+        Http::fake(['ai-api.test/health' => Http::response(['status' => 'ok', 'version' => '0.1.0', 'gpu' => true, 'gpu_name' => 'NVIDIA GeForce RTX 3050'])]);
 
         $this->actingAs(User::factory()->admin()->create())
             ->getJson(route('admin.system.ai-health'))
             ->assertOk()
-            ->assertJson(['reachable' => true, 'status' => 'ok', 'version' => '0.1.0']);
+            ->assertJson(['reachable' => true, 'status' => 'ok', 'version' => '0.1.0', 'gpu' => true, 'gpu_name' => 'NVIDIA GeForce RTX 3050']);
     }
 
     public function test_a_broadcast_ping_dispatches_the_event_from_laravel(): void

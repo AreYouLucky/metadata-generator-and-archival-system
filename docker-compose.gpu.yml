@@ -1,7 +1,8 @@
-# Optional NVIDIA GPU for local Whisper / pyannote / YOLO (Phase 5+).
+# NVIDIA GPU for local Whisper (Phase 1) and later pyannote / YOLO.
 # docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+# Needs a current NVIDIA driver and Docker Desktop's WSL2 GPU support.
 services:
-    ai-worker:
+    ai-worker-gpu:
         deploy:
             resources:
                 reservations:

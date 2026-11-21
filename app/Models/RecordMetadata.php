@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Enums\Preset;
+use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * One AI metadata generation for a record; history is kept and one is active.

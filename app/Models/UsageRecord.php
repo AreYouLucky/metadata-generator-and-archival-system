@@ -4,10 +4,10 @@ namespace App\Models;
 
 use App\Enums\UsageKind;
 use App\Models\Concerns\AppendOnly;
+use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * Metered AI usage attributed to an encoder. Append-only.

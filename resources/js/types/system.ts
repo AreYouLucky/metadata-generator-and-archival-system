@@ -2,7 +2,9 @@ export type AiServiceHealth = {
     reachable: boolean;
     status: string | null;
     version: string | null;
+    /** The transcription worker's GPU (published by the running worker). */
     gpu: boolean | null;
+    gpu_name: string | null;
     latency_ms: number | null;
     error: string | null;
 };

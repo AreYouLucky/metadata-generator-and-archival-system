@@ -5,6 +5,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app import __version__
 from app.api import ping as ping_module
 from app.security import signed_headers
 from tests.conftest import SECRET
@@ -35,8 +36,9 @@ def test_health_is_open_and_reports_the_version(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-    assert response.json()["version"] == "0.1.0"
+    assert response.json()["version"] == __version__
     assert isinstance(response.json()["gpu"], bool)
+    assert "gpu_name" in response.json()
 
 
 def test_a_signed_ping_queues_the_callback_task(client: TestClient, queued: list[str]) -> None:

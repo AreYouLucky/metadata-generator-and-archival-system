@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPhilippineLocation;
+use Carbon\CarbonImmutable as Carbon;
 use Database\Factories\ProjectSeriesFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -9,7 +11,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Carbon;
 
 /**
  * A series or sub-event inside a project.
@@ -18,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string $project_id
  * @property string $title
  * @property Carbon|null $date
+ * @property Carbon|null $end_date
  * @property string|null $description
  * @property string|null $location
  * @property int|null $region_id
@@ -29,11 +31,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['title', 'date', 'description', 'location', 'region_id', 'prov_id', 'city_id', 'brgy_id', 'agency_id'])]
+#[Fillable(['title', 'date', 'end_date', 'description', 'location', 'region_id', 'prov_id', 'city_id', 'brgy_id', 'agency_id'])]
 class ProjectSeries extends Model
 {
     /** @use HasFactory<ProjectSeriesFactory> */
-    use HasFactory, HasUlids;
+    use HasFactory, HasPhilippineLocation, HasUlids;
 
     protected $table = 'project_series';
 
@@ -46,6 +48,7 @@ class ProjectSeries extends Model
     {
         return [
             'date' => 'date',
+            'end_date' => 'date',
         ];
     }
 

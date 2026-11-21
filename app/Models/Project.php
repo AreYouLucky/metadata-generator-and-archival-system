@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPhilippineLocation;
+use Carbon\CarbonImmutable as Carbon;
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -9,14 +11,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * An event or programme that groups records.
  *
  * @property string $id
+ * @property int|null $created_by
  * @property string $title
  * @property Carbon|null $date
+ * @property Carbon|null $end_date
  * @property string|null $description
  * @property string|null $location
  * @property int|null $region_id
@@ -27,12 +31,13 @@ use Illuminate\Support\Carbon;
  * @property string|null $thumbnail_path
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
-#[Fillable(['title', 'date', 'description', 'location', 'region_id', 'prov_id', 'city_id', 'brgy_id', 'agency_id'])]
+#[Fillable(['title', 'date', 'end_date', 'description', 'location', 'region_id', 'prov_id', 'city_id', 'brgy_id', 'agency_id'])]
 class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
-    use HasFactory, HasUlids;
+    use HasFactory, HasPhilippineLocation, HasUlids, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.
@@ -43,7 +48,16 @@ class Project extends Model
     {
         return [
             'date' => 'date',
+            'end_date' => 'date',
         ];
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**

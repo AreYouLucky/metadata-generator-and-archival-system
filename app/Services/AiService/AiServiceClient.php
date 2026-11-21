@@ -23,8 +23,9 @@ class AiServiceClient
 
     /**
      * Never throws: an unreachable or unhealthy service is reported in the result.
+     * `gpu` / `gpu_name` describe the transcription worker's GPU, not the API's.
      *
-     * @return array{reachable: bool, status: string|null, version: string|null, gpu: bool|null, latency_ms: int|null, error: string|null}
+     * @return array{reachable: bool, status: string|null, version: string|null, gpu: bool|null, gpu_name: string|null, latency_ms: int|null, error: string|null}
      */
     public function health(): array
     {
@@ -43,6 +44,7 @@ class AiServiceClient
             'status' => is_string($response->json('status')) ? $response->json('status') : null,
             'version' => is_string($response->json('version')) ? $response->json('version') : null,
             'gpu' => is_bool($response->json('gpu')) ? $response->json('gpu') : null,
+            'gpu_name' => is_string($response->json('gpu_name')) ? $response->json('gpu_name') : null,
             'latency_ms' => (int) round((hrtime(true) - $startedAt) / 1_000_000),
             'error' => null,
         ];
@@ -61,16 +63,45 @@ class AiServiceClient
     }
 
     /**
+     * Queue the processing pipeline for a record's master file. Returns the job id;
+     * results arrive later on the signed /internal callbacks.
+     *
+     * @param  array{record_id: string, record_file_id: string, video_path: string, options: array<string, mixed>}  $payload
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function process(array $payload): string
+    {
+        return (string) $this->send('POST', '/jobs/process', $payload)->throw()->json('job_id');
+    }
+
+    /**
+     * Generate AI metadata synchronously (used by GenerateMetadataJob for regenerations).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function generateMetadata(array $payload): array
+    {
+        /** @var array<string, mixed> */
+        return $this->send('POST', '/generate/metadata', $payload, timeoutSeconds: 300)->throw()->json();
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      *
      * @throws ConnectionException
      */
-    private function send(string $method, string $path, array $payload = []): Response
+    private function send(string $method, string $path, array $payload = [], ?int $timeoutSeconds = null): Response
     {
-        $body = $method === 'GET' ? '' : json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $body = $method === 'GET' ? '' : json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         $request = Http::baseUrl($this->baseUrl)
-            ->timeout($this->timeoutSeconds)
+            ->timeout($timeoutSeconds ?? $this->timeoutSeconds)
             ->connectTimeout(3)
             ->acceptJson()
             ->withHeaders($this->signature->headers($body));
@@ -83,7 +114,7 @@ class AiServiceClient
     }
 
     /**
-     * @return array{reachable: false, status: null, version: null, gpu: null, latency_ms: null, error: string}
+     * @return array{reachable: false, status: null, version: null, gpu: null, gpu_name: null, latency_ms: null, error: string}
      */
     private function unreachable(string $error): array
     {
@@ -92,6 +123,7 @@ class AiServiceClient
             'status' => null,
             'version' => null,
             'gpu' => null,
+            'gpu_name' => null,
             'latency_ms' => null,
             'error' => $error,
         ];

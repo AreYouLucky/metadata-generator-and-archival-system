@@ -10,6 +10,7 @@ use App\Enums\MetadataSource;
 use App\Enums\ProcessingStatus;
 use App\Enums\ReviewStatus;
 use App\Enums\SecurityClassification;
+use Carbon\CarbonImmutable as Carbon;
 use Database\Factories\RecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -19,7 +20,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 
 /**
  * One archived video. Workflow fields (accession number, processing, approval) are set explicitly, never mass-assigned.
@@ -139,11 +139,13 @@ class Record extends Model
     }
 
     /**
+     * Includes deleted projects, so a video still shows the event it was filed under.
+     *
      * @return BelongsTo<Project, $this>
      */
     public function project(): BelongsTo
     {
-        return $this->belongsTo(Project::class);
+        return $this->belongsTo(Project::class)->withTrashed();
     }
 
     /**

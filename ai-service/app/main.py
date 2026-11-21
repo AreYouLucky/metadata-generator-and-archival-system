@@ -1,7 +1,12 @@
+import logging
+
 from fastapi import FastAPI
 
 from app import __version__
-from app.api import health, ping
+from app.api import generate, health, jobs, ping
+
+# Structured enough to grep: every pipeline log line carries record_id=... (PROJECT_SPEC §14).
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 app = FastAPI(
     title="MGAS AI service",
@@ -14,3 +19,5 @@ app = FastAPI(
 
 app.include_router(health.router)
 app.include_router(ping.router)
+app.include_router(jobs.router)
+app.include_router(generate.router)

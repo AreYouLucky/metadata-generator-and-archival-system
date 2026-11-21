@@ -24,4 +24,15 @@ class DashboardTest extends TestCase
         $response = $this->get(route('dashboard'));
         $response->assertOk();
     }
+
+    public function test_encoders_and_admins_are_sent_to_their_record_history(): void
+    {
+        $this->actingAs(User::factory()->encoder()->create())
+            ->get(route('dashboard'))
+            ->assertRedirect(route('records.index'));
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get(route('dashboard'))
+            ->assertRedirect(route('records.index'));
+    }
 }

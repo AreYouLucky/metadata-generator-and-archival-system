@@ -24,7 +24,12 @@ export default function AiServiceCard() {
         ? [
               ['Status', data.status ?? 'unknown'],
               ['Version', data.version ?? 'unknown'],
-              ['GPU', data.gpu ? 'available' : 'not available'],
+              [
+                  'GPU (transcription)',
+                  data.gpu
+                      ? (data.gpu_name ?? 'available')
+                      : 'not available (GPU worker not running)',
+              ],
               ['Response time', `${data.latency_ms ?? '?'} ms`],
           ]
         : [];

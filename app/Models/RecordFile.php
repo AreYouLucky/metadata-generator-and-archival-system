@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ChecksumStatus;
 use App\Enums\FileRole;
+use Carbon\CarbonImmutable as Carbon;
 use Database\Factories\RecordFileFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -13,7 +14,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Carbon;
 
 /**
  * A stored file of a record (master, mezzanine, proxy, access). Checksums are written by the pipeline only.

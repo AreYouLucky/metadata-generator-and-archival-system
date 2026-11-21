@@ -5,12 +5,12 @@ namespace App\Models;
 use App\Enums\AccessLevel;
 use App\Enums\PermissionStatus;
 use App\Enums\ReleaseConsent;
+use Carbon\CarbonImmutable as Carbon;
 use Database\Factories\RecordRightsFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * Rights and access metadata for a record.

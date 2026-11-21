@@ -26,11 +26,13 @@ class HorizonAccessTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_deactivated_admins_are_refused(): void
+    public function test_deactivated_admins_are_signed_out(): void
     {
         $this->actingAs(User::factory()->admin()->inactive()->create())
             ->get('/horizon')
-            ->assertForbidden();
+            ->assertRedirect(route('login'));
+
+        $this->assertGuest();
     }
 
     public function test_guests_are_sent_to_the_login_page(): void

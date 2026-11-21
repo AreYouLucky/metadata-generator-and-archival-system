@@ -4,12 +4,12 @@ namespace App\Models;
 
 use App\Enums\AuditAction;
 use App\Models\Concerns\AppendOnly;
+use Carbon\CarbonImmutable as Carbon;
 use Database\Factories\VideoAuditLogFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * An entry in a record's append-only audit log, including review notes. Rows are never updated or deleted.
