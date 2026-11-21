@@ -106,6 +106,32 @@ export type TranscriptSegment = {
     end: number;
     text: string;
     is_edited: boolean;
+    speaker_id: number | null;
+};
+
+/** A speaker label (S1, S2…) and the name an encoder gave it. */
+export type Speaker = {
+    id: number;
+    label: string;
+    display_name: string | null;
+};
+
+export type ContributorRole =
+    | 'producer'
+    | 'director'
+    | 'videographer'
+    | 'editor'
+    | 'presenter'
+    | 'cast'
+    | 'contributor';
+
+export type ContributorRoleOption = { value: ContributorRole; label: string };
+
+/** A credit; `id` is absent until the row has been saved. */
+export type Contributor = {
+    id?: number;
+    role: ContributorRole;
+    name: string;
 };
 
 export type WorkspaceTranscript = {

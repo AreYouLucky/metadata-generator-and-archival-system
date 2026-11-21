@@ -5,13 +5,21 @@ import {
     useRef,
     useState,
 } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type {
+    MouseEvent as ReactMouseEvent,
+    PointerEvent as ReactPointerEvent,
+} from 'react';
+import { toast } from 'sonner';
+import { useDraftChapters } from '@/hooks/use-metadata-draft';
+import { formatTimestamp } from '@/lib/utilities';
+import { useMetadataDraftStore } from '@/stores/metadata-draft-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type {
-    Chapter,
+    ActiveMetadata,
     TranscriptSegment,
     WorkspaceMedia,
 } from '@/types/records';
+import TimelineChapterControls from './timeline-chapter-controls';
 import TimelineChaptersTrack from './timeline-chapters-track';
 import TimelinePlayhead from './timeline-playhead';
 import TimelineRuler from './timeline-ruler';
@@ -22,17 +30,21 @@ import TimelineZoom from './timeline-zoom';
 /** Widest zoom: 200 px per second. "Fit" shows the whole video. */
 const MAX_PIXELS_PER_SECOND = 200;
 
+// The audio track takes whatever height is left, so the timeline fills its share.
 const TRACKS = [
-    { key: 'chapters', label: 'Chapters', height: 'h-9' },
-    { key: 'transcript', label: 'Transcript', height: 'h-12' },
-    { key: 'audio', label: 'Audio', height: 'h-16' },
+    { key: 'chapters', label: 'Chapters', height: 'h-9 shrink-0' },
+    { key: 'transcript', label: 'Transcript', height: 'h-12 shrink-0' },
+    { key: 'audio', label: 'Audio', height: 'min-h-16 flex-1' },
 ] as const;
 
 type Props = {
     recordId: string;
     media: WorkspaceMedia;
     segments: TranscriptSegment[];
-    chapters: Chapter[];
+    /** The active generation; its chapters are edited through the shared draft. */
+    metadata: ActiveMetadata | null;
+    canEdit: boolean;
+    generating: boolean;
 };
 
 export type TimelineViewport = { left: number; width: number };
@@ -40,14 +52,20 @@ export type TimelineViewport = { left: number; width: number };
 /**
  * Editor timeline: time ruler (click or drag to scrub), chapters,
  * transcript and audio waveform tracks, and a playhead that follows playback.
- * Only the visible part of each track is rendered.
+ * Only the visible part of each track is rendered. Encoders add chapters at
+ * the playhead (or by double-clicking the chapters track) and drag them.
  */
 export default function Timeline({
     recordId,
     media,
     segments,
-    chapters,
+    metadata,
+    canEdit,
+    generating,
 }: Props) {
+    const chapters = useDraftChapters(metadata);
+    const addChapter = useMetadataDraftStore((state) => state.addChapter);
+    const editable = canEdit && metadata !== null && !generating;
     const scroller = useRef<HTMLDivElement>(null);
     const pendingScroll = useRef<number | null>(null);
     const frame = useRef(0);
@@ -141,6 +159,23 @@ export default function Timeline({
     const seekToPointer = (event: ReactPointerEvent) =>
         seek(timeAt(event.clientX));
 
+    const addChapterAt = (time: number) => {
+        if (addChapter(time)) {
+            toast.success(
+                `Chapter added at ${formatTimestamp(Math.round(time))}. Name it in the Chapters tab, then save.`,
+            );
+        } else {
+            toast.error('There is already a chapter at that time.');
+        }
+    };
+
+    const addChapterOnTrack = (event: ReactMouseEvent) => {
+        // On empty track only: a double-click on a chapter is two clicks on it.
+        if (editable && !(event.target as HTMLElement).closest('button')) {
+            addChapterAt(timeAt(event.clientX));
+        }
+    };
+
     const range = {
         start: Math.max(0, viewport.left / pixelsPerSecond - 1),
         end: (viewport.left + viewport.width) / pixelsPerSecond + 1,
@@ -149,12 +184,26 @@ export default function Timeline({
     return (
         <section
             aria-label="Timeline"
-            className="flex shrink-0 flex-col border-t border-white/10 bg-neutral-900"
+            className="flex min-h-56 shrink-0 flex-col border-t border-white/10 bg-neutral-900 xl:h-[calc((100svh-1rem)*0.3)] xl:min-h-52"
         >
-            <header className="flex h-9 items-center justify-between gap-3 border-b border-white/10 px-3">
-                <h2 className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
-                    Timeline
-                </h2>
+            <header className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3">
+                <div className="flex min-w-0 items-center gap-3">
+                    <h2 className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
+                        Timeline
+                    </h2>
+                    {canEdit && (
+                        <TimelineChapterControls
+                            recordId={recordId}
+                            editable={editable}
+                            hasMetadata={metadata !== null}
+                            onAdd={() =>
+                                addChapterAt(
+                                    useWorkspaceStore.getState().currentTime,
+                                )
+                            }
+                        />
+                    )}
+                </div>
                 <TimelineZoom
                     pixelsPerSecond={pixelsPerSecond}
                     fitPixelsPerSecond={fitPixelsPerSecond}
@@ -163,9 +212,9 @@ export default function Timeline({
                 />
             </header>
 
-            <div className="flex">
-                <div className="w-24 shrink-0 border-r border-white/10 text-[11px] text-neutral-400">
-                    <div className="h-7 border-b border-white/10" />
+            <div className="flex min-h-0 flex-1">
+                <div className="flex w-24 shrink-0 flex-col border-r border-white/10 text-[11px] text-neutral-400">
+                    <div className="h-7 shrink-0 border-b border-white/10" />
                     {TRACKS.map((track) => (
                         <div
                             key={track.key}
@@ -181,7 +230,10 @@ export default function Timeline({
                     onScroll={onScroll}
                     className="relative min-w-0 flex-1 overflow-x-auto overflow-y-hidden"
                 >
-                    <div className="relative" style={{ width: contentWidth }}>
+                    <div
+                        className="relative flex h-full flex-col"
+                        style={{ width: contentWidth }}
+                    >
                         <TimelineRuler
                             pixelsPerSecond={pixelsPerSecond}
                             range={range}
@@ -189,18 +241,25 @@ export default function Timeline({
                             onScrub={timeAt}
                         />
                         <div
-                            className="h-9 border-b border-white/5"
+                            className="h-9 shrink-0 border-b border-white/5"
                             onPointerDown={seekToPointer}
+                            onDoubleClick={addChapterOnTrack}
+                            title={
+                                editable
+                                    ? 'Double-click to add a chapter here'
+                                    : undefined
+                            }
                         >
                             <TimelineChaptersTrack
                                 chapters={chapters}
                                 duration={duration}
                                 pixelsPerSecond={pixelsPerSecond}
                                 range={range}
+                                editable={editable}
                             />
                         </div>
                         <div
-                            className="h-12 border-b border-white/5"
+                            className="h-12 shrink-0 border-b border-white/5"
                             onPointerDown={seekToPointer}
                         >
                             <TimelineTranscriptTrack
@@ -210,7 +269,7 @@ export default function Timeline({
                             />
                         </div>
                         <div
-                            className="h-16 border-b border-white/5"
+                            className="min-h-16 flex-1 border-b border-white/5"
                             onPointerDown={seekToPointer}
                         >
                             <TimelineWaveformTrack

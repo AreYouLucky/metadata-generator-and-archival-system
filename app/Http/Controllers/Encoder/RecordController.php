@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Encoder;
 
+use App\Enums\ContributorRole;
 use App\Enums\PipelineStage;
 use App\Enums\Preset;
 use App\Http\Controllers\Controller;
@@ -14,6 +15,7 @@ use App\Models\Record;
 use App\Models\RecordFile;
 use App\Models\RecordMetadata;
 use App\Models\RecordSegment;
+use App\Models\RecordSpeaker;
 use App\Models\RecordStage;
 use App\Models\User;
 use App\Services\Records\PipelineOptions;
@@ -169,6 +171,13 @@ class RecordController extends Controller
             'media' => fn (): array => $this->media($record),
             'stages' => fn (): array => $this->stages($record),
             'transcript' => fn (): ?array => $this->transcript($record),
+            'contributors' => fn (): array => ContributorController::list($record),
+            'contributorRoles' => ContributorRole::options(),
+            'speakers' => fn (): array => $record->speakers()
+                ->orderBy('id')
+                ->get(['id', 'label', 'display_name'])
+                ->map(fn (RecordSpeaker $speaker): array => SpeakerController::present($speaker))
+                ->all(),
             'metadata' => fn (): ?array => $this->activeMetadata($record),
             'metadataHistory' => fn (): array => $record->metadata()
                 ->latest()
@@ -228,7 +237,7 @@ class RecordController extends Controller
     }
 
     /**
-     * @return array{language: string, segments: list<array{id: int, start: float, end: float, text: string, is_edited: bool}>}|null
+     * @return array{language: string, segments: list<array{id: int, start: float, end: float, text: string, is_edited: bool, speaker_id: int|null}>}|null
      */
     private function transcript(Record $record): ?array
     {
@@ -241,13 +250,14 @@ class RecordController extends Controller
         return [
             'language' => $transcript->language,
             'segments' => array_values($transcript->segments()
-                ->get(['id', 'start', 'end', 'text', 'is_edited'])
+                ->get(['id', 'start', 'end', 'text', 'is_edited', 'record_speaker_id'])
                 ->map(fn (RecordSegment $segment): array => [
                     'id' => $segment->id,
                     'start' => $segment->start,
                     'end' => $segment->end,
                     'text' => $segment->text,
                     'is_edited' => $segment->is_edited,
+                    'speaker_id' => $segment->record_speaker_id,
                 ])
                 ->all()),
         ];

@@ -1,3 +1,4 @@
+import { History } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     Select,
@@ -40,10 +41,14 @@ export default function MetadataHistory({
             }
         >
             <SelectTrigger
-                className="h-8 w-56 text-xs"
+                className="h-7 w-auto gap-1 border-none bg-transparent px-2 text-xs shadow-none dark:bg-transparent"
                 aria-label="Generation history"
+                title="Earlier generations"
             >
-                <SelectValue placeholder="History" />
+                <History className="size-3.5" aria-hidden />
+                <span className="sr-only">
+                    <SelectValue placeholder="History" />
+                </span>
             </SelectTrigger>
             <SelectContent>
                 {history.map((item) => (

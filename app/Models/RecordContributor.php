@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Enums\ContributorRole;
 use Carbon\CarbonImmutable as Carbon;
+use Database\Factories\RecordContributorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,6 +24,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['role', 'name', 'sort_order'])]
 class RecordContributor extends Model
 {
+    /** @use HasFactory<RecordContributorFactory> */
+    use HasFactory;
+
     /**
      * Defaults mirrored from the migration so new models see them before a refresh.
      *

@@ -1,9 +1,10 @@
-import { Copy, X } from 'lucide-react';
+import { BookmarkPlus, Copy, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClipboard } from '@/hooks/use-clipboard';
 import { formatChapterLines, formatTimestamp } from '@/lib/utilities';
+import { useMetadataDraftStore } from '@/stores/metadata-draft-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { Chapter } from '@/types/records';
 
@@ -14,11 +15,13 @@ type Props = {
 };
 
 /**
- * Chapters: click the time to seek, edit or remove titles, and copy them in
- * YouTube's "00:00 Intro" format.
+ * Chapters: add one at the playhead, click the time to seek, edit or remove
+ * titles, and copy them in YouTube's "00:00 Intro" format. Chapters can also
+ * be added and dragged on the timeline.
  */
 export default function ChaptersList({ chapters, disabled, onChange }: Props) {
     const seek = useWorkspaceStore((state) => state.seek);
+    const addChapter = useMetadataDraftStore((state) => state.addChapter);
     const [, copy] = useClipboard();
 
     const copyForYouTube = async () => {
@@ -31,12 +34,40 @@ export default function ChaptersList({ chapters, disabled, onChange }: Props) {
         <div className="grid gap-2">
             <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Chapters</span>
-                {chapters.length > 0 && (
-                    <Button variant="ghost" size="sm" onClick={copyForYouTube}>
-                        <Copy aria-hidden />
-                        Copy for YouTube
-                    </Button>
-                )}
+                <div className="flex items-center gap-1">
+                    {!disabled && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                if (
+                                    !addChapter(
+                                        useWorkspaceStore.getState()
+                                            .currentTime,
+                                    )
+                                ) {
+                                    toast.error(
+                                        'There is already a chapter at the playhead.',
+                                    );
+                                }
+                            }}
+                        >
+                            <BookmarkPlus aria-hidden />
+                            Add at playhead
+                        </Button>
+                    )}
+                    {chapters.length > 0 && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={copyForYouTube}
+                            aria-label="Copy for YouTube"
+                            title="Copy for YouTube"
+                        >
+                            <Copy aria-hidden />
+                        </Button>
+                    )}
+                </div>
             </div>
             {chapters.length === 0 ? (
                 <p className="text-sm text-muted-foreground">

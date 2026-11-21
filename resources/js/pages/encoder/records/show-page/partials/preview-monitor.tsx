@@ -1,16 +1,36 @@
 import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { useWorkspaceStore } from '@/stores/workspace-store';
-import type { WorkspaceMedia } from '@/types/records';
+import type {
+    Contributor,
+    ContributorRoleOption,
+    WorkspaceMedia,
+} from '@/types/records';
+import FrameTextTool from './frame-text-tool';
 import TransportBar from './transport-bar';
+
+type Props = {
+    recordId: string;
+    media: WorkspaceMedia;
+    contributors: Contributor[];
+    contributorRoles: ContributorRoleOption[];
+    canEdit: boolean;
+};
 
 /**
  * The program monitor: the master streamed through the authorised media
  * route, letterboxed on black, with editor transport controls below. The
  * <video> element is registered in the workspace store so the transcript,
- * chapters and timeline can seek it.
+ * chapters and timeline can seek it. While paused, "Copy text" reads the
+ * text shown in the frame.
  */
-export default function PreviewMonitor({ media }: { media: WorkspaceMedia }) {
+export default function PreviewMonitor({
+    recordId,
+    media,
+    contributors,
+    contributorRoles,
+    canEdit,
+}: Props) {
     const setPlayer = useWorkspaceStore((state) => state.setPlayer);
     const setDuration = useWorkspaceStore((state) => state.setDuration);
     const togglePlay = useWorkspaceStore((state) => state.togglePlay);
@@ -36,6 +56,14 @@ export default function PreviewMonitor({ media }: { media: WorkspaceMedia }) {
                 >
                     Your browser can't play this video.
                 </video>
+                {!unplayable && (
+                    <FrameTextTool
+                        recordId={recordId}
+                        contributors={contributors}
+                        roles={contributorRoles}
+                        canEdit={canEdit}
+                    />
+                )}
                 {unplayable && (
                     <p className="absolute inset-x-4 top-4 flex items-start gap-2 rounded-md bg-amber-500/15 px-3 py-2 text-sm text-amber-100 ring-1 ring-amber-400/30">
                         <AlertTriangle

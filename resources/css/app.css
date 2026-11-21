@@ -246,6 +246,63 @@
         @apply bg-background text-foreground;
     }
 
+    /*
+     * Thin scrollbars everywhere: a slim rounded thumb on a clear track, in the
+     * theme's muted colour (so the dark workspace gets a dark one), a little
+     * stronger while the pointer is over the scrolling area.
+     */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(
+                in oklab,
+                var(--muted-foreground) 35%,
+                transparent
+            )
+            transparent;
+    }
+
+    *:hover {
+        scrollbar-color: color-mix(
+                in oklab,
+                var(--muted-foreground) 60%,
+                transparent
+            )
+            transparent;
+    }
+
+    /* Browsers without scrollbar-color (older Safari) use these instead. */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        border: 2px solid transparent;
+        border-radius: 9999px;
+        background-clip: padding-box;
+        background-color: color-mix(
+            in oklab,
+            var(--muted-foreground) 45%,
+            transparent
+        );
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: color-mix(
+            in oklab,
+            var(--muted-foreground) 70%,
+            transparent
+        );
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
     /* Snap the welcome page to each fold where the folds are full-screen. */
     @media (min-width: 64rem) and (min-height: 45rem) {
         html:has([data-scroll-snap]) {
@@ -266,5 +323,20 @@
             animation-iteration-count: 1 !important;
             transition-duration: 0.01ms !important;
         }
+    }
+}
+
+/*
+ * The record workspace is an editor: on wide screens the page is exactly the
+ * visible height (no page scroll), so the timeline can take 30% of it and the
+ * breadcrumbs plus the panels the other 70%. The sidebar's inset style leaves
+ * 0.5rem above and below the page. Unlayered so it beats the inset's
+ * min-height utility.
+ */
+@media (width >= 80rem) {
+    [data-slot='sidebar-inset']:has([data-workspace]) {
+        height: calc(100svh - 1rem);
+        min-height: 0;
+        overflow: hidden;
     }
 }

@@ -227,3 +227,44 @@ export function formatDateTime(value: string | null): string {
           })
         : '—';
 }
+
+/** Chip colours for speakers, by position in the record's speaker list. */
+const SPEAKER_COLORS = [
+    'bg-sky-500/15 text-sky-700 ring-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200 dark:ring-sky-400/40',
+    'bg-amber-500/15 text-amber-700 ring-amber-500/40 dark:bg-amber-500/20 dark:text-amber-200 dark:ring-amber-400/40',
+    'bg-emerald-500/15 text-emerald-700 ring-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/40',
+    'bg-fuchsia-500/15 text-fuchsia-700 ring-fuchsia-500/40 dark:bg-fuchsia-500/20 dark:text-fuchsia-200 dark:ring-fuchsia-400/40',
+    'bg-rose-500/15 text-rose-700 ring-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200 dark:ring-rose-400/40',
+    'bg-lime-500/15 text-lime-700 ring-lime-500/40 dark:bg-lime-500/20 dark:text-lime-200 dark:ring-lime-400/40',
+    'bg-violet-500/15 text-violet-700 ring-violet-500/40 dark:bg-violet-500/20 dark:text-violet-200 dark:ring-violet-400/40',
+    'bg-orange-500/15 text-orange-700 ring-orange-500/40 dark:bg-orange-500/20 dark:text-orange-200 dark:ring-orange-400/40',
+];
+
+export function speakerColor(position: number): string {
+    return SPEAKER_COLORS[Math.max(0, position) % SPEAKER_COLORS.length];
+}
+
+/** The name an encoder gave a speaker, or its label (S1, S2…). */
+export function speakerName(speaker: {
+    label: string;
+    display_name: string | null;
+}): string {
+    return speaker.display_name ?? speaker.label;
+}
+
+/**
+ * Whether a key press belongs to a text field, menu or dialog control rather
+ * than to the page (so page shortcuts must leave it alone).
+ */
+export function isTypingTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+        return false;
+    }
+
+    return (
+        target.isContentEditable ||
+        target.closest(
+            'input, textarea, select, [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"], [role="slider"]',
+        ) !== null
+    );
+}

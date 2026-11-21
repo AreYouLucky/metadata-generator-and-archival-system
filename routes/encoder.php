@@ -8,6 +8,7 @@
 
 use App\Http\Controllers\Encoder\AgencyController;
 use App\Http\Controllers\Encoder\AgencyOptionsController;
+use App\Http\Controllers\Encoder\ContributorController;
 use App\Http\Controllers\Encoder\MetadataController;
 use App\Http\Controllers\Encoder\ProjectController;
 use App\Http\Controllers\Encoder\ProjectOptionsController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Encoder\RecordWaveformController;
 use App\Http\Controllers\Encoder\RetryProcessingController;
 use App\Http\Controllers\Encoder\ReviewController;
 use App\Http\Controllers\Encoder\SegmentController;
+use App\Http\Controllers\Encoder\SpeakerController;
 use App\Http\Controllers\Encoder\UploadController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,7 +41,14 @@ Route::middleware(['auth', 'verified', 'role:encoder,admin'])->group(function ()
     Route::get('records/{record}/export', RecordExportController::class)->name('records.export');
     Route::post('records/{record}/retry', RetryProcessingController::class)->middleware('throttle:ai')->name('records.retry');
 
+    Route::patch('records/{record}/transcript/speaker', [SegmentController::class, 'assignSpeaker'])->name('records.transcript.speaker');
     Route::patch('records/{record}/segments/{segment}', [SegmentController::class, 'update'])->name('records.segments.update');
+    Route::delete('records/{record}/segments/{segment}', [SegmentController::class, 'destroy'])->name('records.segments.destroy');
+
+    Route::put('records/{record}/contributors', [ContributorController::class, 'sync'])->name('records.contributors.sync');
+
+    Route::post('records/{record}/speakers', [SpeakerController::class, 'store'])->name('records.speakers.store');
+    Route::patch('records/{record}/speakers/{speaker}', [SpeakerController::class, 'update'])->scopeBindings()->name('records.speakers.update');
 
     Route::post('records/{record}/metadata', [MetadataController::class, 'store'])->middleware('throttle:ai')->name('records.metadata.store');
     Route::patch('records/{record}/metadata/{metadata}', [MetadataController::class, 'update'])->name('records.metadata.update');
