@@ -6,34 +6,47 @@ import type { ActiveMetadata } from '@/types/records';
 
 const TABS: { value: InspectorTab; label: string }[] = [
     { value: 'metadata', label: 'Metadata' },
+    { value: 'archive', label: 'Archive' },
     { value: 'chapters', label: 'Chapters' },
     { value: 'credits', label: 'Credits' },
+    { value: 'translations', label: 'Languages' },
+    { value: 'export', label: 'Export' },
 ];
 
 type Props = {
     /** Its draft chapters are counted live (they change on the timeline). */
     metadata: ActiveMetadata | null;
     creditCount: number;
+    translationCount: number;
+    /** Unconfirmed AI subjects and keywords. */
+    suggestionCount: number;
 };
 
 /**
  * The inspector's tabs, sitting in the panel header's top-left corner in
  * place of a title, with a count on Chapters and Credits.
  */
-export default function InspectorTabBar({ metadata, creditCount }: Props) {
+export default function InspectorTabBar({
+    metadata,
+    creditCount,
+    translationCount,
+    suggestionCount,
+}: Props) {
     const chapterCount = useDraftChapters(metadata).length;
     const tab = useWorkspaceStore((state) => state.inspectorTab);
     const setTab = useWorkspaceStore((state) => state.setInspectorTab);
     const counts: Partial<Record<InspectorTab, number>> = {
         chapters: chapterCount,
         credits: creditCount,
+        translations: translationCount,
+        archive: suggestionCount,
     };
 
     return (
         <div
             role="tablist"
             aria-label="Inspector"
-            className="-ml-1 flex h-full min-w-0 items-stretch gap-0.5"
+            className="-ml-1 flex h-full min-w-0 [scrollbar-width:none] items-stretch gap-0.5 overflow-x-auto"
         >
             {TABS.map(({ value, label }) => (
                 <button

@@ -23,6 +23,7 @@ class RecordStageResultController extends Controller
             PipelineStage::Probe => $recorder->storeProbe($record, $this->master($record), $request->validated()),
             PipelineStage::Transcribe => $recorder->storeTranscript($record, $request->transcriptResult()),
             PipelineStage::GenerateMetadata => $recorder->storeMetadata($record, $request->metadataResult()),
+            PipelineStage::Proxy => $recorder->storeProxy($record, $request->proxyResult()),
             default => $recorder->complete($record, $stage),
         };
 

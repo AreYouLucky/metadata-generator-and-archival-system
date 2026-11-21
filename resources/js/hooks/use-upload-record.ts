@@ -28,57 +28,65 @@ export type UploadRecordInput = {
 type UploadSession = { id: string; received: number };
 
 /**
- * Uploads a video in 8 MB chunks (resumable: a rejected or failed chunk is
- * retried from the byte count the server reports), then creates the record,
- * which queues processing.
+ * Sends a file in 8 MB chunks (resumable: a rejected or failed chunk is
+ * retried from the byte count the server reports). Returns the upload id,
+ * which a later request claims (a new record, or an extra file of one).
+ */
+export async function uploadInChunks(
+    file: File,
+    onProgress: (fraction: number) => void,
+): Promise<string> {
+    const { data: session } = await http.post<UploadSession>(
+        startUpload.url(),
+        { filename: file.name, size: file.size },
+    );
+
+    let offset = 0;
+    let attempts = 0;
+
+    while (offset < file.size) {
+        const body = new FormData();
+        body.append('offset', String(offset));
+        body.append('chunk', file.slice(offset, offset + CHUNK_BYTES), 'chunk');
+
+        try {
+            const { data } = await http.post<UploadSession>(
+                chunkUrl.url(session.id),
+                body,
+            );
+            offset = data.received;
+            attempts = 0;
+        } catch (error) {
+            attempts++;
+
+            if (attempts >= MAX_ATTEMPTS || !isRetryable(error)) {
+                throw error;
+            }
+
+            const { data } = await http.get<UploadSession>(
+                uploadStatus.url(session.id),
+            );
+            offset = data.received;
+        }
+
+        onProgress(offset / file.size);
+    }
+
+    return session.id;
+}
+
+/**
+ * Uploads a video in chunks, then creates the record, which queues processing.
  */
 export function useUploadRecord() {
     return useMutation({
         mutationFn: async (input: UploadRecordInput) => {
-            const { data: session } = await http.post<UploadSession>(
-                startUpload.url(),
-                { filename: input.file.name, size: input.file.size },
-            );
-
-            let offset = 0;
-            let attempts = 0;
-
-            while (offset < input.file.size) {
-                const body = new FormData();
-                body.append('offset', String(offset));
-                body.append(
-                    'chunk',
-                    input.file.slice(offset, offset + CHUNK_BYTES),
-                    'chunk',
-                );
-
-                try {
-                    const { data } = await http.post<UploadSession>(
-                        chunkUrl.url(session.id),
-                        body,
-                    );
-                    offset = data.received;
-                    attempts = 0;
-                } catch (error) {
-                    attempts++;
-
-                    if (attempts >= MAX_ATTEMPTS || !isRetryable(error)) {
-                        throw error;
-                    }
-
-                    const { data } = await http.get<UploadSession>(
-                        uploadStatus.url(session.id),
-                    );
-                    offset = data.received;
-                }
-
-                input.onProgress(offset / input.file.size);
-            }
+            const uploadId = await uploadInChunks(input.file, input.onProgress);
 
             const { data } = await http.post<{ id: string; url: string }>(
                 storeRecord.url(),
                 {
-                    upload_id: session.id,
+                    upload_id: uploadId,
                     project_id: input.projectId,
                     project_series_id: input.seriesId,
                     title: input.title || null,

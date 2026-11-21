@@ -1,0 +1,9 @@
+Current working title: {{ request.current_title or '(none)' }}
+{% if request.language %}Detected language code: {{ request.language }}
+{% endif -%}
+{% if request.project %}Event (project): {{ request.project.title }}{% if request.project.date %}, {{ request.project.date }}{% if request.project.end_date and request.project.end_date != request.project.date %} to {{ request.project.end_date }}{% endif %}{% endif %}{% if request.project.location %}, at {{ request.project.location }}{% endif %}
+{% endif -%}
+{% if request.series %}Session (series): {{ request.series.title }}{% if request.series.date %}, {{ request.series.date }}{% if request.series.end_date and request.series.end_date != request.series.date %} to {{ request.series.end_date }}{% endif %}{% endif %}{% if request.series.location %}, at {{ request.series.location }}{% endif %}
+{% endif -%}
+Genres: {{ request.genres | join('; ') if request.genres else '(none)' }}
+Video types: {{ request.video_types | join('; ') if request.video_types else '(none)' }}

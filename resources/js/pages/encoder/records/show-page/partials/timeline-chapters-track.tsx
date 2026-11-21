@@ -7,9 +7,9 @@ import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { Chapter } from '@/types/records';
 
 const COLOURS = [
-    'bg-sky-700/70 hover:bg-sky-600/80',
+    'bg-blue-700/70 hover:bg-blue-600/80',
     'bg-violet-700/70 hover:bg-violet-600/80',
-    'bg-teal-700/70 hover:bg-teal-600/80',
+    'bg-sky-700/70 hover:bg-sky-600/80',
     'bg-amber-700/70 hover:bg-amber-600/80',
 ];
 

@@ -13,6 +13,8 @@ return [
     'max_video_minutes' => (int) env('MAX_VIDEO_MINUTES', 180),
 
     'max_batch_size' => (int) env('MAX_BATCH_SIZE', 20),
+    // Release forms, contracts and sidecars (private disk only).
+    'max_attachment_mb' => (int) env('MAX_ATTACHMENT_MB', 50),
 
     'encoder_daily_processing_minutes' => (int) env('ENCODER_DAILY_PROCESSING_MINUTES', 120),
 
@@ -29,6 +31,36 @@ return [
     'accession_number_format' => env('ACCESSION_NUMBER_FORMAT', 'ACC-{year}-{seq:5}'),
 
     'fixity_check_interval_days' => (int) env('FIXITY_CHECK_INTERVAL_DAYS', 90),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Transcript translations
+    |--------------------------------------------------------------------------
+    |
+    | Languages a transcript can be translated into (code => English name, the
+    | name is what the AI service is told). Codes are ISO 639 / BCP 47, so they
+    | also work as the `srclang` of the player's caption tracks.
+    |
+    */
+
+    'translation_languages' => [
+        'en' => 'English',
+        'fil' => 'Filipino',
+        'ceb' => 'Cebuano',
+        'ilo' => 'Ilocano',
+        'hil' => 'Hiligaynon',
+        'war' => 'Waray',
+        'bcl' => 'Central Bikol',
+        'pam' => 'Kapampangan',
+        'pag' => 'Pangasinan',
+        'es' => 'Spanish',
+        'zh-Hans' => 'Chinese (Simplified)',
+        'ja' => 'Japanese',
+        'ko' => 'Korean',
+        'ar' => 'Arabic',
+        'fr' => 'French',
+        'de' => 'German',
+    ],
 
     /*
     |--------------------------------------------------------------------------

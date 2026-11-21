@@ -2,11 +2,15 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasOptions;
+
 /**
  * Actions recorded in a record's audit log, including approval steps and preservation events.
  */
 enum AuditAction: string
 {
+    use HasOptions;
+
     case Uploaded = 'uploaded';
     case Updated = 'updated';
     case Submitted = 'submitted';

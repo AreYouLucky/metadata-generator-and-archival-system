@@ -2,6 +2,7 @@
  * Record, workspace and pipeline types. The `AiMetadata` shape mirrors the
  * `ai` block of PROJECT_SPEC §10 and ai-service/app/schemas/metadata.py.
  */
+import type { SuggestedLocation } from '@/types/archive';
 
 export type ProcessingStatus =
     | 'queued'
@@ -24,15 +25,25 @@ export type PipelineStageName =
     | 'probe'
     | 'extract_audio'
     | 'transcribe'
-    | 'generate_metadata';
+    | 'generate_metadata'
+    | 'proxy';
 
-export type PresetName = 'generic' | 'youtube';
+export type PresetName =
+    | 'generic'
+    | 'youtube'
+    | 'tiktok'
+    | 'instagram'
+    | 'linkedin';
 
 export type RecordListItem = {
     id: string;
     title: string;
     processing_status: ProcessingStatus;
     review_status: ReviewStatus;
+    accession_number: string | null;
+    classification: string;
+    /** Set while an embargo is in force. */
+    embargo_until: string | null;
     duration: number | null;
     project: string | null;
     series: string | null;
@@ -44,6 +55,7 @@ export type RecordFilters = {
     q: string;
     processing_status: ProcessingStatus | null;
     review_status: ReviewStatus | null;
+    flag: 'embargoed' | 'classified' | null;
     sort: 'newest' | 'oldest' | 'title';
 };
 
@@ -70,6 +82,10 @@ export type WorkspaceRecord = {
     processing_status: ProcessingStatus;
     processing_error: string | null;
     review_status: ReviewStatus;
+    accession_number: string | null;
+    classification: string;
+    /** Set while an embargo is in force. */
+    embargo_until: string | null;
     created_at: string | null;
     can_edit: boolean;
 };
@@ -77,8 +93,13 @@ export type WorkspaceRecord = {
 export type WorkspaceMedia = {
     url: string;
     mime_type: string | null;
-    /** null until the probe stage has run. */
+    /** null until the probe stage has run; true when the master or its access copy plays. */
     playable: boolean | null;
+    /** What the player streams: the master, or the access copy made for browsers. */
+    source: 'master' | 'proxy';
+    /** The master's frame rate ("25/1") and start timecode, for timecode display. */
+    frame_rate: string | null;
+    start_timecode: string | null;
     duration: number | null;
     /** Set once the audio stage has written the waveform peaks. */
     has_waveform: boolean;
@@ -144,6 +165,31 @@ export type Chapter = {
     title: string;
 };
 
+/** A line worth quoting, aligned to the transcript lines it came from. */
+export type Quote = {
+    start: number;
+    end: number;
+    speaker: string | null;
+    text: string;
+};
+
+export type Tone =
+    | 'informative'
+    | 'educational'
+    | 'formal'
+    | 'conversational'
+    | 'celebratory'
+    | 'inspirational'
+    | 'promotional'
+    | 'serious'
+    | 'urgent'
+    | 'entertaining';
+
+export type ContentFlags = {
+    profanity: boolean;
+    sensitiveTopics: string[];
+};
+
 export type AiMetadata = {
     titles: string[];
     selectedTitle: string | null;
@@ -153,6 +199,10 @@ export type AiMetadata = {
     keywords: string[];
     hashtags: string[];
     chapters: Chapter[];
+    quotes: Quote[];
+    tone: Tone | null;
+    contentFlags: ContentFlags | null;
+    suggestedLocation?: SuggestedLocation | null;
 };
 
 export type ActiveMetadata = {
@@ -177,6 +227,50 @@ export type MetadataHistoryItem = {
 export type RecordProgressEvent = {
     processing_status: ProcessingStatus;
     stage: Omit<StageState, 'label'>;
+};
+
+export type TaskStatus = 'queued' | 'processing' | 'done' | 'failed';
+
+/** A transcript translation (an extra `record_transcripts` row). */
+export type Translation = {
+    id: number;
+    language: string;
+    status: TaskStatus;
+    progress: number;
+    error: string | null;
+    line_count: number;
+    /** Lines corrected by hand (translating again would replace them). */
+    edited_count: number;
+};
+
+export type TranslationLanguage = { code: string; name: string };
+
+/** GET /records/{id}/translations/{language} */
+export type TranslationLines = {
+    language: string;
+    segments: Pick<
+        TranscriptSegment,
+        'id' | 'start' | 'end' | 'text' | 'is_edited'
+    >[];
+};
+
+export type ExportFormatName = 'json' | 'srt' | 'vtt' | 'txt' | 'csv' | 'md';
+
+export type ExportFormatOption = {
+    value: ExportFormatName;
+    label: string;
+    /** Built from one transcript, so it takes a language. */
+    transcript: boolean;
+};
+
+export type RecordArchiveUpdatedEvent = { reason: string };
+
+export type RecordTranslationUpdatedEvent = { translation: Translation };
+
+export type RecordTitlesGeneratedEvent = {
+    metadata_id: number;
+    titles: string[];
+    error: string | null;
 };
 
 export type RecordStageCompletedEvent = {

@@ -2,6 +2,8 @@
 
 namespace App\Policies;
 
+use App\Enums\ReviewStatus;
+use App\Enums\SecurityClassification;
 use App\Enums\UserRole;
 use App\Models\Record;
 use App\Models\User;
@@ -9,7 +11,7 @@ use App\Models\User;
 /**
  * Encoders see and edit only the records they created (and edit only while the
  * record is a draft or has changes requested); admins see and edit everything.
- * The public `distribute` check arrives in Phase 3.
+ * `distribute` decides whether a record may leave the archive.
  */
 class RecordPolicy
 {
@@ -60,5 +62,24 @@ class RecordPolicy
     public function export(User $user, Record $record): bool
     {
         return $this->view($user, $record);
+    }
+
+    /**
+     * Whether the record may leave the archive (PROJECT_SPEC §8, distribution
+     * policy): the public catalogue, YouTube publishing, public-API export and
+     * batch ZIPs all ask this, for guests too. It needs an approved and
+     * published record that isn't deleted, an `unclassified` classification,
+     * and rights that allow public access (public, permission approved, no
+     * embargo in force). The viewer doesn't matter, so `$user` may be null.
+     */
+    public function distribute(?User $user, Record $record): bool
+    {
+        $record->loadMissing('rights');
+
+        return $record->review_status === ReviewStatus::Approved
+            && $record->published_at !== null
+            && ! $record->trashed()
+            && $record->security_classification === SecurityClassification::Unclassified
+            && ($record->rights?->allowsPublicAccess() ?? false);
     }
 }

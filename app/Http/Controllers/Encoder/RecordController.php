@@ -2,13 +2,19 @@
 
 namespace App\Http\Controllers\Encoder;
 
+use App\Enums\AuditAction;
 use App\Enums\ContributorRole;
+use App\Enums\ExportFormat;
+use App\Enums\FileRole;
 use App\Enums\PipelineStage;
 use App\Enums\Preset;
+use App\Enums\SecurityClassification;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Encoder\CreateRecordRequest;
 use App\Http\Requests\Encoder\IndexRecordsRequest;
 use App\Http\Requests\Encoder\StoreRecordRequest;
+use App\Http\Requests\Encoder\StoreTranslationRequest;
+use App\Http\Requests\Encoder\UpdateRecordRequest;
 use App\Models\Project;
 use App\Models\ProjectSeries;
 use App\Models\Record;
@@ -18,6 +24,8 @@ use App\Models\RecordSegment;
 use App\Models\RecordSpeaker;
 use App\Models\RecordStage;
 use App\Models\User;
+use App\Models\VideoAuditLog;
+use App\Services\Records\ArchivePresenter;
 use App\Services\Records\PipelineOptions;
 use App\Services\Records\RecordIngestService;
 use Illuminate\Database\Eloquent\Builder;
@@ -42,9 +50,15 @@ class RecordController extends Controller
         $filters = $request->validated();
 
         $records = Record::query()
-            ->select(['id', 'created_by', 'project_id', 'project_series_id', 'title', 'processing_status', 'review_status', 'created_at'])
+            ->select(['id', 'created_by', 'project_id', 'project_series_id', 'title', 'accession_number', 'security_classification', 'processing_status', 'review_status', 'created_at'])
             ->when(! $user->isAdmin(), fn (Builder $query) => $query->where('created_by', $user->id))
-            ->when($filters['q'] ?? null, fn (Builder $query, string $search) => $query->whereLike('title', '%'.addcslashes($search, '%_\\').'%'))
+            // Title or accession number (PROJECT_SPEC §13, Phase 3).
+            ->when($filters['q'] ?? null, function (Builder $query, string $search): void {
+                $pattern = '%'.addcslashes($search, '%_\\').'%';
+                $query->where(fn (Builder $match) => $match->whereLike('title', $pattern)->orWhereLike('accession_number', $pattern));
+            })
+            ->when(($filters['flag'] ?? null) === 'embargoed', fn (Builder $query) => $query->whereHas('rights', fn (Builder $rights) => $rights->where('embargo_until', '>', now())))
+            ->when(($filters['flag'] ?? null) === 'classified', fn (Builder $query) => $query->where('security_classification', '!=', SecurityClassification::Unclassified))
             ->when($filters['processing_status'] ?? null, fn (Builder $query, string $status) => $query->where('processing_status', $status))
             ->when($filters['review_status'] ?? null, fn (Builder $query, string $status) => $query->where('review_status', $status))
             ->when(
@@ -60,6 +74,7 @@ class RecordController extends Controller
                 'masterFile.technicalMetadata:id,record_file_id,duration',
                 'project:id,title',
                 'projectSeries:id,title',
+                'rights:id,record_id,embargo_until',
                 ...($user->isAdmin() ? ['creator:id,name'] : []),
             ])
             ->paginate(self::PER_PAGE)
@@ -67,6 +82,9 @@ class RecordController extends Controller
             ->through(fn (Record $record): array => [
                 'id' => $record->id,
                 'title' => $record->title,
+                'accession_number' => $record->accession_number,
+                'classification' => $record->security_classification->value,
+                'embargo_until' => $record->rights?->isEmbargoed() ? $record->rights->embargo_until?->toDateString() : null,
                 'processing_status' => $record->processing_status->value,
                 'review_status' => $record->review_status->value,
                 'duration' => $record->masterFile?->technicalMetadata?->duration,
@@ -82,6 +100,7 @@ class RecordController extends Controller
                 'q' => $filters['q'] ?? '',
                 'processing_status' => $filters['processing_status'] ?? null,
                 'review_status' => $filters['review_status'] ?? null,
+                'flag' => $filters['flag'] ?? null,
                 'sort' => $filters['sort'] ?? 'newest',
             ],
             'showCreator' => $user->isAdmin(),
@@ -165,6 +184,10 @@ class RecordController extends Controller
                 'processing_status' => $record->processing_status->value,
                 'processing_error' => $record->processing_error,
                 'review_status' => $record->review_status->value,
+                'accession_number' => $record->accession_number,
+                'classification' => $record->security_classification->value,
+                // Only while the embargo is in force (EmbargoBadge).
+                'embargo_until' => $record->rights?->isEmbargoed() ? $record->rights->embargo_until?->toDateString() : null,
                 'created_at' => $record->created_at?->toIso8601String(),
                 'can_edit' => $user?->can('update', $record) ?? false,
             ],
@@ -193,11 +216,54 @@ class RecordController extends Controller
                 ])
                 ->all(),
             'presets' => $this->presets(),
+            'translations' => fn (): array => TranslationController::list($record),
+            'translationLanguages' => array_map(
+                fn (string $code, string $name): array => ['code' => $code, 'name' => $name],
+                array_keys(StoreTranslationRequest::languages()),
+                array_values(StoreTranslationRequest::languages()),
+            ),
+            'exportFormats' => ExportFormat::options(),
+            'exportSchemas' => fn (): array => $user instanceof User ? ExportSchemaController::list($user) : [],
+            'archive' => fn (): array => app(ArchivePresenter::class)->present($record),
+            'archiveOptions' => fn (): array => $user instanceof User ? app(ArchivePresenter::class)->options($user) : [],
         ]);
     }
 
     /**
-     * @return array{url: string, mime_type: string|null, playable: bool|null, duration: float|null, has_waveform: bool}
+     * Save one Archive sub-tab's catalogue fields. Each change is logged as
+     * `updated` with the names of the fields that changed.
+     */
+    public function update(UpdateRecordRequest $request, Record $record, ArchivePresenter $archive): JsonResponse
+    {
+        $data = $request->validated();
+
+        // Workflow field: set explicitly, never mass-assigned (PROJECT_SPEC §8).
+        if (array_key_exists('accession_number', $data)) {
+            $record->accession_number = (string) $data['accession_number'];
+            unset($data['accession_number']);
+        }
+
+        $record->fill($data);
+        $changed = array_keys($record->getDirty());
+
+        if ($changed !== []) {
+            $record->save();
+
+            VideoAuditLog::create([
+                'record_id' => $record->id,
+                'record_file_id' => null,
+                'action' => AuditAction::Updated,
+                'performed_by' => $request->user()?->id,
+                'performed_at' => now(),
+                'remarks' => 'Changed: '.implode(', ', $changed),
+            ]);
+        }
+
+        return response()->json(['archive' => $archive->present($record->refresh())]);
+    }
+
+    /**
+     * @return array{url: string, mime_type: string|null, playable: bool|null, source: string, frame_rate: string|null, start_timecode: string|null, duration: float|null, has_waveform: bool}
      */
     private function media(Record $record): array
     {
@@ -205,11 +271,18 @@ class RecordController extends Controller
         $master = $record->masterFile()->with('technicalMetadata')->first();
         $technical = $master?->technicalMetadata;
         $hasWaveform = Storage::disk('media')->exists(RecordWaveformController::path($record));
+        $masterPlays = $technical?->isBrowserPlayable($master->mime_type);
+        $hasProxy = $record->files()->where('role', FileRole::Proxy)->exists();
+        // `version` changes when the access copy arrives, so the player reloads.
+        $source = $masterPlays === false && $hasProxy ? 'proxy' : 'master';
 
         return [
-            'url' => route('records.media', $record),
+            'url' => route('records.media', [$record, 'v' => $source]),
             'mime_type' => $master?->mime_type,
-            'playable' => $technical?->isBrowserPlayable($master->mime_type),
+            'playable' => $masterPlays === null ? null : ($masterPlays || $hasProxy),
+            'source' => $source,
+            'frame_rate' => $technical?->frame_rate,
+            'start_timecode' => $technical?->start_timecode,
             'duration' => $technical?->duration,
             'has_waveform' => $hasWaveform,
         ];
@@ -276,7 +349,13 @@ class RecordController extends Controller
             'model' => $metadata->model,
             'custom_prompt' => $metadata->custom_prompt,
             'created_at' => $metadata->created_at?->toIso8601String(),
-            'payload' => $metadata->payload,
+            // Generations from before Phase 2 have no quotes, tone or flags.
+            'payload' => [
+                'quotes' => [],
+                'tone' => null,
+                'contentFlags' => null,
+                ...$metadata->payload,
+            ],
         ];
     }
 

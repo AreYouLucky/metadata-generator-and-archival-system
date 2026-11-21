@@ -128,6 +128,9 @@ export default function TranscriptPanel({
         getScrollElement: () => scroller.current,
         estimateSize: () => 56,
         overscan: 8,
+        // Room under the last line, so it scrolls clear of the floating
+        // "Back to current" button and the panel's bottom edge.
+        paddingEnd: 72,
     });
 
     useEffect(() => {

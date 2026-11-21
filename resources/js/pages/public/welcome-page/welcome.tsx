@@ -1,11 +1,11 @@
-import { Head } from "@inertiajs/react";
-import WelcomeArchival from "./partials/welcome-archival";
-import WelcomeBrowse from "./partials/welcome-browse";
-import WelcomeFooter from "./partials/welcome-footer";
-import WelcomeGenerated from "./partials/welcome-generated";
-import WelcomeHeader from "./partials/welcome-header";
-import WelcomeHero from "./partials/welcome-hero";
-import WelcomeSteps from "./partials/welcome-steps";
+import { Head } from '@inertiajs/react';
+import WelcomeArchival from './partials/welcome-archival';
+import WelcomeBrowse from './partials/welcome-browse';
+import WelcomeFooter from './partials/welcome-footer';
+import WelcomeGenerated from './partials/welcome-generated';
+import WelcomeHeader from './partials/welcome-header';
+import WelcomeHero from './partials/welcome-hero';
+import WelcomeSteps from './partials/welcome-steps';
 
 type Props = {
     canRegister: boolean;

@@ -61,5 +61,5 @@ ignore_missing_imports = true
 
 # Celery's @task decorator is untyped.
 [[tool.mypy.overrides]]
-module = ["app.worker", "app.pipeline.tasks"]
+module = ["app.worker", "app.pipeline.tasks", "app.pipeline.translation", "app.pipeline.files"]
 disallow_untyped_decorators = false

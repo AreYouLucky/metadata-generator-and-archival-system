@@ -1,33 +1,48 @@
-import { Head } from '@inertiajs/react';
-import { useCallback, useEffect, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useLoadMetadataDraft } from '@/hooks/use-metadata-draft';
-import { usePlaybackShortcuts } from '@/hooks/use-playback-shortcuts';
 import { useRecordChannel } from '@/hooks/use-record-channel';
+import { translationLinesKey } from '@/hooks/use-translations';
+import { languageName } from '@/lib/utilities';
+import { useMetadataDraftStore } from '@/stores/metadata-draft-store';
 import { index as projectsIndex, show as showProject } from '@/routes/projects';
 import { show } from '@/routes/records';
 import { useWorkspaceStore } from '@/stores/workspace-store';
+import type { Archive, ArchiveOptions } from '@/types/archive';
+import type { ExportSchema } from '@/types/export-schemas';
 import type {
     ActiveMetadata,
     Contributor,
     ContributorRoleOption,
+    ExportFormatOption,
     MetadataHistoryItem,
     PresetRules,
     RecordProgressEvent,
+    RecordTitlesGeneratedEvent,
+    RecordTranslationUpdatedEvent,
     Speaker,
     StageState,
     TranscriptSegment,
+    Translation,
+    TranslationLanguage,
     WorkspaceMedia,
     WorkspaceRecord,
     WorkspaceTranscript,
 } from '@/types/records';
 import ChaptersPanel from './partials/chapters-panel';
+import ArchivePanel from './partials/archive-panel';
 import CreditsPanel from './partials/credits-panel';
+import ExportPanel from './partials/export-panel';
 import InspectorTabBar from './partials/inspector-tab-bar';
 import InspectorTabs from './partials/inspector-tabs';
 import MetadataPanel from './partials/metadata-panel';
 import PreviewMonitor from './partials/preview-monitor';
 import Timeline from './partials/timeline';
 import TranscriptPanel from './partials/transcript-panel';
+import TranslationsPanel from './partials/translations-panel';
 import WorkspaceHeaderActions from './partials/workspace-header-actions';
 
 type Props = {
@@ -41,6 +56,12 @@ type Props = {
     metadata: ActiveMetadata | null;
     metadataHistory: MetadataHistoryItem[];
     presets: PresetRules[];
+    translations: Translation[];
+    translationLanguages: TranslationLanguage[];
+    exportFormats: ExportFormatOption[];
+    exportSchemas: ExportSchema[];
+    archive: Archive;
+    archiveOptions: ArchiveOptions;
 };
 
 type SavedSegment = Pick<TranscriptSegment, 'id'> & Partial<TranscriptSegment>;
@@ -51,7 +72,7 @@ type SavedSegment = Pick<TranscriptSegment, 'id'> & Partial<TranscriptSegment>;
  * the right, above a timeline that takes 30% of the height. Status and
  * export sit in the app header beside the breadcrumbs. It stays dark in both
  * themes, like editing software, by scoping the `dark` theme to this
- * subtree. Space / K play and pause, J / L jump 5 s.
+ * subtree. Keyboard shortcuts are listed in the shortcuts dialog ("?").
  */
 export default function ShowRecord(props: Props) {
     const {
@@ -64,6 +85,11 @@ export default function ShowRecord(props: Props) {
         metadata,
         metadataHistory,
         presets,
+        translationLanguages,
+        exportFormats,
+        exportSchemas,
+        archive,
+        archiveOptions,
     } = props;
     const [stages, setStages] = useState(props.stages);
     const [processingStatus, setProcessingStatus] = useState(
@@ -79,6 +105,75 @@ export default function ShowRecord(props: Props) {
     );
     useEffect(() => reset, [reset]);
     useLoadMetadataDraft(metadata);
+
+    // Timecode display uses the master's frame rate and start timecode.
+    const setTimecodeBase = useWorkspaceStore((state) => state.setTimecodeBase);
+    useEffect(
+        () => setTimecodeBase(media.frame_rate, media.start_timecode),
+        [media.frame_rate, media.start_timecode, setTimecodeBase],
+    );
+
+    // Translations change live (Reverb); a reload of the prop replaces them.
+    const [translations, setTranslations] = useState(props.translations);
+    useEffect(() => setTranslations(props.translations), [props.translations]);
+    const upsertTranslation = useCallback((translation: Translation) => {
+        setTranslations((current) =>
+            current.some((item) => item.id === translation.id)
+                ? current.map((item) =>
+                      item.id === translation.id ? translation : item,
+                  )
+                : [...current, translation].sort((first, second) =>
+                      first.language.localeCompare(second.language),
+                  ),
+        );
+    }, []);
+    const queryClient = useQueryClient();
+    const onTranslation = useCallback(
+        ({ translation }: RecordTranslationUpdatedEvent) => {
+            upsertTranslation(translation);
+            const name = languageName(translation.language);
+
+            if (translation.status === 'done') {
+                // New lines: the viewer and the caption track load them again.
+                void queryClient.invalidateQueries({
+                    queryKey: translationLinesKey(
+                        record.id,
+                        translation.language,
+                    ),
+                });
+                useWorkspaceStore.getState().bumpCaptions();
+                toast.success(`${name} translation is ready.`);
+            } else if (translation.status === 'failed') {
+                toast.error(
+                    translation.error ?? `The ${name} translation failed.`,
+                );
+            }
+        },
+        [upsertTranslation, queryClient, record.id],
+    );
+
+    // "Generate more" titles arrive over Reverb, already saved.
+    const [titlesPending, setTitlesPending] = useState(false);
+    const appendTitles = useMetadataDraftStore((state) => state.appendTitles);
+    const onTitles = useCallback(
+        (event: RecordTitlesGeneratedEvent) => {
+            setTitlesPending(false);
+
+            if (event.error) {
+                toast.error(event.error);
+
+                return;
+            }
+
+            const count = event.titles.length;
+            appendTitles(event.metadata_id, event.titles);
+            toast.success(
+                `${count} new title ${count === 1 ? 'option' : 'options'} added.`,
+            );
+            router.reload({ only: ['metadata'] });
+        },
+        [appendTitles],
+    );
 
     // The lines every panel shows (transcript, timeline, current-line copy),
     // with edits and deletions applied; a reload of the transcript replaces them.
@@ -98,12 +193,15 @@ export default function ShowRecord(props: Props) {
             ),
         [],
     );
+    const bumpCaptions = useWorkspaceStore((state) => state.bumpCaptions);
     const onSegmentDeleted = useCallback(
-        (segmentId: number) =>
+        (segmentId: number) => {
             setSegments((current) =>
                 current.filter((segment) => segment.id !== segmentId),
-            ),
-        [],
+            );
+            bumpCaptions();
+        },
+        [bumpCaptions],
     );
     const onSpeakerApplied = useCallback(
         (segmentIds: number[], speakerId: number | null) => {
@@ -130,8 +228,31 @@ export default function ShowRecord(props: Props) {
         );
     }, []);
 
-    useRecordChannel(record.id, onProgress);
-    usePlaybackShortcuts();
+    useRecordChannel(record.id, { onProgress, onTranslation, onTitles });
+    useKeyboardShortcuts({ segments, speakers, canEdit: record.can_edit });
+
+    const finishedTranslations = useMemo(
+        () => translations.filter((item) => item.status === 'done'),
+        [translations],
+    );
+    const captionLanguages = useMemo(
+        () =>
+            transcript && segments.length > 0
+                ? [
+                      transcript.language,
+                      ...finishedTranslations.map((item) => item.language),
+                  ]
+                : [],
+        [transcript, segments.length, finishedTranslations],
+    );
+    const captionsVersion = useWorkspaceStore((state) => state.captionsVersion);
+    // Saved metadata or transcript lines changed: the export preview refetches.
+    const exportVersion = [
+        metadata?.id ?? 0,
+        metadata?.payload.titles.length ?? 0,
+        captionsVersion,
+        finishedTranslations.length,
+    ].join('-');
 
     const generating = stages.some(
         (stage) =>
@@ -147,6 +268,11 @@ export default function ShowRecord(props: Props) {
         <InspectorTabBar
             metadata={metadata}
             creditCount={contributors.length}
+            translationCount={translations.length}
+            suggestionCount={
+                archive.subjects.filter((item) => !item.is_confirmed).length +
+                archive.keywords.filter((item) => !item.is_confirmed).length
+            }
         />
     );
 
@@ -190,6 +316,7 @@ export default function ShowRecord(props: Props) {
                             contributors={contributors}
                             contributorRoles={contributorRoles}
                             canEdit={record.can_edit}
+                            captionLanguages={captionLanguages}
                         />
                     </div>
                     <div className="order-3 h-144 min-h-0 overflow-hidden bg-neutral-900 xl:order-0 xl:h-auto">
@@ -205,6 +332,23 @@ export default function ShowRecord(props: Props) {
                                         canEdit={record.can_edit}
                                         hasTranscript={segments.length > 0}
                                         generating={generating}
+                                        titlesPending={titlesPending}
+                                        onTitlesQueued={() =>
+                                            setTitlesPending(true)
+                                        }
+                                    />
+                                ),
+                                archive: (
+                                    <ArchivePanel
+                                        recordId={record.id}
+                                        heading={tabBar}
+                                        archive={archive}
+                                        options={archiveOptions}
+                                        suggestedLocation={
+                                            metadata?.payload
+                                                .suggestedLocation ?? null
+                                        }
+                                        canEdit={record.can_edit}
                                     />
                                 ),
                                 chapters: (
@@ -225,6 +369,33 @@ export default function ShowRecord(props: Props) {
                                         canEdit={record.can_edit}
                                     />
                                 ),
+                                translations: (
+                                    <TranslationsPanel
+                                        recordId={record.id}
+                                        heading={tabBar}
+                                        translations={translations}
+                                        languages={translationLanguages}
+                                        originalLanguage={
+                                            transcript?.language ?? null
+                                        }
+                                        canEdit={record.can_edit}
+                                        hasTranscript={segments.length > 0}
+                                        onStarted={upsertTranslation}
+                                    />
+                                ),
+                                export: (
+                                    <ExportPanel
+                                        recordId={record.id}
+                                        heading={tabBar}
+                                        formats={exportFormats}
+                                        schemas={exportSchemas}
+                                        originalLanguage={
+                                            transcript?.language ?? null
+                                        }
+                                        translations={translations}
+                                        version={exportVersion}
+                                    />
+                                ),
                             }}
                         />
                     </div>
@@ -237,6 +408,7 @@ export default function ShowRecord(props: Props) {
                     metadata={metadata}
                     canEdit={record.can_edit}
                     generating={generating}
+                    onSegmentSaved={onSegmentSaved}
                 />
             </div>
         </>

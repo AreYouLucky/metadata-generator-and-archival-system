@@ -6,7 +6,14 @@ type Props = {
     panels: Record<InspectorTab, ReactNode>;
 };
 
-const ORDER: InspectorTab[] = ['metadata', 'chapters', 'credits'];
+const ORDER: InspectorTab[] = [
+    'metadata',
+    'archive',
+    'chapters',
+    'credits',
+    'translations',
+    'export',
+];
 
 /**
  * Shows the inspector panel for the selected tab (the tabs themselves sit in

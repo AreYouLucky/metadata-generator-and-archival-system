@@ -30,6 +30,8 @@ class IndexRecordsRequest extends FormRequest
             'q' => ['nullable', 'string', 'max:100'],
             'processing_status' => ['nullable', Rule::enum(ProcessingStatus::class)],
             'review_status' => ['nullable', Rule::enum(ReviewStatus::class)],
+            // Archival flags: an embargo in force, or any classification above unclassified.
+            'flag' => ['nullable', Rule::in(['embargoed', 'classified'])],
             'sort' => ['nullable', Rule::in(self::SORTS)],
             'page' => ['nullable', 'integer', 'min:1'],
         ];

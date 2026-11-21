@@ -157,7 +157,7 @@ class RecordControllerTest extends TestCase
     public function test_a_preset_that_is_not_enabled_is_refused(): void
     {
         $this->actingAs(User::factory()->encoder()->create())
-            ->postJson(route('records.store'), ['upload_id' => fake()->uuid(), 'preset' => 'tiktok'])
+            ->postJson(route('records.store'), ['upload_id' => fake()->uuid(), 'preset' => 'vimeo'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['preset']);
     }
@@ -236,7 +236,11 @@ class RecordControllerTest extends TestCase
                 ->where('record.id', $record->id)
                 ->where('record.can_edit', true)
                 ->where('transcript', null)
-                ->has('presets', 2));
+                ->has('presets', 5)
+                ->where('presets.2.name', 'tiktok')
+                ->has('translations', 0)
+                ->has('exportFormats', 6)
+                ->has('exportSchemas', 0));
     }
 
     public function test_an_encoder_cannot_open_another_encoders_record(): void

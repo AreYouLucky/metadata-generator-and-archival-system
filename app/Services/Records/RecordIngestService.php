@@ -28,7 +28,10 @@ class RecordIngestService
      */
     private const array EXTRA_MIME_TYPES = ['application/mxf'];
 
-    public function __construct(private ChunkedUploadStore $uploads) {}
+    public function __construct(
+        private ChunkedUploadStore $uploads,
+        private AccessionNumbers $accessionNumbers,
+    ) {}
 
     /**
      * @param  array{title?: string|null, project_id?: string|null, project_series_id?: string|null, agency_id?: int|null, division_id?: int|null, expected_md5?: string|null, expected_sha256?: string|null}  $details
@@ -57,6 +60,8 @@ class RecordIngestService
                 'division_id' => $details['division_id'] ?? null,
             ]);
             $record->created_by = $user->id;
+            // Assigned at ingest (PROJECT_SPEC §11); editable later, always unique.
+            $record->accession_number = $this->accessionNumbers->next();
             $record->save();
 
             $fileId = (string) Str::ulid();

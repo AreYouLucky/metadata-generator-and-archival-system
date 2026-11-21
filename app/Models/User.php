@@ -89,4 +89,14 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         return $this->hasMany(Record::class, 'created_by');
     }
+
+    /**
+     * This user's custom JSON export schemas.
+     *
+     * @return HasMany<ExportSchema, $this>
+     */
+    public function exportSchemas(): HasMany
+    {
+        return $this->hasMany(ExportSchema::class);
+    }
 }

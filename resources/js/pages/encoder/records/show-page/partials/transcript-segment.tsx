@@ -1,9 +1,10 @@
 import { Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { useTimeFormat } from '@/hooks/use-time-format';
 import { useUpdateSegment } from '@/hooks/use-update-segment';
 import { formatTimestamp, getErrorMessage } from '@/lib/utilities';
 import { cn } from '@/lib/utils';
@@ -52,9 +53,24 @@ export default function TranscriptSegment({
     onApplySpeaker,
 }: Props) {
     const seek = useWorkspaceStore((state) => state.seek);
+    const bumpCaptions = useWorkspaceStore((state) => state.bumpCaptions);
+    const requested = useWorkspaceStore(
+        (state) => state.editRequest === segment.id,
+    );
+    const requestEdit = useWorkspaceStore((state) => state.requestEdit);
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(segment.text);
     const update = useUpdateSegment(recordId);
+    const formatTime = useTimeFormat(formatTimestamp);
+
+    // The E shortcut asks the current line to open for editing.
+    useEffect(() => {
+        if (requested && canEdit) {
+            setDraft(segment.text);
+            setEditing(true);
+            requestEdit(null);
+        }
+    }, [requested, canEdit, segment.text, requestEdit]);
 
     const save = () => {
         const text = draft.trim();
@@ -70,6 +86,7 @@ export default function TranscriptSegment({
             {
                 onSuccess: (saved) => {
                     onSaved(saved);
+                    bumpCaptions();
                     setEditing(false);
                     toast.success('Line saved.');
                 },
@@ -111,9 +128,9 @@ export default function TranscriptSegment({
                 type="button"
                 onClick={() => seek(segment.start)}
                 className="h-fit shrink-0 rounded px-1 font-mono text-xs text-brand tabular-nums hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                aria-label={`Play from ${formatTimestamp(segment.start)}`}
+                aria-label={`Play from ${formatTime(segment.start)}`}
             >
-                {formatTimestamp(segment.start)}
+                {formatTime(segment.start)}
             </button>
 
             <div className="min-w-0 flex-1 space-y-1">

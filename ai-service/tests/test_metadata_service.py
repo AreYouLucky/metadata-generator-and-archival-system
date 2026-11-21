@@ -15,11 +15,16 @@ from app.schemas.common import PresetRules, TranscriptSegment
 from app.schemas.metadata import (
     Chapter,
     ChunkSummary,
+    ContentFlags,
     GeneratedMetadata,
+    LocationSuggestion,
     PresetCopy,
+    QuoteDraft,
+    SubjectSuggestion,
+    TitleOptions,
 )
 from app.services.cache import MemoryCache
-from app.services.metadata import MetadataGenerator, compact_transcript
+from app.services.metadata import MetadataGenerator, align_quotes, compact_transcript
 
 GENERIC = PresetRules(
     name="generic", label="Generic", title_max=30, description_max=40, tags_max_count=3
@@ -54,7 +59,13 @@ class FakeLlm:
         usage = LlmUsage(model=model, input_tokens=1000, cached_tokens=200, output_tokens=100)
         if schema is ChunkSummary:
             return ChunkSummary(
-                summary="Part summary.", chapters=[Chapter(start=0, title="Part")]
+                summary="Part summary.",
+                chapters=[Chapter(start=0, title="Part")],
+                quotes=[QuoteDraft(start=6, text="Magandang umaga po sa inyong lahat 1")],
+            ), usage
+        if schema is TitleOptions:
+            return TitleOptions(
+                titles=["Existing title", "Fresh angle on the fair", "Another new title"]
             ), usage
         copy = {
             "titles": ["A title that is far too long for the generic preset", "Short title"],
@@ -74,6 +85,25 @@ class FakeLlm:
                 Chapter(start=60, title="Speeches"),
                 Chapter(start=9999, title="Past the end"),
             ],
+            quotes=[
+                # Block time 0:30, but the words are on the line at 0:36.
+                QuoteDraft(start=30, text='"Magandang umaga po sa inyong lahat 6"'),
+                QuoteDraft(start=30, text="Words nobody said in this video"),
+            ],
+            tone="formal",
+            content_flags=ContentFlags(profanity=False, sensitive_topics=["politics", "politics"]),
+            subjects=[
+                SubjectSuggestion(name="DOST", type="organisation"),
+                SubjectSuggestion(name="dost", type="organisation"),
+                SubjectSuggestion(name="Science fair", type="event"),
+            ],
+            location=LocationSuggestion(
+                text="Provincial Capitol, Cebu City",
+                region="Region VII",
+                province="Cebu",
+                city="Cebu City",
+                barangay=None,
+            ),
         ), usage
 
 
@@ -191,3 +221,84 @@ def test_a_long_transcript_is_condensed_part_by_part_with_the_light_model_first(
     assert final["model"] == "gpt-6.2-sol"
     assert final["schema"] is GeneratedMetadata
     assert final["messages"][0].startswith(f"Transcript:\nPart 1 of {len(map_calls)}:")
+
+
+def test_quotes_tone_and_flags_are_kept_and_quotes_are_aligned_to_the_lines() -> None:
+    result = generator(FakeLlm()).generate(segments(), GENERIC, duration=120)
+
+    metadata = result.metadata
+    assert [(q.start, q.end, q.text) for q in metadata.quotes] == [
+        (36.0, 41.0, "Magandang umaga po sa inyong lahat 6")
+    ]
+    assert metadata.tone == "formal"
+    assert metadata.content_flags is not None
+    assert metadata.content_flags.sensitive_topics == ["politics"]
+    dumped = result.model_dump()["metadata"]
+    assert dumped["contentFlags"] == {"profanity": False, "sensitiveTopics": ["politics"]}
+
+
+def test_quotes_survive_a_regeneration_from_the_cached_core() -> None:
+    service = generator(FakeLlm())
+    service.generate(segments(), GENERIC)
+
+    result = service.generate(segments(), YOUTUBE)
+
+    assert result.source == "core"
+    assert [q.start for q in result.metadata.quotes] == [36.0]
+    assert result.metadata.tone == "formal"
+
+
+def test_a_quote_spanning_lines_ends_where_its_last_words_are() -> None:
+    lines = [
+        TranscriptSegment(start=0, end=4, text="Welcome everyone."),
+        TranscriptSegment(start=4, end=8, text="Science is for every Filipino,"),
+        TranscriptSegment(start=8, end=12, text="from the city to the farthest barangay."),
+        TranscriptSegment(start=12, end=16, text="Let us begin."),
+    ]
+    text = "Science is for every Filipino, from the city to the farthest barangay."
+
+    quotes = align_quotes([QuoteDraft(start=0, text=text)], lines)
+
+    assert [(q.start, q.end) for q in quotes] == [(4.0, 12.0)]
+
+
+def test_long_transcripts_carry_verbatim_quotes_from_the_map_step() -> None:
+    llm = FakeLlm()
+
+    generator(llm, llm_max_transcript_tokens=200, llm_map_chunk_tokens=120).generate(
+        segments(40), GENERIC
+    )
+
+    assert (
+        'Quotable lines:\n[0:06] "Magandang umaga po sa inyong lahat 1"'
+        in (llm.calls[-1]["messages"][0])
+    )
+
+
+def test_more_titles_come_from_the_summary_and_skip_existing_ones() -> None:
+    llm = FakeLlm()
+
+    result = generator(llm).generate_titles(
+        "Officials open the fair.", GENERIC, count=2, avoid=["Existing title"]
+    )
+
+    assert llm.calls[0]["schema"] is TitleOptions
+    assert llm.calls[0]["messages"][0] == "Summary:\nOfficials open the fair."
+    assert "- Existing title" in llm.calls[0]["messages"][1]
+    assert result.titles == ["Fresh angle on the fair", "Another new title"]
+    assert all(len(title) <= 30 for title in result.titles)
+    assert {usage.kind for usage in result.usage} == {"llm_input_tokens", "llm_output_tokens"}
+
+
+def test_subject_and_location_suggestions_are_deduplicated_and_kept_in_the_core() -> None:
+    service = generator(FakeLlm())
+    service.generate(segments(), GENERIC)
+
+    result = service.generate(segments(), YOUTUBE)
+
+    dumped = result.model_dump()["metadata"]
+    assert dumped["suggestedSubjects"] == [
+        {"name": "DOST", "type": "organisation"},
+        {"name": "Science fair", "type": "event"},
+    ]
+    assert dumped["suggestedLocation"]["city"] == "Cebu City"

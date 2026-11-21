@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     callback_timeout_seconds: float = 10.0
 
     storage_root: str = "/data/storage"
+    # Access copies (proxy stage) are never taller than this.
+    proxy_max_height: int = Field(default=1080, ge=240, le=2160)
     redis_url: str = "redis://redis:6379/1"
     celery_result_url: str = "redis://redis:6379/2"
 
@@ -52,6 +54,13 @@ class Settings(BaseSettings):
     # Transcript lines are merged into blocks of about this many seconds for the prompt.
     llm_block_seconds: float = 30.0
     llm_cache_ttl_seconds: int = 60 * 60 * 24 * 30
+
+    # Translation (Phase 2). The main model by default: Filipino and regional languages are
+    # where a small model's subtitles read badly. Each batch is a few thousand tokens.
+    llm_translation_model: str = "gpt-6.2-sol"
+    llm_translation_reasoning_effort: ReasoningEffort = "low"
+    translation_batch_lines: int = Field(default=60, ge=1, le=200)
+    translation_batch_chars: int = Field(default=6000, ge=500, le=20000)
 
     openai_api_key: SecretStr = Field(default=SecretStr(""))
     openai_timeout_seconds: float = 180.0

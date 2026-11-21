@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TRANSCRIPT_SEARCH_ID } from '@/hooks/use-keyboard-shortcuts';
 
 type Props = {
     query: string;
@@ -40,6 +41,7 @@ export default function TranscriptSearch({
                     aria-hidden
                 />
                 <Input
+                    id={TRANSCRIPT_SEARCH_ID}
                     type="search"
                     value={query}
                     onChange={(event) => onQueryChange(event.target.value)}
@@ -49,7 +51,7 @@ export default function TranscriptSearch({
                             onPrevious();
                         }
                     }}
-                    placeholder="Search transcript"
+                    placeholder="Search transcript ( / )"
                     aria-label="Search transcript"
                     className="h-8 w-full pl-8"
                 />

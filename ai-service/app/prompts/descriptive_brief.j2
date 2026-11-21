@@ -1,0 +1,10 @@
+Summary:
+{{ summary }}
+{% if chapters %}
+Chapters:
+{% for chapter in chapters %}- {{ chapter }}
+{% endfor %}
+{%- endif %}
+{% if keywords %}
+Keywords: {{ keywords | join(', ') }}
+{% endif %}

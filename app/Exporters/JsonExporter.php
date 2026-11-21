@@ -2,6 +2,8 @@
 
 namespace App\Exporters;
 
+use App\Enums\ReviewStatus;
+use App\Enums\TaskStatus;
 use App\Models\FixityCheck;
 use App\Models\Record;
 use App\Models\RecordAttachment;
@@ -27,13 +29,21 @@ class JsonExporter implements Exporter
 {
     public const string SCHEMA_VERSION = '1.0';
 
-    public const string GENERATOR_VERSION = '0.2.0';
+    public const string GENERATOR_VERSION = '0.3.0';
 
+    /**
+     * The whole document, or only a custom schema's fields when `fields` is set.
+     */
     public function export(Record $record, ExportOptions $options): string
     {
         $flags = JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION;
+        $document = $this->document($record);
 
-        return json_encode($this->document($record), $options->pretty ? $flags | JSON_PRETTY_PRINT : $flags);
+        if ($options->fields !== null) {
+            $document = ExportSchemaFields::filter($document, $options->fields);
+        }
+
+        return json_encode($document, $options->pretty ? $flags | JSON_PRETTY_PRINT : $flags);
     }
 
     public function contentType(): string
@@ -52,8 +62,8 @@ class JsonExporter implements Exporter
     public function document(Record $record): array
     {
         $record->loadMissing([
-            'project:id,title,date',
-            'projectSeries:id,title,date',
+            'project:id,title,date,end_date',
+            'projectSeries:id,title,date,end_date',
             'work:id,title,total_parts',
             'agency:id,name,acronym',
             'division:id,name,acronym',
@@ -72,6 +82,7 @@ class JsonExporter implements Exporter
             'provenance',
             'auditLogs.performer:id,name',
             'attachments',
+            'transcripts' => fn ($query) => $query->where('status', TaskStatus::Done),
             'transcripts.segments.speaker:id,label',
             'speakers',
             'scenes',
@@ -146,8 +157,18 @@ class JsonExporter implements Exporter
             'accessionNumber' => $record->accession_number,
             'title' => $record->title,
             'alternativeTitle' => $record->alternative_title,
-            'project' => $record->project ? ['id' => $record->project->id, 'title' => $record->project->title, 'date' => $this->date($record->project->date)] : null,
-            'series' => $record->projectSeries ? ['id' => $record->projectSeries->id, 'title' => $record->projectSeries->title, 'date' => $this->date($record->projectSeries->date)] : null,
+            'project' => $record->project ? [
+                'id' => $record->project->id,
+                'title' => $record->project->title,
+                'date' => $this->date($record->project->date),
+                'endDate' => $this->date($record->project->end_date),
+            ] : null,
+            'series' => $record->projectSeries ? [
+                'id' => $record->projectSeries->id,
+                'title' => $record->projectSeries->title,
+                'date' => $this->date($record->projectSeries->date),
+                'endDate' => $this->date($record->projectSeries->end_date),
+            ] : null,
             'work' => $record->work ? [
                 'id' => $record->work->id,
                 'title' => $record->work->title,
@@ -157,6 +178,7 @@ class JsonExporter implements Exporter
             ] : null,
             'agency' => $record->agency ? ['name' => $record->agency->name, 'acronym' => $record->agency->acronym] : null,
             'productionUnit' => $record->division ? ['name' => $record->division->name, 'acronym' => $record->division->acronym] : null,
+            'isApproved' => $record->review_status === ReviewStatus::Approved,
             'reviewStatus' => $record->review_status->value,
             'publishedAt' => $this->timestamp($record->published_at),
         ];

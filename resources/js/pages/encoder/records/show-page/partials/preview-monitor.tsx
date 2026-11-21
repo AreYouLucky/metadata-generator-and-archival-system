@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { captions } from '@/routes/records';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type {
     Contributor,
@@ -15,6 +16,8 @@ type Props = {
     contributors: Contributor[];
     contributorRoles: ContributorRoleOption[];
     canEdit: boolean;
+    /** Transcript languages with captions (original first). */
+    captionLanguages: string[];
 };
 
 /**
@@ -30,12 +33,28 @@ export default function PreviewMonitor({
     contributors,
     contributorRoles,
     canEdit,
+    captionLanguages,
 }: Props) {
+    const player = useWorkspaceStore((state) => state.player);
+    const captionLanguage = useWorkspaceStore((state) => state.captionLanguage);
+    const captionsVersion = useWorkspaceStore((state) => state.captionsVersion);
     const setPlayer = useWorkspaceStore((state) => state.setPlayer);
     const setDuration = useWorkspaceStore((state) => state.setDuration);
     const togglePlay = useWorkspaceStore((state) => state.togglePlay);
     const [failed, setFailed] = useState(false);
     const unplayable = media.playable === false || failed;
+
+    // Show only the chosen caption track (tracks reload when lines change).
+    useEffect(() => {
+        if (!player) {
+            return;
+        }
+
+        for (const track of Array.from(player.textTracks)) {
+            track.mode =
+                track.language === captionLanguage ? 'showing' : 'disabled';
+        }
+    }, [player, captionLanguage, captionLanguages, captionsVersion]);
 
     return (
         <div className="flex h-full min-h-0 flex-col">
@@ -54,6 +73,18 @@ export default function PreviewMonitor({
                     onError={() => setFailed(true)}
                     className="aspect-video max-h-full w-full cursor-pointer object-contain xl:absolute xl:inset-0 xl:aspect-auto xl:h-full"
                 >
+                    {captionLanguages.map((language) => (
+                        <track
+                            key={`${language}-${captionsVersion}`}
+                            kind="subtitles"
+                            srcLang={language}
+                            label={language}
+                            src={captions.url(
+                                { record: recordId, language },
+                                { query: { v: captionsVersion } },
+                            )}
+                        />
+                    ))}
                     Your browser can't play this video.
                 </video>
                 {!unplayable && (
@@ -71,13 +102,16 @@ export default function PreviewMonitor({
                             aria-hidden
                         />
                         This master's format can't play in a browser (for
-                        example ProRes or MXF). The transcript and metadata
-                        still work; a playable access copy comes in a later
-                        release.
+                        example ProRes or MXF). A playable access copy is made
+                        after the transcript and metadata; it plays here once it
+                        is ready.
                     </p>
                 )}
             </div>
-            <TransportBar fallbackDuration={media.duration ?? 0} />
+            <TransportBar
+                fallbackDuration={media.duration ?? 0}
+                captionLanguages={captionLanguages}
+            />
         </div>
     );
 }

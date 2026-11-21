@@ -66,6 +66,7 @@ void createInertiaApp({
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):
+            case name.startsWith('encoder/settings/'):
                 return [AppLayout, SettingsLayout];
             default:
                 return AppLayout;
@@ -83,7 +84,7 @@ void createInertiaApp({
         );
     },
     progress: {
-        color: '#0e7490',
+        color: '#0284c7',
     },
 });
 

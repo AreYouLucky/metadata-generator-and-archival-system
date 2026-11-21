@@ -14,3 +14,8 @@ Rules:
 - tags: lowercase search phrases without "#".
 - hashtags: each starts with "#", no spaces; return an empty list when the platform takes none.
 - Keep every field within its limit; shorter is fine.
+- quotes: up to 5 short, quotable lines (one or two sentences each) copied word for word from the transcript, as {start, text}; start is the time of the block the line is in. Return an empty list if nothing stands out.
+- tone: the overall tone of the video, one of the allowed values.
+- contentFlags: profanity is true only if swear words are spoken; sensitiveTopics lists up to 5 short labels (e.g. "violence", "disaster", "death", "health", "politics", "minors") only for topics that are clearly present, else an empty list.
+- subjects: up to 12 people, organisations, places, events and topics the video is clearly about, as {name, type}; only names said in the transcript, never guesses about who appears on screen.
+- location: where the video was recorded if the transcript says so, as {text, region, province, city, barangay} using Philippine names (e.g. region "Region VII", province "Cebu", city "Cebu City"); null levels when unknown; null when the place isn't said.

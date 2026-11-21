@@ -53,7 +53,7 @@ export default function CreditsPanel({
                     <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                         No credits yet.
                         {canEdit &&
-                            ' Add the cast and crew below, or pause the video and use “Copy text” to pick up names shown on screen.'}
+                            ' Add the cast and crew below, or pause the video, click “Copy text” and drag over the names shown on screen.'}
                     </p>
                 ) : (
                     <ol className="space-y-1.5">

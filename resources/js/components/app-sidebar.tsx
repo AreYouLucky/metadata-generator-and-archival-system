@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
+    Archive,
     Building2,
     ClipboardCheck,
     FolderKanban,
@@ -21,6 +22,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as dispositions } from '@/routes/admin/dispositions';
 import { index as logs } from '@/routes/admin/logs';
 import { show as systemStatus } from '@/routes/admin/system';
 import { index as users } from '@/routes/admin/users';
@@ -69,6 +71,11 @@ const adminNavItems: NavItem[] = [
         title: 'Logs',
         href: logs(),
         icon: ScrollText,
+    },
+    {
+        title: 'Disposition review',
+        href: dispositions(),
+        icon: Archive,
     },
     {
         title: 'System status',

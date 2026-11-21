@@ -6,15 +6,19 @@ from pydantic import BaseModel, Field
 
 from app.schemas.common import PresetRules, TranscriptSegment
 
-StageName = Literal["checksum", "probe", "extract_audio", "transcribe", "generate_metadata"]
+StageName = Literal[
+    "checksum", "probe", "extract_audio", "transcribe", "generate_metadata", "proxy"
+]
 
-# Phase 1 stages, in run order. Checksums come first: nothing else touches the file before.
+# Stages in run order. Checksums come first: nothing else touches the file before.
+# The access copy comes last, so a long transcode never delays the transcript.
 STAGES: tuple[StageName, ...] = (
     "checksum",
     "probe",
     "extract_audio",
     "transcribe",
     "generate_metadata",
+    "proxy",
 )
 
 # A stage is skipped when any stage it depends on failed or was skipped.
@@ -24,6 +28,7 @@ DEPENDS_ON: dict[StageName, tuple[StageName, ...]] = {
     "extract_audio": ("probe",),
     "transcribe": ("extract_audio",),
     "generate_metadata": ("transcribe",),
+    "proxy": ("probe",),
 }
 
 
@@ -54,6 +59,10 @@ class PipelineContext(BaseModel):
     failed: list[StageName] = []
     skipped: list[StageName] = []
     duration: float | None = None
+    # ffprobe's format_name and the probe summary's codecs, for the proxy decision.
+    container: str | None = None
+    playable: bool | None = None
+    interlaced: bool = False
     audio_path: str | None = None
     language: str | None = None
     segments: list[TranscriptSegment] = []

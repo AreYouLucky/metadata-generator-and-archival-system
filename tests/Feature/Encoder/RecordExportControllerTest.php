@@ -65,12 +65,12 @@ class RecordExportControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_formats_from_later_phases_are_rejected(): void
+    public function test_unknown_formats_are_rejected(): void
     {
         $file = RecordFile::factory()->create();
 
         $this->actingAs($file->record->creator)
-            ->getJson(route('records.export', [$file->record, 'format' => 'srt']))
+            ->getJson(route('records.export', [$file->record, 'format' => 'docx']))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['format']);
     }

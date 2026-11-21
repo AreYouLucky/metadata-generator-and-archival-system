@@ -12,11 +12,14 @@ import type {
     PresetRules,
 } from '@/types/records';
 import ChipInput from './chip-input';
+import GenerateTitlesButton from './generate-titles-button';
 import MetadataHistory from './metadata-history';
 import MetadataSaveBar from './metadata-save-bar';
+import QuotesList from './quotes-list';
 import RegenerateDialog from './regenerate-dialog';
 import RegenerateForm from './regenerate-form';
 import TitleOptions from './title-options';
+import ToneBadges from './tone-badges';
 
 type Props = {
     recordId: string;
@@ -28,7 +31,13 @@ type Props = {
     canEdit: boolean;
     hasTranscript: boolean;
     generating: boolean;
+    /** "Generate more" titles were requested and haven't arrived yet. */
+    titlesPending: boolean;
+    onTitlesQueued: () => void;
 };
+
+/** Mirrors ReceiveStageResultRequest::MAX_TITLES on the server. */
+const MAX_TITLES = 12;
 
 /**
  * Edit the active generation's text fields (its chapters have their own tab;
@@ -44,6 +53,8 @@ export default function MetadataPanel({
     canEdit,
     hasTranscript,
     generating,
+    titlesPending,
+    onTitlesQueued,
 }: Props) {
     const { draft, dirty } = useMetadataDraft(metadata);
     const change = useMetadataDraftStore((state) => state.change);
@@ -122,15 +133,32 @@ export default function MetadataPanel({
                             generating && 'pointer-events-none opacity-60',
                         )}
                     >
-                        <TitleOptions
-                            titles={draft.titles}
-                            selected={draft.selectedTitle}
-                            maxLength={preset?.title_max ?? null}
-                            disabled={readOnly}
-                            onChange={(titles, selectedTitle) =>
-                                change({ titles, selectedTitle })
-                            }
-                        />
+                        <div className="grid gap-1">
+                            <TitleOptions
+                                titles={draft.titles}
+                                selected={draft.selectedTitle}
+                                maxLength={preset?.title_max ?? null}
+                                disabled={readOnly}
+                                onChange={(titles, selectedTitle) =>
+                                    change({ titles, selectedTitle })
+                                }
+                            />
+                            {canEdit && (
+                                <div className="flex justify-end">
+                                    <GenerateTitlesButton
+                                        recordId={recordId}
+                                        metadataId={metadata.id}
+                                        pending={titlesPending}
+                                        onQueued={onTitlesQueued}
+                                        disabled={
+                                            readOnly ||
+                                            !draft.summary ||
+                                            draft.titles.length >= MAX_TITLES
+                                        }
+                                    />
+                                </div>
+                            )}
+                        </div>
 
                         <div className="grid gap-2">
                             <div className="flex items-baseline justify-between">
@@ -203,6 +231,17 @@ export default function MetadataPanel({
                                 onChange={(hashtags) => change({ hashtags })}
                             />
                         )}
+
+                        <ToneBadges
+                            tone={draft.tone ?? null}
+                            flags={draft.contentFlags ?? null}
+                        />
+
+                        <QuotesList
+                            quotes={draft.quotes ?? []}
+                            disabled={readOnly}
+                            onChange={(quotes) => change({ quotes })}
+                        />
 
                         <p className="text-xs text-neutral-500">
                             Generated with {metadata.model}

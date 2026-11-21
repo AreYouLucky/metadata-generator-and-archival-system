@@ -92,6 +92,78 @@ class AiServiceClient
     }
 
     /**
+     * More title options from the active generation's summary (GenerateTitlesJob).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{model?: string, titles?: list<string>, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>}
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function generateTitles(array $payload): array
+    {
+        /** @var array{model?: string, titles?: list<string>, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>} */
+        return $this->send('POST', '/generate/titles', $payload, timeoutSeconds: 120)->throw()->json();
+    }
+
+    /**
+     * Catalogue field suggestions for the Archive panel ("Fill with AI").
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{model?: string, fields?: array<string, mixed>, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>}
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function suggestDescriptive(array $payload): array
+    {
+        /** @var array{model?: string, fields?: array<string, mixed>, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>} */
+        return $this->send('POST', '/generate/descriptive', $payload, timeoutSeconds: 120)->throw()->json();
+    }
+
+    /**
+     * Queue a transcript translation. Returns the job id; the lines arrive on
+     * the signed /internal/records/{record}/translations/{transcript} callbacks.
+     *
+     * @param  array{record_id: string, transcript_id: int, source_language: string|null, target_language: string, target_language_name: string, lines: list<array{id: int, text: string}>}  $payload
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function translate(array $payload): string
+    {
+        return (string) $this->send('POST', '/jobs/translate', $payload, timeoutSeconds: 30)->throw()->json('job_id');
+    }
+
+    /**
+     * Checksum and probe an added file (mezzanine, access copy). Results arrive
+     * on /internal/record-files/{file}/results/{checksum|probe|failed}.
+     *
+     * @param  array{record_id: string, record_file_id: string, path: string, role: string}  $payload
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function ingestFile(array $payload): string
+    {
+        return (string) $this->send('POST', '/jobs/ingest-file', $payload)->throw()->json('job_id');
+    }
+
+    /**
+     * Re-hash a stored file for a fixity check. The checksums arrive on
+     * /internal/record-files/{file}/fixity; Laravel compares them.
+     *
+     * @param  array{record_file_id: string, path: string, triggered_by: string}  $payload
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function fixity(array $payload): string
+    {
+        return (string) $this->send('POST', '/jobs/fixity', $payload)->throw()->json('job_id');
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      *
      * @throws ConnectionException

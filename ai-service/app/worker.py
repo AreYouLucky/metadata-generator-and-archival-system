@@ -22,7 +22,7 @@ celery_app = Celery(
     "ai_service",
     broker=settings.redis_url,
     backend=settings.celery_result_url,
-    include=["app.pipeline.tasks"],
+    include=["app.pipeline.tasks", "app.pipeline.translation", "app.pipeline.files"],
 )
 celery_app.conf.update(
     task_serializer="json",

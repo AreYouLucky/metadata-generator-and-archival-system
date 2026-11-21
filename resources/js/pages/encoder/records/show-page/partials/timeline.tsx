@@ -45,6 +45,10 @@ type Props = {
     metadata: ActiveMetadata | null;
     canEdit: boolean;
     generating: boolean;
+    /** A line's timing changed on the transcript track. */
+    onSegmentSaved: (
+        saved: Pick<TranscriptSegment, 'id'> & Partial<TranscriptSegment>,
+    ) => void;
 };
 
 export type TimelineViewport = { left: number; width: number };
@@ -53,7 +57,8 @@ export type TimelineViewport = { left: number; width: number };
  * Editor timeline: time ruler (click or drag to scrub), chapters,
  * transcript and audio waveform tracks, and a playhead that follows playback.
  * Only the visible part of each track is rendered. Encoders add chapters at
- * the playhead (or by double-clicking the chapters track) and drag them.
+ * the playhead (or by double-clicking the chapters track) and drag them, and
+ * drag or trim transcript lines to fix their timing.
  */
 export default function Timeline({
     recordId,
@@ -62,6 +67,7 @@ export default function Timeline({
     metadata,
     canEdit,
     generating,
+    onSegmentSaved,
 }: Props) {
     const chapters = useDraftChapters(metadata);
     const addChapter = useMetadataDraftStore((state) => state.addChapter);
@@ -263,9 +269,13 @@ export default function Timeline({
                             onPointerDown={seekToPointer}
                         >
                             <TimelineTranscriptTrack
+                                recordId={recordId}
                                 segments={segments}
                                 pixelsPerSecond={pixelsPerSecond}
                                 range={range}
+                                duration={duration}
+                                editable={canEdit}
+                                onSegmentSaved={onSegmentSaved}
                             />
                         </div>
                         <div

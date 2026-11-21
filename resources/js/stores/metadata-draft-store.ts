@@ -18,6 +18,11 @@ type MetadataDraftState = {
     /** Move one chapter, kept between its neighbours so the order never changes. */
     moveChapter: (index: number, start: number) => void;
     markSaved: () => void;
+    /**
+     * Add "Generate more" titles to generation `metadataId`. They are already
+     * saved on the server, so this doesn't make the draft dirty.
+     */
+    appendTitles: (metadataId: number, titles: string[]) => void;
 };
 
 /** Chapters always play in order; the timeline relies on it. */
@@ -99,4 +104,26 @@ export const useMetadataDraftStore = create<MetadataDraftState>((set, get) => ({
             };
         }),
     markSaved: () => set({ dirty: false }),
+    appendTitles: (metadataId, titles) =>
+        set((state) => {
+            if (state.metadataId !== metadataId || !state.draft) {
+                return state;
+            }
+
+            const taken = new Set(
+                state.draft.titles.map((title) => title.toLowerCase()),
+            );
+            const fresh = titles.filter(
+                (title) => !taken.has(title.toLowerCase()),
+            );
+
+            return fresh.length === 0
+                ? state
+                : {
+                      draft: {
+                          ...state.draft,
+                          titles: [...state.draft.titles, ...fresh],
+                      },
+                  };
+        }),
 }));

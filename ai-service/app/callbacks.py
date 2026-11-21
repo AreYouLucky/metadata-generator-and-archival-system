@@ -51,7 +51,7 @@ def report_progress(
     """POST /internal/records/{id}/progress. Status: running | failed | skipped.
 
     Status changes are retried; throttled progress ticks are best effort."""
-    send = _post_with_retry if retry_on_error else post_to_laravel
+    send = post_with_retry if retry_on_error else post_to_laravel
     send(
         f"/internal/records/{record_id}/progress",
         {
@@ -65,7 +65,7 @@ def report_progress(
 
 def report_result(record_id: str, stage: str, result: dict[str, Any]) -> None:
     """POST /internal/records/{id}/results/{stage}: marks the stage done and stores its output."""
-    _post_with_retry(f"/internal/records/{record_id}/results/{stage}", result)
+    post_with_retry(f"/internal/records/{record_id}/results/{stage}", result)
 
 
 def _is_retryable(error: BaseException) -> bool:
@@ -81,7 +81,7 @@ def _is_retryable(error: BaseException) -> bool:
     wait=wait_exponential(multiplier=1, max=30),
     reraise=True,
 )
-def _post_with_retry(path: str, payload: dict[str, Any]) -> None:
+def post_with_retry(path: str, payload: dict[str, Any]) -> None:
     # Each attempt is signed again with a fresh timestamp, so the replay guard accepts it.
     post_to_laravel(path, payload)
 

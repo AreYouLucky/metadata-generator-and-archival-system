@@ -201,6 +201,78 @@ class SegmentControllerTest extends TestCase
         $this->assertModelExists($segment);
     }
 
+    public function test_a_line_can_be_retimed_and_its_translations_follow(): void
+    {
+        $segment = $this->segmentOf(Record::factory()->create(), 'Line');
+        $segment->update(['position' => 0, 'start' => 1.0, 'end' => 3.0]);
+        $record = $segment->transcript->record;
+        $translated = RecordSegment::factory()
+            ->for(RecordTranscript::factory()->for($record)->translation(), 'transcript')
+            ->create(['position' => 0, 'start' => 1.0, 'end' => 3.0]);
+        $otherLine = RecordSegment::factory()
+            ->for(RecordTranscript::factory()->for(Record::factory()->create())->translation(), 'transcript')
+            ->create(['position' => 0, 'start' => 1.0, 'end' => 3.0]);
+
+        $this->actingAs($record->creator)
+            ->patchJson(route('records.segments.update', [$record, $segment]), ['start' => 1.25, 'end' => 3.5])
+            ->assertOk()
+            ->assertJson(['start' => 1.25, 'end' => 3.5, 'text' => 'Line']);
+
+        $this->assertEqualsWithDelta(1.25, $segment->refresh()->start, 0.0001);
+        $this->assertEqualsWithDelta(3.5, $segment->end, 0.0001);
+        $this->assertEqualsWithDelta(1.25, $translated->refresh()->start, 0.0001);
+        $this->assertEqualsWithDelta(3.5, $translated->end, 0.0001);
+        $this->assertEqualsWithDelta(1.0, $otherLine->refresh()->start, 0.0001);
+    }
+
+    public function test_a_retimed_line_may_overlap_its_neighbours_but_not_pass_them(): void
+    {
+        $segment = $this->segmentOf(Record::factory()->create(), 'Middle');
+        $segment->update(['position' => 1, 'start' => 4.0, 'end' => 6.0]);
+        $record = $segment->transcript->record;
+        RecordSegment::factory()->for($segment->transcript, 'transcript')->create(['position' => 0, 'start' => 1.0, 'end' => 4.0]);
+        RecordSegment::factory()->for($segment->transcript, 'transcript')->create(['position' => 2, 'start' => 6.0, 'end' => 8.0]);
+        $url = route('records.segments.update', [$record, $segment]);
+
+        $this->actingAs($record->creator)
+            ->patchJson($url, ['start' => 3.0, 'end' => 7.0])
+            ->assertOk();
+
+        $this->actingAs($record->creator)
+            ->patchJson($url, ['start' => 0.5, 'end' => 2.0])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['start']);
+
+        $this->actingAs($record->creator)
+            ->patchJson($url, ['start' => 6.5, 'end' => 9.0])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['start']);
+
+        $this->assertEqualsWithDelta(3.0, $segment->refresh()->start, 0.0001);
+    }
+
+    public function test_timing_needs_a_start_before_its_end(): void
+    {
+        $segment = $this->segmentOf(Record::factory()->create(), 'Line');
+        $record = $segment->transcript->record;
+        $url = route('records.segments.update', [$record, $segment]);
+
+        $this->actingAs($record->creator)
+            ->patchJson($url, ['start' => 5.0, 'end' => 4.0])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['end']);
+
+        $this->actingAs($record->creator)
+            ->patchJson($url, ['start' => 5.0])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['end']);
+
+        $this->actingAs($record->creator)
+            ->patchJson($url, ['start' => -1, 'end' => 2])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['start']);
+    }
+
     private function segmentOf(Record $record, string $text): RecordSegment
     {
         $transcript = RecordTranscript::factory()->for($record)->create();

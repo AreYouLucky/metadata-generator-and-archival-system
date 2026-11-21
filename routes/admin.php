@@ -7,6 +7,7 @@
 
 use App\Http\Controllers\Admin\AgencyController;
 use App\Http\Controllers\Admin\AiServiceHealthController;
+use App\Http\Controllers\Admin\DispositionController;
 use App\Http\Controllers\Admin\LogController;
 use App\Http\Controllers\Admin\SystemPingController;
 use App\Http\Controllers\Admin\SystemStatusController;
@@ -32,6 +33,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])
         Route::delete('agencies/{agency}', [AgencyController::class, 'destroy'])->middleware('throttle:60,1')->name('agencies.destroy');
 
         Route::get('logs', LogController::class)->name('logs.index');
+        Route::get('dispositions', DispositionController::class)->name('dispositions.index');
 
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->middleware('throttle:30,1')->name('users.store');
