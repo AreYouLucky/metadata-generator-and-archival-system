@@ -2,8 +2,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import AppearanceToggle from '@/components/all/appearance-toggle';
-import AppLogoIcon from '@/components/app-logo-icon';
+import BrandLogo from '@/components/all/brand-logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { dashboard, login, logout, register } from '@/routes';
@@ -32,12 +31,16 @@ export default function CatalogueHeader() {
                     href={home()}
                     className="flex min-w-0 items-center gap-2.5 font-semibold"
                 >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-                        <AppLogoIcon className="size-4 fill-current" />
-                    </span>
-                    <span className="hidden truncate text-sm md:inline">
-                        {name}
-                    </span>
+                    <BrandLogo
+                        variant="mark"
+                        alt={name}
+                        className="size-8 md:hidden"
+                    />
+                    <BrandLogo
+                        variant="compact"
+                        alt={name}
+                        className="hidden h-8 md:block"
+                    />
                 </Link>
 
                 <nav aria-label="Catalogue" className="hidden sm:block">
@@ -67,7 +70,6 @@ export default function CatalogueHeader() {
                 </form>
 
                 <div className="flex shrink-0 items-center gap-1">
-                    <AppearanceToggle />
                     {auth.user ? (
                         <>
                             <Button

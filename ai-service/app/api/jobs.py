@@ -4,10 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel, Field
 
 from app.pipeline import cancellation
-from app.pipeline.files import start_audio_export, start_fixity, start_ingest
+from app.pipeline.files import start_audio_export, start_clip, start_fixity, start_ingest
+from app.pipeline.imports import start_import
 from app.pipeline.tasks import start_pipeline
 from app.pipeline.translation import start_translation
-from app.schemas.files import AudioExportRequest, FixityRequest, IngestFileRequest
+from app.schemas.files import AudioExportRequest, ClipRequest, FixityRequest, IngestFileRequest
+from app.schemas.imports import ImportRequest
 from app.schemas.pipeline import ProcessRequest
 from app.schemas.translation import TranslateRequest
 from app.security import require_signature
@@ -98,3 +100,30 @@ def export_audio(body: AudioExportRequest) -> JobAccepted:
     except UnsafePathError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
     return JobAccepted(job_id=start_audio_export(body))
+
+
+@router.post("/clips", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED)
+def clip(body: ClipRequest) -> JobAccepted:
+    """Signed by Laravel's StartClipJob: cut a part of the master to its own MP4 in the
+    background; the result arrives on /internal/records/{id}/clips/{clip}."""
+    _confined(body.video_path)
+    try:
+        resolve(body.output_path)
+    except UnsafePathError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+    return JobAccepted(job_id=start_clip(body))
+
+
+@router.post("/import-url", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED)
+def import_url(body: ImportRequest) -> JobAccepted:
+    """Signed by Laravel's StartImportJob: download a web address (yt-dlp) into the
+    record's master folder. The address is checked again in the task, after resolving
+    its host; the result arrives on /internal/imports/{record}/done."""
+    expected = f"records/{body.record_id}/master"
+    if body.output_dir != expected:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unexpected output folder.")
+    try:
+        resolve(body.output_dir)
+    except UnsafePathError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+    return JobAccepted(job_id=start_import(body))

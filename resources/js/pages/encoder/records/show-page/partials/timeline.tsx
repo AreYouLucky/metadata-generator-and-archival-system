@@ -22,6 +22,7 @@ import type {
 import type { Scene, Shot } from '@/types/visuals';
 import TimelineChapterControls from './timeline-chapter-controls';
 import TimelineChaptersTrack from './timeline-chapters-track';
+import TimelineClipRange from './timeline-clip-range';
 import TimelinePlayhead from './timeline-playhead';
 import TimelineRuler from './timeline-ruler';
 import TimelineScenesTrack from './timeline-scenes-track';
@@ -198,11 +199,11 @@ export default function Timeline({
     return (
         <section
             aria-label="Timeline"
-            className="flex min-h-60 shrink-0 flex-col border-t border-white/10 bg-neutral-900 xl:h-[calc((100svh-1rem)*0.3)] xl:min-h-60"
+            className="flex min-h-60 shrink-0 flex-col border-t border-border bg-card xl:h-[calc((100svh-1rem)*0.3)] xl:min-h-60"
         >
-            <header className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3">
+            <header className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-border px-3">
                 <div className="flex min-w-0 items-center gap-3">
-                    <h2 className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
+                    <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                         Timeline
                     </h2>
                     {canEdit && (
@@ -227,12 +228,12 @@ export default function Timeline({
             </header>
 
             <div className="flex min-h-0 flex-1">
-                <div className="flex w-24 shrink-0 flex-col border-r border-white/10 text-[11px] text-neutral-400">
-                    <div className="h-7 shrink-0 border-b border-white/10" />
+                <div className="flex w-24 shrink-0 flex-col border-r border-border text-[11px] text-muted-foreground">
+                    <div className="h-7 shrink-0 border-b border-border" />
                     {TRACKS.map((track) => (
                         <div
                             key={track.key}
-                            className={`${track.height} flex items-center border-b border-white/5 px-3`}
+                            className={`${track.height} flex items-center border-b border-border px-3`}
                         >
                             {track.label}
                         </div>
@@ -255,7 +256,7 @@ export default function Timeline({
                             onScrub={timeAt}
                         />
                         <div
-                            className="h-9 shrink-0 border-b border-white/5"
+                            className="h-9 shrink-0 border-b border-border"
                             onPointerDown={seekToPointer}
                             onDoubleClick={addChapterOnTrack}
                             title={
@@ -273,7 +274,7 @@ export default function Timeline({
                             />
                         </div>
                         <div
-                            className="h-12 shrink-0 border-b border-white/5"
+                            className="h-12 shrink-0 border-b border-border"
                             onPointerDown={seekToPointer}
                         >
                             <TimelineTranscriptTrack
@@ -287,7 +288,7 @@ export default function Timeline({
                             />
                         </div>
                         <div
-                            className="h-8 shrink-0 border-b border-white/5"
+                            className="h-8 shrink-0 border-b border-border"
                             onPointerDown={seekToPointer}
                         >
                             <TimelineScenesTrack
@@ -298,7 +299,7 @@ export default function Timeline({
                             />
                         </div>
                         <div
-                            className="min-h-12 flex-1 border-b border-white/5"
+                            className="min-h-12 flex-1 border-b border-border"
                             onPointerDown={seekToPointer}
                         >
                             <TimelineWaveformTrack
@@ -308,6 +309,7 @@ export default function Timeline({
                                 viewport={viewport}
                             />
                         </div>
+                        <TimelineClipRange pixelsPerSecond={pixelsPerSecond} />
                         <TimelinePlayhead
                             pixelsPerSecond={pixelsPerSecond}
                             viewport={viewport}

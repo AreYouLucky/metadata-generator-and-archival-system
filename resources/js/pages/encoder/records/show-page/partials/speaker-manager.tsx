@@ -34,12 +34,12 @@ export default function SpeakerManager({ recordId, speakers, canEdit }: Props) {
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 gap-1.5 px-2 text-xs text-neutral-300"
+                    className="h-7 gap-1.5 px-2 text-xs text-foreground/80"
                 >
                     <Users aria-hidden />
                     Speakers
                     {speakers.length > 0 && (
-                        <span className="text-neutral-500">
+                        <span className="text-muted-foreground">
                             {speakers.length}
                         </span>
                     )}

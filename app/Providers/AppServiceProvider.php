@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -65,8 +66,22 @@ class AppServiceProvider extends ServiceProvider
         // Anything that starts paid AI work or heavy processing (new records, regenerations).
         RateLimiter::for('ai', fn (Request $request): Limit => Limit::perMinute(10)->by($request->user()?->id ?: $request->ip()));
 
+        // Chat questions (Phase 7): each answer makes several AI calls.
+        RateLimiter::for('chat', fn (Request $request): Limit => Limit::perMinute(6)->by($request->user()?->id ?: $request->ip()));
+
         // Chunked uploads: one request per 8 MB chunk.
         RateLimiter::for('uploads', fn (Request $request): Limit => Limit::perMinute(600)->by($request->user()?->id ?: $request->ip()));
+
+        // YouTube uploads (Phase 7): each costs a large share of the daily API quota.
+        RateLimiter::for('youtube', fn (Request $request): Limit => Limit::perHour(10)->by($request->user()?->id ?: $request->ip()));
+
+        // Public API (Phase 7): per token, so one integration can't starve another.
+        RateLimiter::for('api', function (Request $request): Limit {
+            $token = $request->user()?->currentAccessToken();
+            $key = $token instanceof PersonalAccessToken ? 'token:'.$token->getKey() : 'ip:'.$request->ip();
+
+            return Limit::perMinute((int) config('archive.api.requests_per_minute'))->by($key);
+        });
 
         // Public catalogue pages, and the player's media requests (seeking sends many Range requests).
         RateLimiter::for('catalogue', fn (Request $request): Limit => Limit::perMinute(120)->by($request->user()?->id ?: $request->ip()));

@@ -29,8 +29,8 @@ export default function SuggestionChip({
             className={cn(
                 'flex items-center gap-1 rounded-full py-0.5 pr-1 pl-2.5 text-xs',
                 confirmed
-                    ? 'bg-white/10'
-                    : 'border border-dashed border-brand/60 text-neutral-300',
+                    ? 'bg-muted'
+                    : 'border border-dashed border-brand/60 text-foreground/80',
             )}
             title={
                 confirmed
@@ -49,7 +49,7 @@ export default function SuggestionChip({
                 <button
                     type="button"
                     onClick={onConfirm}
-                    className="rounded-full p-0.5 text-emerald-300 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="rounded-full p-0.5 text-emerald-700 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     aria-label="Confirm"
                 >
                     <Check className="size-3.5" aria-hidden />
@@ -59,7 +59,7 @@ export default function SuggestionChip({
                 <button
                     type="button"
                     onClick={onRemove}
-                    className="rounded-full p-0.5 text-neutral-400 hover:bg-white/10 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-red-800 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     aria-label={confirmed ? 'Remove' : 'Reject'}
                 >
                     <X className="size-3.5" aria-hidden />

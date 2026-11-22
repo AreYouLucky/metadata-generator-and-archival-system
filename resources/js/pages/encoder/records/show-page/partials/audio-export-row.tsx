@@ -18,14 +18,14 @@ export default function AudioExportRow({ audio, pending, onPrepare }: Props) {
     const working = pending || audio.status === 'processing';
 
     return (
-        <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-white/5 px-3 py-2 text-sm">
+        <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-muted/60 px-3 py-2 text-sm">
             <AudioLines
-                className="size-4 shrink-0 text-neutral-400"
+                className="size-4 shrink-0 text-muted-foreground"
                 aria-hidden
             />
             <div className="min-w-0 flex-1">
                 <p>{audio.label}</p>
-                <p className="text-xs wrap-anywhere text-neutral-500">
+                <p className="text-xs wrap-anywhere text-muted-foreground">
                     {audio.status === 'ready' && audio.file_size !== null
                         ? formatBytes(audio.file_size)
                         : audio.status === 'processing'

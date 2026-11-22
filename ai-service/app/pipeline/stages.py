@@ -10,8 +10,10 @@ from typing import Any
 
 from app.config import get_settings
 from app.pipeline import audio, checksum, frames, objects, ocr, probe, proxy, scenes
+from app.providers.diarization import get_diarization_provider
 from app.providers.transcription import get_transcription_provider
-from app.schemas.pipeline import PipelineContext
+from app.providers.transcription.assemblyai import AssemblyAIProvider
+from app.schemas.pipeline import PipelineContext, StageName
 from app.schemas.visual import FrameInfo
 from app.services.metadata import MetadataGenerator
 from app.services.vision import FrameDescriber
@@ -83,11 +85,43 @@ def write_waveform(context: PipelineContext, audio_file: Path) -> str | None:
 def run_transcribe(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
     if context.audio_path is None:
         raise SkipStage("No audio was extracted.")
-    result = get_transcription_provider().transcribe(
-        resolve(context.audio_path), context.duration, on_progress
-    )
+    provider = get_transcription_provider()
+    audio_file = resolve(context.audio_path)
+    if isinstance(provider, AssemblyAIProvider):
+        # One request gives both the lines and, when asked for, the speakers.
+        result = provider.transcribe(
+            audio_file,
+            context.duration,
+            on_progress,
+            speaker_labels=context.request.options.diarization,
+        )
+    else:
+        result = provider.transcribe(audio_file, context.duration, on_progress)
     context.segments = result.segments
     context.language = result.language
+    context.speaker_turns = result.speaker_turns
+    return result.model_dump()
+
+
+def run_diarize(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
+    """Who speaks when. Laravel gives each transcript line the speaker who talks longest
+    during it. Reuses the transcription's labels when the provider gave them."""
+    if not context.segments:
+        raise SkipStage("Nothing was said in the video, so there are no speakers to find.")
+    if context.speaker_turns:
+        return {
+            "provider": "assemblyai",
+            "model": None,
+            "turns": [turn.model_dump() for turn in context.speaker_turns],
+            "usage": [],
+        }
+    if context.audio_path is None:
+        raise SkipStage("No audio was extracted.")
+    result = get_diarization_provider().diarize(
+        resolve(context.audio_path), context.duration, on_progress
+    )
+    if not result.turns:
+        raise SkipStage("No speech was found to tell speakers apart.")
     return result.model_dump()
 
 
@@ -254,3 +288,48 @@ def run_generate_metadata(context: PipelineContext, on_progress: Progress) -> di
         "custom_prompt": options.custom_prompt,
         **result.model_dump(),
     }
+
+
+def restore(stage: StageName, context: PipelineContext) -> None:
+    """For a partial run (a retry of one stage): give the context what `stage` produced
+    the first time, without reporting anything, so the stages that run again have their
+    inputs. Cheap facts are measured again (probe); stored results come from the seed
+    Laravel sent; the extracted audio is reused when it is still in the work folder."""
+    request = context.request
+    seed = request.seed
+    needs_audio = request.runs("transcribe") or request.runs("diarize")
+
+    if stage == "probe":
+        run_probe(context, _quiet)
+    elif stage == "extract_audio" and needs_audio:
+        audio_file = work_dir(request.record_id) / "audio.mp3"
+        if audio_file.is_file():
+            context.audio_path = relative(audio_file)
+        else:
+            audio.extract(resolve(request.video_path), audio_file, context.duration, _quiet)
+            context.audio_path = relative(audio_file)
+    elif stage == "transcribe" and seed is not None and seed.segments is not None:
+        context.segments = seed.segments
+        context.language = seed.language
+    elif stage == "scenes" and seed is not None and seed.shots is not None:
+        context.shots = seed.shots
+    elif stage == "frames" and seed is not None and seed.frames is not None:
+        context.frames = [frame.model_copy(update={"duplicate_of": None}) for frame in seed.frames]
+        _find_repeats(context)
+
+
+def _find_repeats(context: PipelineContext) -> None:
+    """Mark frames that repeat the one before, as the frames stage does, so a rerun of
+    OCR or objects doesn't pay for a slide twice. Without the image tools (or a frame
+    file), every frame is analysed."""
+    try:
+        looks = [frames.look(resolve(frame.path)) for frame in context.frames]
+    except Exception:  # noqa: BLE001 - an optimisation only
+        logger.info("record_id=%s repeats not checked", context.request.record_id, exc_info=True)
+        return
+    for frame, repeat_of in zip(context.frames, frames.duplicates(looks), strict=True):
+        frame.duplicate_of = repeat_of
+
+
+def _quiet(_progress: int) -> None:
+    """Progress of a restored stage isn't reported: it isn't being run again."""

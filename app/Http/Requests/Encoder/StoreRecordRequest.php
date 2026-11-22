@@ -2,17 +2,20 @@
 
 namespace App\Http\Requests\Encoder;
 
-use App\Enums\Preset;
 use App\Http\Requests\Concerns\ChecksDailyProcessingLimit;
+use App\Http\Requests\Concerns\HasRecordDetailRules;
 use App\Models\Record;
-use App\Services\Records\PipelineOptions;
+use App\Rules\PublicMediaUrl;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
+/**
+ * One new record: a finished chunked upload (`upload_id`) or a web address
+ * to import (`url`, Phase 6), never both.
+ */
 class StoreRecordRequest extends FormRequest
 {
-    use ChecksDailyProcessingLimit;
+    use ChecksDailyProcessingLimit, HasRecordDetailRules;
 
     public function authorize(): bool
     {
@@ -25,28 +28,13 @@ class StoreRecordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'upload_id' => ['required', 'uuid'],
-            // Every record is filed under a project (event); the series is optional
-            // but must belong to that project.
-            'project_id' => ['required', 'string', Rule::exists('projects', 'id')->withoutTrashed()],
-            'project_series_id' => [
-                'nullable',
-                'string',
-                Rule::exists('project_series', 'id')->where('project_id', (string) $this->input('project_id')),
-            ],
-            // Producing agency and, optionally, one of its production units.
-            'agency_id' => ['nullable', 'integer', 'required_with:division_id', Rule::exists('production_agencies', 'id')->whereNull('parent_id')],
-            'division_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('production_agencies', 'id')->where('parent_id', (int) $this->input('agency_id')),
-            ],
+            'upload_id' => ['required_without:url', 'prohibits:url', 'nullable', 'uuid'],
+            'url' => ['required_without:upload_id', 'nullable', 'string', new PublicMediaUrl],
+            ...$this->recordDetailRules(),
             'title' => ['nullable', 'string', 'max:250'],
-            'preset' => ['required', Rule::in(PipelineOptions::enabledPresets())],
-            'custom_prompt' => ['nullable', 'string', 'max:2000'],
-            'expected_md5' => ['nullable', 'string', 'regex:/^[A-Fa-f0-9]{32}$/'],
-            'expected_sha256' => ['nullable', 'string', 'regex:/^[A-Fa-f0-9]{64}$/'],
-            ...PipelineOptions::visualRules(),
+            // A manifest's checksums only make sense for a file the encoder has.
+            'expected_md5' => ['nullable', 'prohibits:url', 'string', 'regex:/^[A-Fa-f0-9]{32}$/'],
+            'expected_sha256' => ['nullable', 'prohibits:url', 'string', 'regex:/^[A-Fa-f0-9]{64}$/'],
         ];
     }
 
@@ -56,25 +44,14 @@ class StoreRecordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'project_id.required' => 'Choose the project (event) this video belongs to.',
-            'project_series_id.exists' => 'That series does not belong to the chosen project.',
-            'agency_id.required_with' => 'Choose the agency of that production unit.',
-            'division_id.exists' => 'That production unit does not belong to the chosen agency.',
+            ...$this->recordDetailMessages(),
+            'upload_id.required_without' => 'Choose a video file or enter a web address.',
+            'url.required_without' => 'Choose a video file or enter a web address.',
+            'upload_id.prohibits' => 'Upload a file or import a web address, not both.',
+            'expected_md5.prohibits' => 'Expected checksums apply to uploaded files only.',
+            'expected_sha256.prohibits' => 'Expected checksums apply to uploaded files only.',
             'expected_md5.regex' => 'An MD5 checksum is 32 hexadecimal characters.',
             'expected_sha256.regex' => 'A SHA-256 checksum is 64 hexadecimal characters.',
         ];
-    }
-
-    public function pipelineOptions(): PipelineOptions
-    {
-        $prompt = trim((string) $this->validated('custom_prompt'));
-
-        return new PipelineOptions(
-            Preset::from($this->validated('preset')),
-            $prompt !== '' ? $prompt : null,
-            visualAnalysis: (bool) $this->validated('visual_analysis', false),
-            ocr: (bool) $this->validated('ocr', false),
-            objectDetection: (bool) $this->validated('object_detection', false),
-        );
     }
 }

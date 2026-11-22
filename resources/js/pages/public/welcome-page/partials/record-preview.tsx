@@ -33,7 +33,7 @@ export default function RecordPreview() {
 
             <div className="relative overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-2xl shadow-black/30">
                 <div className="relative aspect-video bg-ink">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_35%,oklch(0.55_0.1_205/0.45),transparent_55%),radial-gradient(circle_at_75%_70%,oklch(0.6_0.12_60/0.3),transparent_50%)]" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_35%,rgb(14_165_233/0.45),transparent_55%),radial-gradient(circle_at_75%_70%,rgb(250_204_21/0.3),transparent_50%)]" />
                     <div className="absolute inset-x-0 top-0 h-1/4 animate-scan bg-linear-to-b from-transparent via-brand-glow/20 to-transparent" />
                     <div className="absolute inset-x-0 top-0 flex justify-between p-3 font-mono text-[11px] text-white/80">
                         <span className="flex items-center gap-1.5">

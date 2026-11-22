@@ -34,9 +34,9 @@ export default function ArchiveCredits({ recordId, archive, canEdit }: Props) {
                     change({ agency_id: agencyId, division_id: divisionId })
                 }
             />
-            <div className="flex items-center gap-3 rounded-md bg-white/5 p-3 text-sm">
+            <div className="flex items-center gap-3 rounded-md bg-muted/60 p-3 text-sm">
                 <Users className="size-4 shrink-0 text-brand" aria-hidden />
-                <p className="flex-1 text-neutral-300">
+                <p className="flex-1 text-foreground/80">
                     Producer, director, videographer, editor, presenter and cast
                     are in the Credits tab.
                 </p>

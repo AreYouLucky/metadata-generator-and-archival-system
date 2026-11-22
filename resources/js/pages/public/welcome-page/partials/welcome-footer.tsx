@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import AppLogoIcon from '@/components/app-logo-icon';
+import BrandLogo from '@/components/all/brand-logo';
 import { dashboard, home, login, register } from '@/routes';
 import { WELCOME_SECTIONS } from './welcome-sections';
 
@@ -24,10 +24,11 @@ export default function WelcomeFooter({ canRegister }: Props) {
                         href={home()}
                         className="flex items-center gap-2.5 font-semibold"
                     >
-                        <span className="flex size-9 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-                            <AppLogoIcon className="size-5 fill-current" />
-                        </span>
-                        {name}
+                        <BrandLogo
+                            variant="horizontal"
+                            alt={name}
+                            className="h-11"
+                        />
                     </Link>
                     <p className="text-sm text-muted-foreground">
                         A video archive where every recording is described,

@@ -39,7 +39,7 @@ export default function TimelineWaveformTrack({
         context.clearRect(0, 0, viewport.width, height);
         context.fillStyle =
             getComputedStyle(element).getPropertyValue('--brand').trim() ||
-            '#2dd4bf';
+            '#0284c7';
 
         const perSecond = data.peaks_per_second;
         const middle = height / 2;
@@ -76,7 +76,7 @@ export default function TimelineWaveformTrack({
 
     if (!available || isError) {
         return (
-            <p className="flex h-full items-center px-3 text-[11px] text-neutral-500">
+            <p className="flex h-full items-center px-3 text-[11px] text-muted-foreground">
                 {isError
                     ? 'The waveform could not be loaded.'
                     : 'The waveform appears after the audio is extracted.'}
@@ -87,7 +87,7 @@ export default function TimelineWaveformTrack({
     return (
         <div className="relative h-full">
             {isPending && (
-                <div className="absolute inset-2 animate-pulse rounded bg-white/5" />
+                <div className="absolute inset-2 animate-pulse rounded bg-muted/60" />
             )}
             <canvas
                 ref={canvas}

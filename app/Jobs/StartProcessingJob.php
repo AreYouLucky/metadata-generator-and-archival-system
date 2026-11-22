@@ -10,6 +10,7 @@ use App\Models\Record;
 use App\Services\AiService\AiServiceClient;
 use App\Services\Records\PipelineOptions;
 use App\Services\Records\PipelineRecorder;
+use App\Services\Records\PipelineSeed;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\RequestException;
@@ -19,6 +20,9 @@ use Throwable;
 /**
  * Hands a record's master file to the AI service (POST /jobs/process). The
  * service then reports each stage back on the signed /internal callbacks.
+ * With `$stages`, only those run again (a retry of one stage and the stages
+ * that read its results); the stored results the others produced go along
+ * as the seed.
  */
 class StartProcessingJob implements ShouldQueue
 {
@@ -31,9 +35,13 @@ class StartProcessingJob implements ShouldQueue
      */
     public bool $deleteWhenMissingModels = true;
 
+    /**
+     * @param  list<PipelineStage>|null  $stages  null runs every stage
+     */
     public function __construct(
         public Record $record,
         public PipelineOptions $options,
+        public ?array $stages = null,
     ) {}
 
     /**
@@ -46,7 +54,7 @@ class StartProcessingJob implements ShouldQueue
         return [10, 30, 60, 120];
     }
 
-    public function handle(AiServiceClient $client): void
+    public function handle(AiServiceClient $client, PipelineSeed $seed): void
     {
         // Cancelled while this job waited in the queue.
         if ($this->isCancelled()) {
@@ -65,8 +73,10 @@ class StartProcessingJob implements ShouldQueue
                     'custom_prompt' => $this->options->customPrompt,
                     'title_count' => PipelineOptions::TITLE_COUNT,
                     'max_duration_seconds' => config('archive.max_video_minutes') * 60,
-                    ...$this->options->visualFlags(),
+                    ...$this->options->jobFlags(),
+                    'stages' => $this->stages === null ? null : array_map(fn (PipelineStage $stage): string => $stage->value, $this->stages),
                 ],
+                ...($this->stages === null ? [] : ['seed' => $seed->for($this->record, $this->stages)]),
             ]);
         } catch (RequestException $exception) {
             // A rejected request won't succeed on retry; only outages and throttling are worth waiting out.
@@ -111,7 +121,7 @@ class StartProcessingJob implements ShouldQueue
             ? 'The AI service rejected the processing request.'
             : 'The AI service could not be reached to start processing.';
 
-        foreach (PipelineStage::active() as $stage) {
+        foreach ($this->stages ?? PipelineStage::active() as $stage) {
             $recorder->progress($this->record, $stage, StageStatus::Failed, message: $message);
         }
 

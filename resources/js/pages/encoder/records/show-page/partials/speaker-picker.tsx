@@ -80,7 +80,7 @@ export default function SpeakerPicker({
         'inline-flex h-5 items-center gap-1 rounded-full px-2 text-[11px] font-medium ring-1',
         current
             ? speakerColor(position)
-            : 'text-neutral-500 ring-white/10 hover:text-neutral-300',
+            : 'text-muted-foreground ring-border hover:text-foreground',
     );
 
     if (!canEdit) {

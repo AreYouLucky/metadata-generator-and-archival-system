@@ -19,7 +19,7 @@ export default function TimecodeToggle() {
                     ? 'Showing timecode; switch to clock'
                     : 'Showing clock; switch to timecode'
             }
-            className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-neutral-400 ring-1 ring-white/15 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-pressed:text-brand aria-pressed:ring-brand/50"
+            className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-muted-foreground ring-1 ring-border hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-pressed:text-brand aria-pressed:ring-brand/50"
         >
             TC
         </button>

@@ -29,7 +29,7 @@ export default function ArchiveKeywords({
     const onError = (error: unknown) => toast.error(getErrorMessage(error));
 
     return (
-        <section className="grid gap-2 border-t border-white/10 pt-4">
+        <section className="grid gap-2 border-t border-border pt-4">
             <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-medium">
                     Keywords

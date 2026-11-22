@@ -13,6 +13,7 @@ const TABS: { value: InspectorTab; label: string }[] = [
     { value: 'chapters', label: 'Chapters' },
     { value: 'credits', label: 'Credits' },
     { value: 'translations', label: 'Languages' },
+    { value: 'clips', label: 'Clips' },
 ];
 
 type Props = {
@@ -23,6 +24,7 @@ type Props = {
     /** Unconfirmed AI subjects and keywords. */
     suggestionCount: number;
     frameCount: number;
+    clipCount: number;
 };
 
 /**
@@ -38,6 +40,7 @@ export default function InspectorTabBar({
     translationCount,
     suggestionCount,
     frameCount,
+    clipCount,
 }: Props) {
     const chapterCount = useDraftChapters(metadata).length;
     const tab = useWorkspaceStore((state) => state.inspectorTab);
@@ -50,6 +53,7 @@ export default function InspectorTabBar({
         translations: translationCount,
         archive: suggestionCount,
         visuals: frameCount,
+        clips: clipCount,
     };
 
     // Which ends have tabs out of view. Also runs when a hidden panel's copy
@@ -132,12 +136,12 @@ export default function InspectorTabBar({
                             '-mb-px flex shrink-0 snap-start items-center gap-1.5 border-b-2 px-2 text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset',
                             tab === value
                                 ? 'border-brand text-foreground'
-                                : 'border-transparent text-neutral-500 hover:text-neutral-300',
+                                : 'border-transparent text-muted-foreground hover:text-foreground',
                         )}
                     >
                         {label}
                         {(counts[value] ?? 0) > 0 && (
-                            <span className="text-neutral-500 tabular-nums">
+                            <span className="text-muted-foreground tabular-nums">
                                 {counts[value]}
                             </span>
                         )}

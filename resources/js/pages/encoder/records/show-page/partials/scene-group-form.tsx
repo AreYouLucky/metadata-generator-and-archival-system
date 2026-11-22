@@ -54,7 +54,7 @@ export default function SceneGroupForm({
     return (
         <form
             onSubmit={submit}
-            className="grid gap-2 rounded-md bg-white/5 p-3"
+            className="grid gap-2 rounded-md bg-muted/60 p-3"
         >
             <div className="grid gap-1.5">
                 <Label htmlFor="scene-label">Scene name</Label>

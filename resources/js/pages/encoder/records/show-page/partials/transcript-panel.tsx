@@ -163,7 +163,7 @@ export default function TranscriptPanel({
                 title="Transcript"
                 icon={<AlignLeft className="size-3.5" aria-hidden />}
             >
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-neutral-400">
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
                     {transcribing ? (
                         <>
                             <Spinner />
@@ -193,7 +193,7 @@ export default function TranscriptPanel({
                 )
             }
         >
-            <div className="border-b border-white/10 p-2">
+            <div className="border-b border-border p-2">
                 <TranscriptSearch
                     query={query}
                     onQueryChange={(value) => {

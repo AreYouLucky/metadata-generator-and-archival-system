@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 
 from app import __version__
-from app.api import frames, generate, health, jobs, ping
+from app.api import chat, frames, generate, health, jobs, ping
 
 # Structured enough to grep: every pipeline log line carries record_id=... (PROJECT_SPEC §14).
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -22,3 +22,4 @@ app.include_router(ping.router)
 app.include_router(jobs.router)
 app.include_router(generate.router)
 app.include_router(frames.router)
+app.include_router(chat.router)

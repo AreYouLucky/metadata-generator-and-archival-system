@@ -1,4 +1,5 @@
 import { Head } from '@inertiajs/react';
+import AskMe from '@/components/all/ask-me';
 import WelcomeArchival from './partials/welcome-archival';
 import WelcomeBrowse from './partials/welcome-browse';
 import WelcomeFooter from './partials/welcome-footer';
@@ -33,6 +34,7 @@ export default function Welcome({ canRegister }: Props) {
                 </main>
                 <WelcomeFooter canRegister={canRegister} />
             </div>
+            <AskMe />
         </>
     );
 }

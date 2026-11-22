@@ -17,9 +17,9 @@ export default function ArchiveSaveBar({
     disabled,
 }: Props) {
     return (
-        <div className="sticky bottom-0 -mx-5 -mb-5 flex items-center justify-end gap-3 border-t border-white/10 bg-neutral-900 px-5 py-3">
+        <div className="sticky bottom-0 -mx-5 -mb-5 flex items-center justify-end gap-3 border-t border-border bg-card px-5 py-3">
             {dirty && (
-                <span className="text-xs text-neutral-400">
+                <span className="text-xs text-muted-foreground">
                     Unsaved changes
                 </span>
             )}

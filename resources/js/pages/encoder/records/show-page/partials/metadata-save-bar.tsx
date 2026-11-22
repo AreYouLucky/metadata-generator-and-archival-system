@@ -21,9 +21,9 @@ export default function MetadataSaveBar({
     const { save, isPending } = useSaveMetadataDraft(recordId);
 
     return (
-        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-white/10 px-5 py-3">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
             {dirty && (
-                <span className="text-xs text-neutral-400">
+                <span className="text-xs text-muted-foreground">
                     Unsaved changes
                 </span>
             )}

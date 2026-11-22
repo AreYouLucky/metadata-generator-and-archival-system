@@ -45,7 +45,7 @@ export default function TimelineScenesTrack({
                         tabIndex={-1}
                         title={scene.label ?? undefined}
                         onPointerDown={(event) => jump(event, scene.start)}
-                        className="absolute top-0.5 h-4 overflow-hidden rounded-sm border-l-2 border-white/70 bg-emerald-700/70 px-1 text-left text-[10px] leading-4 whitespace-nowrap text-white select-none hover:bg-emerald-600/80"
+                        className="absolute top-0.5 h-4 overflow-hidden rounded-sm border-l-2 border-white/70 bg-yellow-700/90 px-1 text-left text-[10px] leading-4 whitespace-nowrap text-white select-none hover:bg-yellow-600/90"
                         style={{ left: scene.start * pixelsPerSecond, width }}
                     >
                         {width > 30 && scene.label}

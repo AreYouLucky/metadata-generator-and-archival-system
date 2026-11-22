@@ -11,6 +11,7 @@ use App\Http\Requests\User\ShowCatalogueCaptionsRequest;
 use App\Models\Project;
 use App\Models\Record;
 use App\Models\RecordFile;
+use App\Models\RecordFrame;
 use App\Services\Catalogue\Catalogue;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -65,6 +66,25 @@ class CatalogueMediaController extends Controller
         abort_unless($record->thumbnail_path !== null && $disk->exists($record->thumbnail_path), 404);
 
         return response()->file($disk->path($record->thumbnail_path), [
+            // Private: the record can leave the catalogue (reopened, embargoed).
+            'Cache-Control' => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /**
+     * A key frame's image on a public record's page. Only frames of that
+     * record are bound (scoped route).
+     */
+    public function frame(Record $record, RecordFrame $frame): BinaryFileResponse
+    {
+        abort_unless(Gate::forUser(null)->allows('distribute', $record), 404);
+
+        $disk = Storage::disk('media');
+        abort_unless($disk->exists($frame->path), 404);
+
+        return response()->file($disk->path($frame->path), [
+            'Content-Type' => 'image/jpeg',
             // Private: the record can leave the catalogue (reopened, embargoed).
             'Cache-Control' => 'private, max-age=3600',
             'X-Content-Type-Options' => 'nosniff',

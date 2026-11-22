@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.common import ULID_PATTERN, PresetRules, TranscriptSegment
+from app.schemas.common import ULID_PATTERN, PresetRules, SpeakerTurn, TranscriptSegment
 from app.schemas.visual import FrameInfo, Shot, VisualFrame
 
 __all__ = ["ULID_PATTERN"]
@@ -14,6 +14,7 @@ StageName = Literal[
     "probe",
     "extract_audio",
     "transcribe",
+    "diarize",
     "scenes",
     "frames",
     "vision",
@@ -24,7 +25,7 @@ StageName = Literal[
 ]
 
 # Stages in run order. Checksums come first: nothing else touches the file before.
-# After probing, the audio branch (extract_audio, transcribe) and the visual branch
+# After probing, the audio branch (extract_audio, transcribe, diarize) and the visual branch
 # (scenes ... objects) run side by side; metadata waits for both. The access copy
 # comes last, so a long transcode never delays the transcript.
 STAGES: tuple[StageName, ...] = (
@@ -32,6 +33,7 @@ STAGES: tuple[StageName, ...] = (
     "probe",
     "extract_audio",
     "transcribe",
+    "diarize",
     "scenes",
     "frames",
     "vision",
@@ -50,6 +52,7 @@ DEPENDS_ON: dict[StageName, tuple[StageName, ...]] = {
     "probe": (),
     "extract_audio": ("probe",),
     "transcribe": ("extract_audio",),
+    "diarize": ("transcribe",),
     "scenes": ("probe",),
     "frames": ("probe", "scenes"),
     "vision": ("frames",),
@@ -69,6 +72,23 @@ class JobOptions(BaseModel):
     visual_analysis: bool = False
     ocr: bool = False
     object_detection: bool = False
+    # Speaker labels on the transcript (Phase 6).
+    diarization: bool = False
+    # A retry of one stage runs only these (that stage and those reading its results);
+    # the others restore what they would have produced, from the seed or the stored
+    # files, without calling Laravel. None runs every stage.
+    stages: list[StageName] | None = None
+
+
+class PipelineSeed(BaseModel):
+    """Results Laravel already stored, sent with a partial run for the stages it doesn't
+    run again (the service keeps nothing between runs)."""
+
+    language: str | None = None
+    segments: list[TranscriptSegment] | None = None
+    shots: list[Shot] | None = None
+    # Laravel never sends `duplicate_of`; repeats are found again from the images.
+    frames: list[FrameInfo] | None = None
 
 
 class ProcessRequest(BaseModel):
@@ -77,6 +97,11 @@ class ProcessRequest(BaseModel):
     # Relative to STORAGE_ROOT; resolved and confined by app.storage.
     video_path: str = Field(min_length=1, max_length=1024)
     options: JobOptions
+    seed: PipelineSeed | None = None
+
+    def runs(self, stage: StageName) -> bool:
+        """Whether this run does the stage's work and reports it."""
+        return self.options.stages is None or stage in self.options.stages
 
 
 class PipelineContext(BaseModel):
@@ -95,6 +120,9 @@ class PipelineContext(BaseModel):
     audio_path: str | None = None
     language: str | None = None
     segments: list[TranscriptSegment] = []
+    # From a transcription provider that labels speakers itself (AssemblyAI), so the
+    # diarize stage needn't call anything.
+    speaker_turns: list[SpeakerTurn] = []
     shots: list[Shot] = []
     frames: list[FrameInfo] = []
 
@@ -114,6 +142,8 @@ class PipelineContext(BaseModel):
             return "On-screen text recognition was turned off for this video."
         if stage == "objects" and not options.object_detection:
             return "Object detection was turned off for this video."
+        if stage == "diarize" and not options.diarization:
+            return "Speaker identification was turned off for this video."
         return None
 
     def visual_frames(self) -> list[VisualFrame]:
@@ -140,7 +170,7 @@ class PipelineContext(BaseModel):
             for stage in branch.skipped:
                 if stage not in merged.skipped:
                     merged.skipped.append(stage)
-            for name in ("audio_path", "language", "segments", "shots", "frames"):
+            for name in ("audio_path", "language", "segments", "speaker_turns", "shots", "frames"):
                 value = getattr(branch, name)
                 if value:
                     setattr(merged, name, value)

@@ -6,8 +6,10 @@ import {
     CircleSlash,
     Clock,
     Loader2,
+    RotateCcw,
     XCircle,
 } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -78,16 +80,21 @@ const STATUS: Record<
 type Props = {
     stages: StageState[];
     processingStatus: ProcessingStatus;
+    /** Offered on failed or skipped steps that can run again on their own. */
+    onRetryStage?: (stage: StageState) => void;
 };
 
 /**
  * The pipeline in the app header: status and overall progress, with every
- * stage (live over Reverb) and any failure reason one click away.
+ * stage (live over Reverb), any failure reason one click away, and "Retry"
+ * on a step that failed or was skipped.
  */
 export default function ProcessingStatusMenu({
     stages,
     processingStatus,
+    onRetryStage,
 }: Props) {
+    const [open, setOpen] = useState(false);
     const status = STATUS[processingStatus];
     const StatusIcon = status.icon;
     const overall = stages.length
@@ -115,7 +122,7 @@ export default function ProcessingStatusMenu({
         : null;
 
     return (
-        <DropdownMenu>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="ghost"
@@ -191,6 +198,25 @@ export default function ProcessingStatusMenu({
                                                 {stage.progress}%
                                             </span>
                                         )}
+                                    {onRetryStage && stage.retryable && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 px-2 text-xs"
+                                            onClick={() => {
+                                                setOpen(false);
+                                                onRetryStage(stage);
+                                            }}
+                                        >
+                                            <RotateCcw aria-hidden />
+                                            {stage.status === 'skipped'
+                                                ? 'Run'
+                                                : 'Retry'}
+                                            <span className="sr-only">
+                                                {stage.label}
+                                            </span>
+                                        </Button>
+                                    )}
                                 </div>
                                 {stage.message &&
                                     (stage.status === 'failed' ||

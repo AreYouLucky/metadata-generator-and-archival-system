@@ -75,6 +75,65 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Clips (Phase 7)
+    |--------------------------------------------------------------------------
+    |
+    | Parts of a record cut to their own MP4 (H.264/AAC, never taller than
+    | max_height). Each is re-encoded, so length is limited.
+    |
+    */
+
+    'clips' => [
+        'min_seconds' => (float) env('CLIP_MIN_SECONDS', 1),
+        'max_seconds' => (float) env('CLIP_MAX_SECONDS', 600),
+        'max_per_record' => (int) env('CLIP_MAX_PER_RECORD', 100),
+        'max_height' => (int) env('CLIP_MAX_HEIGHT', 1080),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public API (Phase 7)
+    |--------------------------------------------------------------------------
+    |
+    | Sanctum tokens under /api/v1. Requests are limited per token. A file
+    | sent straight to POST /api/v1/records is limited by max_upload_mb here
+    | and by PHP's upload_max_filesize / post_max_size; bigger videos can be
+    | imported from a web address instead. Webhooks are POSTed once
+    | processing finishes, signed with the owner's webhook secret.
+    |
+    */
+
+    'api' => [
+        'requests_per_minute' => (int) env('API_REQUESTS_PER_MINUTE', 60),
+        'max_upload_mb' => (int) env('API_MAX_UPLOAD_MB', 512),
+        'per_page' => 25,
+        'max_per_page' => 100,
+        'webhook_timeout_seconds' => (int) env('API_WEBHOOK_TIMEOUT', 10),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | YouTube publishing (Phase 7)
+    |--------------------------------------------------------------------------
+    |
+    | Uploads are resumable and sent in chunks (a multiple of 256 KiB); each
+    | queued step uploads for at most step_seconds, then queues the next, so
+    | no job runs longer than the queue's timeout. Once uploaded, YouTube's
+    | processing status is checked every status_check_seconds, up to
+    | status_checks times. Category 22 is "People & Blogs".
+    |
+    */
+
+    'youtube' => [
+        'chunk_mb' => (int) env('YOUTUBE_CHUNK_MB', 8),
+        'step_seconds' => (int) env('YOUTUBE_STEP_SECONDS', 40),
+        'default_category_id' => (string) env('YOUTUBE_DEFAULT_CATEGORY', '22'),
+        'status_check_seconds' => (int) env('YOUTUBE_STATUS_CHECK_SECONDS', 60),
+        'status_checks' => (int) env('YOUTUBE_STATUS_CHECKS', 60),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Public catalogue
     |--------------------------------------------------------------------------
     */

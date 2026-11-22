@@ -28,7 +28,7 @@ export default function FrameTile({
             aria-pressed={selected}
             aria-label={`Frame at ${label}`}
             className={cn(
-                'group relative aspect-video overflow-hidden rounded-sm bg-black ring-1 ring-white/10 transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                'group relative aspect-video overflow-hidden rounded-sm bg-black ring-1 ring-border transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                 selected && 'ring-2 ring-brand',
             )}
         >

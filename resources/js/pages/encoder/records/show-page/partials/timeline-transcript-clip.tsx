@@ -197,8 +197,8 @@ export default function TimelineTranscriptClip({
                 editable && 'cursor-grab active:cursor-grabbing',
                 preview && 'z-10 ring-1 ring-white/70',
                 active || preview
-                    ? 'border-brand bg-brand/60'
-                    : 'border-emerald-400/20 bg-emerald-700/40 hover:bg-emerald-600/50',
+                    ? 'border-brand bg-brand/85'
+                    : 'border-sky-800/20 bg-sky-700/80 hover:bg-sky-600/90',
             )}
             style={{ left: timing.start * pixelsPerSecond, width }}
         >

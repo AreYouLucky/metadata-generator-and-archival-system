@@ -60,16 +60,16 @@ export default function TechnicalFileCard({ file }: { file: ArchiveFile }) {
               : CircleDashed;
 
     return (
-        <article className="grid gap-3 rounded-lg border border-white/10 p-3">
+        <article className="grid gap-3 rounded-lg border border-border p-3">
             <header className="flex items-baseline justify-between gap-2">
                 <h4 className="text-sm font-medium">
                     {formatEnumLabel(file.role)}
-                    <span className="ml-2 font-normal text-neutral-500">
+                    <span className="ml-2 font-normal text-muted-foreground">
                         {file.original_filename}
                     </span>
                 </h4>
                 {file.file_size !== null && (
-                    <span className="text-xs text-neutral-500 tabular-nums">
+                    <span className="text-xs text-muted-foreground tabular-nums">
                         {formatBytes(file.file_size)}
                     </span>
                 )}
@@ -85,13 +85,17 @@ export default function TechnicalFileCard({ file }: { file: ArchiveFile }) {
                         )
                         .map(([label, value]) => (
                             <div key={label} className="contents">
-                                <dt className="text-neutral-500">{label}</dt>
+                                <dt className="text-muted-foreground">
+                                    {label}
+                                </dt>
                                 <dd className="break-words">{value}</dd>
                             </div>
                         ))}
                     {tech.audio_tracks.length > 1 && (
                         <div className="contents">
-                            <dt className="text-neutral-500">Audio tracks</dt>
+                            <dt className="text-muted-foreground">
+                                Audio tracks
+                            </dt>
                             <dd>
                                 {tech.audio_tracks
                                     .map(
@@ -104,9 +108,9 @@ export default function TechnicalFileCard({ file }: { file: ArchiveFile }) {
                     )}
                 </dl>
             ) : (
-                <p className="text-xs text-neutral-500">Not probed yet.</p>
+                <p className="text-xs text-muted-foreground">Not probed yet.</p>
             )}
-            <div className="grid gap-1 rounded-md bg-black/30 p-2 font-mono text-[11px] break-all">
+            <div className="grid gap-1 rounded-md bg-muted p-2 font-mono text-[11px] break-all">
                 <p className="flex items-center gap-1.5 font-sans text-xs">
                     <StatusIcon
                         className={
@@ -114,7 +118,7 @@ export default function TechnicalFileCard({ file }: { file: ArchiveFile }) {
                                 ? 'size-3.5 text-emerald-400'
                                 : file.checksum_status === 'mismatch'
                                   ? 'size-3.5 text-red-400'
-                                  : 'size-3.5 text-neutral-500'
+                                  : 'size-3.5 text-muted-foreground'
                         }
                         aria-hidden
                     />

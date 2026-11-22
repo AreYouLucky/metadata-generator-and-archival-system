@@ -25,10 +25,10 @@ type Props = {
 };
 
 const TONES: Partial<Record<ReviewStatus, string>> = {
-    approved: 'border-emerald-500/50 text-emerald-200',
-    changes_requested: 'border-amber-500/60 text-amber-200',
-    rejected: 'border-rose-500/60 text-rose-200',
-    submitted: 'border-sky-500/50 text-sky-200',
+    approved: 'border-emerald-500/50 text-emerald-700',
+    changes_requested: 'border-amber-500/60 text-amber-700',
+    rejected: 'border-rose-500/60 text-rose-700',
+    submitted: 'border-yellow-500/70 text-yellow-700',
 };
 
 /**

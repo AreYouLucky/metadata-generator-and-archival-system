@@ -63,23 +63,23 @@ export default function VisualsScenes({
         <section aria-labelledby="visuals-scenes" className="grid gap-3">
             <h3
                 id="visuals-scenes"
-                className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase"
+                className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
             >
                 Shots and scenes{' '}
-                <span className="text-neutral-500 tabular-nums">
+                <span className="text-muted-foreground tabular-nums">
                     {shots.length}
                 </span>
             </h3>
 
             {shots.length === 0 ? (
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-muted-foreground">
                     No shots were detected yet.
                 </p>
             ) : (
                 <>
                     <div
                         ref={scroller}
-                        className="max-h-48 overflow-y-auto rounded-md ring-1 ring-white/10"
+                        className="max-h-48 overflow-y-auto rounded-md ring-1 ring-border"
                     >
                         <div
                             className="relative"
@@ -113,7 +113,7 @@ export default function VisualsScenes({
                     </div>
 
                     {canEdit && selected && !naming && (
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span>
                                 {selected.count === 1
                                     ? `Shot at ${formatTime(selected.first.start)}. Click another shot to select a run.`

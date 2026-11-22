@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import AskMe from '@/components/all/ask-me';
 import CatalogueHeader from '@/layouts/catalogue/partials/catalogue-header';
 
 /**
@@ -16,6 +17,7 @@ export default function CatalogueLayout({ children }: { children: ReactNode }) {
                 Published records are shared under the licence shown on each
                 video.
             </footer>
+            <AskMe />
         </div>
     );
 }

@@ -2,28 +2,27 @@ import { router } from '@inertiajs/react';
 import { useMutation } from '@tanstack/react-query';
 import { http } from '@/lib/utilities';
 import { retry } from '@/routes/records';
-import type { VisualAnalysisValues } from '@/components/encoder/visual-analysis-options';
-import type { PresetName } from '@/types/records';
+import type { PipelineOptionValues, PipelineStageName } from '@/types/records';
 
 /**
- * Run the whole pipeline again for a record whose processing failed. The
- * workspace reloads its stages; progress then arrives over Reverb.
+ * Run processing again: the whole pipeline after a failure or a cancel, or,
+ * with `stage`, one failed or skipped step and the steps that read its
+ * results. The workspace reloads its stages; progress then arrives over Reverb.
  */
 export function useRetryProcessing(recordId: string) {
     return useMutation({
-        mutationFn: async (
-            input: {
-                preset: PresetName;
-                customPrompt: string;
-            } & VisualAnalysisValues,
-        ) =>
+        mutationFn: async (input: {
+            options: PipelineOptionValues;
+            stage?: PipelineStageName;
+        }) =>
             (
-                await http.post<{ queued: boolean }>(retry.url(recordId), {
-                    preset: input.preset,
-                    custom_prompt: input.customPrompt || null,
-                    visual_analysis: input.visualAnalysis,
-                    ocr: input.ocr,
-                    object_detection: input.objectDetection,
+                await http.post<{
+                    queued: boolean;
+                    stages: PipelineStageName[];
+                }>(retry.url(recordId), {
+                    ...input.options,
+                    custom_prompt: input.options.custom_prompt || null,
+                    stage: input.stage ?? null,
                 })
             ).data,
         onSuccess: () => router.reload({ only: ['record', 'stages'] }),

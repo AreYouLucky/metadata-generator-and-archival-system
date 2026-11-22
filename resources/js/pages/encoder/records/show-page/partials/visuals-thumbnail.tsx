@@ -69,12 +69,12 @@ export default function VisualsThumbnail({
         <section aria-labelledby="visuals-thumbnail" className="grid gap-3">
             <h3
                 id="visuals-thumbnail"
-                className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase"
+                className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
             >
                 Thumbnail
             </h3>
             <div className="flex gap-3">
-                <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-md bg-black ring-1 ring-white/10">
+                <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-md bg-black ring-1 ring-border">
                     {thumbnail ? (
                         <img
                             src={thumbnail.url}
@@ -82,7 +82,7 @@ export default function VisualsThumbnail({
                             className="size-full object-contain"
                         />
                     ) : (
-                        <div className="flex size-full items-center justify-center text-neutral-600">
+                        <div className="flex size-full items-center justify-center text-muted-foreground">
                             <ImageIcon className="size-6" aria-hidden />
                         </div>
                     )}
@@ -92,7 +92,7 @@ export default function VisualsThumbnail({
                         </div>
                     )}
                 </div>
-                <div className="grid min-w-0 content-start gap-2 text-xs text-neutral-400">
+                <div className="grid min-w-0 content-start gap-2 text-xs text-muted-foreground">
                     <p>
                         {thumbnail === null
                             ? 'None yet. One is picked from the key frames after analysis.'

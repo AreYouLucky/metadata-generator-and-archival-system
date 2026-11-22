@@ -7,6 +7,8 @@
 
 use App\Enums\PipelineStage;
 use App\Http\Controllers\Internal\AudioExportCallbackController;
+use App\Http\Controllers\Internal\ClipResultController;
+use App\Http\Controllers\Internal\ImportResultController;
 use App\Http\Controllers\Internal\PingController;
 use App\Http\Controllers\Internal\RecordFileFixityController;
 use App\Http\Controllers\Internal\RecordFileResultController;
@@ -33,6 +35,12 @@ Route::post('records/{record}/translations/{transcript}/result', [TranslationCal
 
 // Audio exports (MP3 or WAV of the master's audio).
 Route::post('records/{record}/audio-export', AudioExportCallbackController::class)->name('records.audio-export');
+
+// Clips (Phase 7): the cut file with its checksums and probe, or why it failed.
+Route::post('records/{record}/clips/{clip}', ClipResultController::class)->scopeBindings()->name('records.clips');
+
+// URL imports (Phase 6): the downloaded file, or why the download failed.
+Route::post('imports/{record}/done', ImportResultController::class)->name('imports.done');
 
 // Added files (mezzanine, access copy) and fixity checks (Phase 3).
 Route::post('record-files/{recordFile}/results/{stage}', RecordFileResultController::class)

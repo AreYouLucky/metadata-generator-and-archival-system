@@ -7,8 +7,8 @@ analyses them with AI, and produces editable metadata (titles, descriptions, tag
 quotes) plus a full archival record with checksums. An admin approves each record, and approved
 videos appear in a public catalogue that anyone can browse by date, event and category.
 
-> **Status:** Phase 5 (visual analysis) done. Phases 1–3 built users,
-> chunked uploads, checksums, local GPU transcription, the synced workspace, every platform
+> **Status:** Phase 7 (advanced) built: chat, clips, the public API and YouTube publishing.
+> Phases 1–3 built users, chunked uploads, checksums, local GPU transcription, the synced workspace, every platform
 > preset, translations with captions, six export formats and the full archival record (Archive
 > tab, accession numbers, access copies, fixity checks, works, embargoes and the distribution
 > policy). Phase 4 adds the approval workflow (submit, request changes, reject, approve, reopen),
@@ -16,7 +16,13 @@ videos appear in a public catalogue that anyone can browse by date, event and ca
 > video types, and the public catalogue (home, browse, project and series pages, watch page)
 > with access logging. Phase 5 adds shot detection, key frames, frame descriptions, on-screen text
 > (OCR), object labels and face counts, thumbnails, named scenes and on-screen content in the AI
-> metadata. The full design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built phase by phase
+> metadata. Phase 6 adds batch uploads with a ZIP of their exports, URL import, speaker
+> identification (pyannote or AssemblyAI), AssemblyAI transcription, retrying a single failed
+> step, and row actions in the record list. Phase 7 so far adds **chat with the video** (the
+> floating "Ask me" button: answers come only from the record's own data through function tools,
+> with clickable timestamps), **clips** cut from the master, a **public API** with Sanctum
+> tokens and signed webhooks, and **YouTube publishing** (OAuth, resumable upload, status). The
+> full design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built phase by phase
 > (see [Roadmap](#roadmap)).
 
 ---
@@ -175,8 +181,8 @@ Outside `local`/`testing`, `UserSeeder` creates only the admin and refuses to ru
 | Service         | What it runs                                                                                               | Host port        |
 | --------------- | ---------------------------------------------------------------------------------------------------------- | ---------------- |
 | `redis`         | Laravel queues (db 0), Celery broker (db 1) and results (db 2), Laravel cache (db 3)                       | `127.0.0.1:6379` |
-| `ai-api`        | FastAPI (`/health`, signed `/ping`, `/jobs/process`, `/generate/metadata`, `/frames/capture`)              | `127.0.0.1:8001` |
-| `ai-worker`     | Celery: checksums, probing, audio, visual analysis (CPU), LLM calls; calls Laravel back at `host.docker.internal:8000` | — |
+| `ai-api`        | FastAPI (`/health`, signed `/ping`, `/jobs/process`, `/import-url`, `/generate/metadata`, `/frames/capture`) | `127.0.0.1:8001` |
+| `ai-worker`     | Celery: checksums, probing, audio, visual analysis and speakers (CPU), URL downloads, LLM calls; calls Laravel back at `host.docker.internal:8000` | — |
 | `ai-worker-gpu` | Celery `gpu` queue: transcription, one job at a time (the 6 GB GPU holds one model)                        | —                |
 
 Uploaded media are stored in `storage/app/media`, which is mounted into the AI containers at
@@ -347,6 +353,156 @@ Then:
    Under **Audio**, click **Prepare** for MP3 or WAV: the file is made from the master in the
    background (a toast says when it's ready), then **Download**. The next download reuses it.
 
+## Try Phase 6
+
+After pulling Phase 6:
+
+1. Run `php artisan migrate` (a `batches` table and three record columns) and `npm run build` (or
+   keep `composer run dev` running).
+2. The batch ZIP needs PHP's `zip` extension: on XAMPP, `extension=zip` must be on in
+   `C:\xampp\php\php.ini` (restart `composer run dev` after changing it). The Docker PHP image
+   has it.
+3. Rebuild the AI image: `docker compose build` then `docker compose up -d`. It adds yt-dlp, Deno
+   (for YouTube), pyannote.audio and torchaudio on the CPU build of torch
+   (`--build-arg DIARIZATION=false` or `IMPORT=false` leave them out). Check with
+   `docker compose exec ai-worker python -c "import pyannote.audio, yt_dlp"`.
+4. For speakers, create a Hugging Face token, accept the terms of
+   `pyannote/speaker-diarization-community-1` on its model page, and set `HF_TOKEN` in
+   `ai-service/.env` (then `docker compose up -d`). The model (about 30 MB) downloads into the
+   `whispermodels` volume on first use. To use AssemblyAI instead, set `ASSEMBLYAI_API_KEY` and
+   `DIARIZATION_PROVIDER=assemblyai` (or `TRANSCRIPTION_PROVIDER=assemblyai` for both); the
+   audio is then uploaded to AssemblyAI, and the Import page says so.
+
+Then:
+
+1. **Batch:** on **Import media**, drop three videos (or browse and pick several). Click each to
+   preview it and give it a working title; name the batch; choose the project and click
+   **Import 3 as a batch**. The batch page shows each record's progress live. Once they have
+   finished, **Build ZIP** (optionally with thumbnails), then **Download ZIP**: one folder per
+   record with JSON, Markdown, SRT, VTT, TXT and CSV, and `manifest.csv`. Set one record's
+   classification to Confidential first and it is left out, with the reason in the manifest.
+2. **URL import:** under **Import from a web address**, paste a video page (e.g. a YouTube video
+   you have the rights to) and **Add**, then **Upload and process**. The workspace shows
+   **Download from URL** progress, then the usual stages; the title becomes the site's, and
+   **Archive → Provenance** notes where it came from. A local address such as
+   `http://192.168.1.10/video.mp4` is refused.
+3. **Speakers:** tick **Identify speakers** before importing an interview. Lines get speaker
+   chips (S1, S2…) in their colours; open **Speakers** above the transcript to name them ("S1" →
+   "Host"). SRT, VTT, TXT and CSV exports carry the names.
+4. **Retry one step:** open the processing status in the workspace header. A failed or skipped
+   step has **Retry** (or **Run**); it runs again with the steps that use its results, and
+   finished steps keep theirs. On a record processed without speakers, **Run** on
+   **Speakers** adds them.
+5. **Record list:** the **⋯** menu on each row opens the record or its batch, stops processing
+   while it runs, and deletes the record after a confirmation.
+
+## Try Phase 7: chat with the video and clips
+
+After pulling:
+
+1. Run `php artisan migrate` (`transcript_chunks`, `chat_messages` and `clips`) and
+   `npm run build` (or keep `composer run dev` running). The AI API picks up new code by itself
+   (`--reload`); restart the worker once so it knows the clip task:
+   `docker compose restart ai-worker`. No image rebuild is needed.
+2. Optional, in `ai-service/.env`: `LLM_CHAT_MODEL` (default `gpt-6.2-sol`) and
+   `EMBEDDING_MODEL` (default `text-embedding-3-small`). Chat needs `OPENAI_API_KEY`.
+
+**Ask me.** Click **Ask me** at the bottom right of any page (or press **A** in the workspace);
+the assistant opens in a floating window (Esc or **Close** hides it; a half-typed question is
+kept). It answers only from **approved** records your account may see: admins all of them,
+encoders their own plus the public catalogue, viewers the public catalogue (public fields
+only). Guests are asked to log in. A record must be approved before it can be asked about.
+
+1. Anywhere: "Which videos talk about X?" The answer names the videos and cites moments as
+   chips (title · time); click one to open that video at that moment.
+2. On a record's page (workspace or public watch page): "What is this video about?", "What did
+   they say about X?", "What is written on screen?". Chips for this record play in place.
+3. Ask about a draft, or a general question ("What is the capital of France?"): the reply is
+   marked **Not in the archive you can see** and has no citations.
+4. Log in as `user@example.com` and ask about a record: only public fields are used (no
+   accession number, technical details or face counts).
+5. The bin icon clears your conversation; each person sees only their own.
+
+**Clips.** Open the **Clips** tab in the inspector:
+
+1. Play to a moment and press **I**, play on and press **O** (or type the times, or use the
+   crosshair buttons). The range shows as an amber band on the timeline and on the transcript
+   lines inside it. **Shift-click** transcript lines (or their scissors button) to grow the
+   range line by line; a key quote's scissors button or **Or clip a whole chapter…** marks
+   that range with its title.
+2. Add a title and click **Cut clip**. It is cut from the master in the background (an exact cut,
+   re-encoded to H.264/AAC MP4, at most 1080 p), checksummed and probed; a toast says when it is
+   ready. The row then shows its size, resolution and codec (hover for the SHA-256).
+3. **Download** it (logged as an export in the audit log), click the row to play that part, or
+   delete it. Limits: 1 s to 10 minutes, 100 clips per record (`CLIP_MIN_SECONDS`,
+   `CLIP_MAX_SECONDS`, `CLIP_MAX_PER_RECORD`, `CLIP_MAX_HEIGHT` in `.env`).
+
+How the chat works: the model may only call the function tools in
+`app/Http/Controllers/FunctionTools/` (record search, overview, transcript search and reading,
+generated metadata, key frames and scenes, speakers, archive record, technical details), each
+reading only approved records the account may see (`ChatScope`). The first step must call a tool; an answer counts as "from the record" only if a tool
+returned data, and citations are kept only where a tool returned that moment. Details in
+[DECISIONS.md](DECISIONS.md#phase-7--advanced-chat-built).
+
+## Try Phase 7: public API and YouTube publishing
+
+After pulling: `composer install` (adds `laravel/sanctum`), `php artisan migrate`
+(`personal_access_tokens`, `youtube_accounts`, `youtube_publications`, webhook fields) and
+`npm run build` (or keep `composer run dev` running).
+
+**Public API** (`/api/v1`, Settings → **API tokens**, encoders and admins):
+
+1. Click **New token**, name it, tick what it may do (`records:read`, `records:create`) and when
+   it expires. Copy the token: it is shown once.
+2. Create a record (the same project and processing options as the Import page; `preset`
+   defaults to the first enabled one):
+
+    ```bash
+    curl -X POST http://localhost:8000/api/v1/records -H "Authorization: Bearer $TOKEN" \
+      -H "Accept: application/json" -F file=@clip.mp4 -F project_id=PROJECT_ID
+    ```
+
+    or send `url=` instead of `file=` to import from a web address. Files sent directly are
+    limited to `API_MAX_UPLOAD_MB` (512) and PHP's `upload_max_filesize`/`post_max_size`.
+3. `GET /api/v1/records/{id}` shows processing status, every stage, review status and whether it
+   may be exported (and why not). `GET /api/v1/records` lists yours (paginated, filters
+   `processing_status`, `review_status`, `updated_since`).
+4. `GET /api/v1/records/{id}/export?format=json|srt|vtt|txt|csv|md` works only for records that
+   pass the distribution policy (approved, unclassified, public rights, no embargo). Release forms
+   and contracts are left out of the attachment list, unconfirmed subjects and keywords are
+   dropped, and each export is logged ("via API").
+5. Webhooks: click **Create** under *Webhook signing secret*, then send
+   `webhook_url=https://…` with the record. When processing finishes, the archive POSTs
+   `{event: "record.ready" | "record.failed", record: {...}}` with
+   `X-Archive-Signature: sha256=HMAC_SHA256(secret, timestamp + "." + body)` and the timestamp in
+   `X-Archive-Timestamp`. Only public https addresses are accepted.
+
+Limits: `API_REQUESTS_PER_MINUTE` (60) per token; creating records also counts toward the AI
+limit and the daily processing minutes. Expired tokens are pruned daily.
+
+**YouTube** (Settings → **YouTube**, then a record's **Publish** button):
+
+1. An administrator creates a Google Cloud OAuth client (*Web application*) with the **YouTube
+   Data API v3** enabled, adds `http://localhost:8000/settings/youtube/callback` (admins see the
+   exact address on Settings → YouTube) as an authorized redirect URI, and sets
+   `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET` in `.env`. While the Google app is in
+   *Testing*, add each publishing account as a test user.
+2. Click **Connect YouTube** and allow both permissions (upload, view channel).
+3. Open an **approved, public** record and click **Publish** in the header. A record that may not
+   leave the archive shows why. Title, description (with chapter lines and hashtags from the
+   metadata), tags and category start from the record; privacy starts at **Private**.
+4. Click **Publish to YouTube**. The master (or its browser copy for MXF) is uploaded in the
+   background in resumable 8 MB chunks; the panel shows the progress live, then "Processing on
+   YouTube", then **Published** with an **Open on YouTube** link. The thumbnail is sent when
+   chosen (YouTube allows custom thumbnails only on verified channels; otherwise it picks one and
+   the panel says so). The upload is logged as `published` in the audit trail, and the JSON
+   export's `publishing.youtube.videoId` is filled in.
+5. Reopen the record (admin) while an upload runs: the next step stops it ("may no longer leave
+   the archive").
+
+Quota: each upload uses 1,600 of the default 10,000 daily YouTube API units, so about six
+uploads a day per Google project; publishing is limited to 10 an hour per person.
+
 ## Roadmap
 
 | Phase                              | Delivers                                                                                                                    |
@@ -357,8 +513,8 @@ Then:
 | 3 — Archival metadata              | Descriptive, rights, provenance and structural records; proxies, versions, fixity checks, embargoes                         |
 | 4 — Approvals and public catalogue | Approval workflow, usage dashboard and limits, categories and events, public browse and watch pages                         |
 | 5 — Visual analysis (built)        | Shots with timecode, key frames, frame descriptions, OCR, object labels, thumbnails, named scenes                            |
-| 6 — Workflow                       | Batch upload and ZIP download, URL import, speaker labels, AssemblyAI transcription                                         |
-| 7 — Advanced                       | Clips, chat with the video, public API, YouTube publishing                                                                  |
+| 6 — Workflow (built)               | Batch upload and ZIP download, URL import, speaker labels, AssemblyAI transcription, single-step retry                     |
+| 7 — Advanced (built)               | Clips, chat with the video, public API, YouTube publishing                                                                  |
 
 Each phase ends with passing tests, an updated README, and sign-off before the next one starts.
 
@@ -394,8 +550,13 @@ changing it, rebuild the image or copy it in before running ruff and mypy in the
 - Never commit `.env` files. API keys stay on the server and are never sent to the browser.
 - When hosted AI providers are selected, video audio, frames and transcripts are sent to those
   providers. The app says so in the UI.
+- Chat questions and the parts of the record they need (transcript passages, frame text,
+  catalogue fields) are sent to OpenAI; the Chat tab says so. Release forms are never read.
 - No face recognition: the system stores face counts only. People are identified only from what
   is said or written.
-- Release forms and other private attachments are stored privately and are never public.
+- Release forms and other private attachments are stored privately and are never public, and
+  never part of public-API exports.
+- API tokens and the webhook secret are shown once and stored hashed (tokens) or encrypted
+  (secret); YouTube OAuth tokens are encrypted and never sent to the browser.
 - Never run `php artisan migrate:fresh` (or other commands that wipe the database) against a
   database with real data.

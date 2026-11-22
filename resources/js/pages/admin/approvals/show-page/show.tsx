@@ -20,6 +20,7 @@ import type {
     FaceSummary,
     ReviewHistoryItem,
 } from '@/types/reviews';
+import type { VisualFrame } from '@/types/visuals';
 import RecordSummary from './partials/record-summary';
 import ReviewArchive from './partials/review-archive';
 import ReviewDecisionForm from './partials/review-decision-form';
@@ -29,6 +30,7 @@ import ReviewTabBar from './partials/review-tab-bar';
 import type { ReviewTab } from './partials/review-tab-bar';
 import ReviewTranscript from './partials/review-transcript';
 import ReviewTranslations from './partials/review-translations';
+import ReviewVisuals from './partials/review-visuals';
 
 type Props = {
     record: ApprovalRecord;
@@ -42,6 +44,8 @@ type Props = {
     publicBlockers: string[];
     /** People on screen (face counts only); null when never counted. */
     faces: FaceSummary | null;
+    /** Key frames with their analysis, for the Visuals table. */
+    frames: VisualFrame[];
     history: ReviewHistoryItem[];
     canReview: boolean;
     canReopen: boolean;
@@ -63,6 +67,7 @@ export default function ApprovalShow({
     archive,
     publicBlockers,
     faces,
+    frames,
     history,
     canReview,
     canReopen,
@@ -132,6 +137,7 @@ export default function ApprovalShow({
                         onChange={setTab}
                         counts={{
                             transcript: transcript?.segments.length ?? 0,
+                            visuals: frames.length,
                             translations: translations.length,
                         }}
                     />
@@ -150,6 +156,9 @@ export default function ApprovalShow({
                     )}
                     {tab === 'archive' && (
                         <ReviewArchive archive={archive} record={record} />
+                    )}
+                    {tab === 'visuals' && (
+                        <ReviewVisuals frames={frames} onSeek={seek} />
                     )}
                     {tab === 'translations' && (
                         <ReviewTranslations

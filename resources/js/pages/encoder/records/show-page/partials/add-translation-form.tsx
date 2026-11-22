@@ -46,7 +46,7 @@ export default function AddTranslationForm({
         });
 
     return (
-        <div className="grid gap-2 rounded-lg bg-white/5 p-3">
+        <div className="grid gap-2 rounded-lg bg-muted/60 p-3">
             <div className="flex gap-2">
                 <Select value={language} onValueChange={setLanguage}>
                     <SelectTrigger
@@ -74,7 +74,7 @@ export default function AddTranslationForm({
                     Translate
                 </Button>
             </div>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-muted-foreground">
                 The transcript text is sent to OpenAI to translate. Timings,
                 speakers and line breaks stay those of the original.
             </p>

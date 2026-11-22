@@ -16,6 +16,7 @@ use App\Enums\TaskStatus;
 use App\Enums\UsageKind;
 use App\Events\RecordProgressUpdated;
 use App\Events\RecordStageCompleted;
+use App\Jobs\SendRecordWebhookJob;
 use App\Models\Record;
 use App\Models\RecordFile;
 use App\Models\RecordFrame;
@@ -25,6 +26,7 @@ use App\Models\RecordTechnicalMetadata;
 use App\Models\RecordTranscript;
 use App\Models\UsageRecord;
 use App\Models\VideoAuditLog;
+use App\Services\Batches\BatchProgress;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -40,6 +42,7 @@ class PipelineRecorder
     public function __construct(
         private SceneStore $scenes,
         private RecordThumbnails $thumbnails,
+        private BatchProgress $batches,
     ) {}
 
     public function progress(Record $record, PipelineStage $stage, StageStatus $status, int $progress = 0, ?string $message = null): RecordStage
@@ -441,19 +444,23 @@ class PipelineRecorder
     }
 
     /**
-     * Put every active stage back to pending before the pipeline runs again.
-     * The record returns to `queued`; earlier results are replaced as the
-     * stages complete (metadata keeps its history). Records from before a
-     * phase added stages get rows for them first.
+     * Put stages back to pending before the pipeline runs again: every active
+     * stage, or only `$stages` (a retry of one stage and those that read its
+     * results). The record returns to `queued`; earlier results are replaced
+     * as the stages complete (metadata keeps its history). Records from
+     * before a phase added stages get rows for them first.
+     *
+     * @param  list<PipelineStage>|null  $stages
      */
-    public function resetStages(Record $record): void
+    public function resetStages(Record $record, ?array $stages = null): void
     {
+        $stages ??= PipelineStage::active();
         $existing = $record->stages()->pluck('stage')->map(fn (PipelineStage $stage): string => $stage->value)->all();
         $missing = array_filter(PipelineStage::active(), fn (PipelineStage $stage): bool => ! in_array($stage->value, $existing, true));
         $record->stages()->createMany(array_map(fn (PipelineStage $stage): array => ['stage' => $stage], array_values($missing)));
 
         $record->stages()
-            ->whereIn('stage', PipelineStage::active())
+            ->whereIn('stage', $stages)
             ->update([
                 'status' => StageStatus::Pending,
                 'progress' => 0,
@@ -466,12 +473,114 @@ class PipelineRecorder
     }
 
     /**
+     * A URL import whose download failed or never started: the stages that
+     * needed the file are skipped, so the record ends as failed with the
+     * download's reason.
+     */
+    public function failImport(Record $record, string $message): void
+    {
+        $record->stages()
+            ->whereIn('stage', PipelineStage::active())
+            ->update([
+                'status' => StageStatus::Skipped,
+                'message' => 'Skipped because the download did not finish.',
+                'finished_at' => now(),
+            ]);
+
+        $this->progress($record, PipelineStage::Import, StageStatus::Failed, message: $message);
+    }
+
+    /**
+     * Speaker turns from diarization (S1, S2… or AssemblyAI's A, B…) label the
+     * original transcript: each line gets the speaker who talks longest during
+     * it. Speakers are matched by label, so names given earlier stay; labels
+     * are renumbered S1, S2… in order of first appearance. Speakers left
+     * without a line or a name are removed.
+     *
+     * @param  array{turns: list<array{start: float, end: float, speaker: string}>, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>}  $result
+     */
+    public function storeSpeakers(Record $record, array $result): void
+    {
+        DB::transaction(function () use ($record, $result): void {
+            $turns = $result['turns'];
+            usort($turns, fn (array $a, array $b): int => $a['start'] <=> $b['start']);
+
+            $labels = [];
+            foreach ($turns as $turn) {
+                $labels[$turn['speaker']] ??= 'S'.(count($labels) + 1);
+            }
+
+            $speakerIds = [];
+            foreach (array_unique(array_values($labels)) as $label) {
+                $speakerIds[$label] = $record->speakers()->firstOrCreate(['label' => $label])->id;
+            }
+
+            $transcript = $record->originalTranscript()->first(['id', 'record_id']);
+
+            if ($transcript !== null) {
+                $assignments = [];
+
+                foreach ($transcript->segments()->get(['id', 'start', 'end']) as $segment) {
+                    $speaker = self::dominantSpeaker($turns, (float) $segment->start, (float) $segment->end);
+                    $assignments[$speaker === null ? 0 : $speakerIds[$labels[$speaker]]][] = $segment->id;
+                }
+
+                foreach ($assignments as $speakerId => $segmentIds) {
+                    foreach (array_chunk($segmentIds, self::SEGMENT_INSERT_BATCH) as $chunk) {
+                        DB::table('record_segments')->whereIn('id', $chunk)->update(['record_speaker_id' => $speakerId === 0 ? null : $speakerId]);
+                    }
+                }
+            }
+
+            $record->speakers()
+                ->whereNull('display_name')
+                ->whereNotIn('id', array_values($speakerIds))
+                ->whereDoesntHave('segments')
+                ->delete();
+
+            $this->recordUsage($record, $result['usage'] ?? []);
+        });
+
+        $this->complete($record, PipelineStage::Diarize);
+    }
+
+    /**
+     * The speaker who talks longest during [start, end]; null when nobody does.
+     *
+     * @param  list<array{start: float, end: float, speaker: string}>  $turns  sorted by start
+     */
+    private static function dominantSpeaker(array $turns, float $start, float $end): ?string
+    {
+        $overlap = [];
+
+        foreach ($turns as $turn) {
+            if ($turn['start'] >= $end) {
+                break;
+            }
+
+            $shared = min($end, $turn['end']) - max($start, $turn['start']);
+
+            if ($shared > 0) {
+                $overlap[$turn['speaker']] = ($overlap[$turn['speaker']] ?? 0) + $shared;
+            }
+        }
+
+        if ($overlap === []) {
+            return null;
+        }
+
+        arsort($overlap);
+
+        return (string) array_key_first($overlap);
+    }
+
+    /**
      * queued -> processing -> ready | failed, derived from the active stages;
      * `cancelled` once an encoder stopped the run (ProcessingCanceller).
      */
     public function refreshStatus(Record $record): void
     {
-        $active = array_map(fn (PipelineStage $stage): string => $stage->value, PipelineStage::active());
+        $active = array_map(fn (PipelineStage $stage): string => $stage->value, PipelineStage::tracked());
         $stages = $record->stages()->whereIn('stage', $active)->get(['stage', 'status', 'message']);
 
         $terminal = $stages->every(fn (RecordStage $stage): bool => in_array(
@@ -493,7 +602,18 @@ class PipelineRecorder
         $record->processing_error = $failed !== null && ! $cancelled
             ? "{$failed->stage->label()}: ".($failed->message ?? 'failed')
             : null;
+        $statusChanged = $record->isDirty('processing_status');
         $record->save();
+
+        // A batch counts its finished and failed records.
+        if ($statusChanged && $record->batch_id !== null) {
+            $this->batches->refresh($record->batch_id);
+        }
+
+        // A record created through the public API may ask to be told when it is done.
+        if ($statusChanged && $record->webhook_url !== null && in_array($record->processing_status, [ProcessingStatus::Ready, ProcessingStatus::Failed], true)) {
+            SendRecordWebhookJob::dispatch($record, 'record.'.$record->processing_status->value)->afterCommit();
+        }
     }
 
     /**

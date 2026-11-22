@@ -96,9 +96,14 @@ def test_a_signed_capture_writes_the_thumbnail_inside_the_record(
         )
 
     ok = capture(f"records/{RECORD_ID}/thumbnail/abc.jpg")
+    key_frame = capture(f"records/{RECORD_ID}/frames/added_abc.jpg")
     other_record = capture("records/01m7z0cwed0mv35vf14kpjeb1e/thumbnail/abc.jpg")
+    other_folder = capture(f"records/{RECORD_ID}/master/abc.jpg")
 
     assert ok.status_code == 200, ok.text
     assert ok.json() == {"path": f"records/{RECORD_ID}/thumbnail/abc.jpg"}
     assert (tmp_path / "records" / RECORD_ID / "thumbnail" / "abc.jpg").is_file()
+    assert key_frame.status_code == 200, key_frame.text
+    assert (tmp_path / "records" / RECORD_ID / "frames" / "added_abc.jpg").is_file()
     assert other_record.status_code == 422
+    assert other_folder.status_code == 422

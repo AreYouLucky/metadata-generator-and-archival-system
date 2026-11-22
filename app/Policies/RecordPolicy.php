@@ -96,6 +96,15 @@ class RecordPolicy
     }
 
     /**
+     * Publish to YouTube (Phase 7): whoever may open the record (its encoder or
+     * an admin), and only while the record may leave the archive.
+     */
+    public function publish(User $user, Record $record): bool
+    {
+        return $this->view($user, $record) && $this->distribute($user, $record);
+    }
+
+    /**
      * Submit for approval: the record's encoder (or an admin), only from
      * `draft` or `changes_requested`.
      */

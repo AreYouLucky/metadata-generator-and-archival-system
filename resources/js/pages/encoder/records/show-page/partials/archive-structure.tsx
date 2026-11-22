@@ -35,7 +35,7 @@ export default function ArchiveStructure({
                             <span className="shrink-0">
                                 {formatEnumLabel(file.role)}
                             </span>
-                            <span className="min-w-0 text-right wrap-anywhere text-neutral-500">
+                            <span className="min-w-0 text-right wrap-anywhere text-muted-foreground">
                                 {file.original_filename}
                             </span>
                         </li>
@@ -43,7 +43,7 @@ export default function ArchiveStructure({
                 </ul>
             </section>
 
-            <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
+            <section className="grid grid-cols-1 gap-2 border-t border-border pt-4">
                 <h3 className="text-sm font-medium">Work (reels and parts)</h3>
                 <WorkPicker
                     recordId={recordId}
@@ -74,7 +74,7 @@ export default function ArchiveStructure({
                 )}
             </section>
 
-            <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
+            <section className="grid grid-cols-1 gap-2 border-t border-border pt-4">
                 <h3 className="text-sm font-medium">Attachments</h3>
                 <AttachmentList
                     recordId={recordId}
@@ -86,7 +86,7 @@ export default function ArchiveStructure({
                 />
             </section>
 
-            <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
+            <section className="grid grid-cols-1 gap-2 border-t border-border pt-4">
                 <h3 className="text-sm font-medium">Transcripts</h3>
                 <ul className="grid grid-cols-1 gap-1 text-sm">
                     {archive.transcripts.map((transcript) => (
@@ -95,7 +95,7 @@ export default function ArchiveStructure({
                             className="flex flex-wrap justify-between gap-x-2"
                         >
                             <span>{languageName(transcript.language)}</span>
-                            <span className="text-right text-neutral-500">
+                            <span className="text-right text-muted-foreground">
                                 {transcript.is_original
                                     ? 'Original'
                                     : `Translation · ${formatEnumLabel(transcript.status)}`}
@@ -105,7 +105,7 @@ export default function ArchiveStructure({
                 </ul>
             </section>
 
-            <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
+            <section className="grid grid-cols-1 gap-2 border-t border-border pt-4">
                 <h3 className="text-sm font-medium">Shot and scene segments</h3>
                 <p className="text-sm text-muted-foreground">
                     {archive.segments.shot_count > 0
@@ -123,7 +123,7 @@ export default function ArchiveStructure({
                                 <span className="min-w-0 wrap-anywhere">
                                     {scene.label}
                                 </span>
-                                <span className="shrink-0 font-mono text-xs text-neutral-500 tabular-nums">
+                                <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
                                     {scene.tc_in} – {scene.tc_out}
                                 </span>
                             </li>

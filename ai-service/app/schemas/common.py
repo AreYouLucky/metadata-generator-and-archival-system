@@ -21,6 +21,15 @@ class TranscriptSegment(BaseModel):
     text: str
 
 
+class SpeakerTurn(BaseModel):
+    """Who speaks when, from diarization. Labels are the provider's own (SPEAKER_00, A...);
+    Laravel renumbers them S1, S2... and matches them to the transcript lines."""
+
+    start: float = Field(ge=0)
+    end: float = Field(ge=0)
+    speaker: str = Field(min_length=1, max_length=32)
+
+
 class Usage(BaseModel):
     """One metered provider call, written by Laravel to `usage_records`."""
 

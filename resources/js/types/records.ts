@@ -27,10 +27,12 @@ export type StageStatus =
     | 'cancelled';
 
 export type PipelineStageName =
+    | 'import'
     | 'checksum'
     | 'probe'
     | 'extract_audio'
     | 'transcribe'
+    | 'diarize'
     | 'scenes'
     | 'frames'
     | 'vision'
@@ -58,8 +60,11 @@ export type RecordListItem = {
     duration: number | null;
     project: string | null;
     series: string | null;
+    /** The batch it was uploaded in (Phase 6). */
+    batch: { id: string; name: string } | null;
     created_at: string | null;
     creator: string | null;
+    can_delete: boolean;
 };
 
 export type RecordFilters = {
@@ -98,10 +103,31 @@ export type WorkspaceRecord = {
     /** Set while an embargo is in force. */
     embargo_until: string | null;
     created_at: string | null;
+    batch: { id: string; name: string } | null;
+    /** The web address it was imported from (yt-dlp). */
+    source_url: string | null;
+    /** What processing was asked for on upload; the retry form starts from it. */
+    pipeline_options: PipelineOptionValues;
     can_edit: boolean;
     /** May stop the pipeline (shown while queued or processing). */
     can_cancel: boolean;
     can_delete: boolean;
+};
+
+/** Which providers the AI service sends audio to (null: the service is down). */
+export type AiProviders = {
+    transcription: 'local' | 'openai' | 'assemblyai' | null;
+    diarization: 'pyannote' | 'assemblyai' | null;
+};
+
+/** Processing choices made on upload (records.pipeline_options). */
+export type PipelineOptionValues = {
+    preset: PresetName;
+    custom_prompt: string | null;
+    visual_analysis: boolean;
+    ocr: boolean;
+    object_detection: boolean;
+    diarization: boolean;
 };
 
 export type WorkspaceMedia = {
@@ -133,6 +159,8 @@ export type StageState = {
     status: StageStatus;
     progress: number;
     message: string | null;
+    /** The workspace only: whether this step can be retried on its own now. */
+    retryable?: boolean;
 };
 
 export type TranscriptSegment = {
@@ -239,6 +267,7 @@ export type MetadataHistoryItem = {
 
 /** Reverb payloads on the private `records.{id}` channel. */
 export type RecordProgressEvent = {
+    record_id: string;
     processing_status: ProcessingStatus;
     stage: Omit<StageState, 'label'>;
 };

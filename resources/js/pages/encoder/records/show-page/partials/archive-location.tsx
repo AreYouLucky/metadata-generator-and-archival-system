@@ -191,7 +191,7 @@ export default function ArchiveLocation({
                     />
                 </Suspense>
                 {canEdit && (
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-xs text-muted-foreground">
                         Click the map to drop the pin, or type the coordinates
                         below.
                     </p>
@@ -237,7 +237,7 @@ export default function ArchiveLocation({
                 </ArchiveField>
             </div>
             {canEdit && hasGps && !gpsApplied && (
-                <div className="flex items-center gap-2 rounded-md bg-white/5 p-2.5 text-xs">
+                <div className="flex items-center gap-2 rounded-md bg-muted/60 p-2.5 text-xs">
                     <MapPin
                         className="size-4 shrink-0 text-brand"
                         aria-hidden

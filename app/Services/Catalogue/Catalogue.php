@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectSeries;
 use App\Models\Record;
 use App\Models\RecordContributor;
+use App\Models\RecordFrame;
 use App\Models\RecordKeyword;
 use App\Models\RecordSubject;
 use App\Models\Region;
@@ -308,6 +309,18 @@ class Catalogue
                     'language' => $transcript['language'],
                     'lines' => array_map(fn (array $line): array => ['start' => $line['start'], 'end' => $line['end'], 'speaker' => $line['speaker'], 'text' => $line['text']], $transcript['lines']),
                 ],
+                // Key frames with what they show; no face counts on the public site.
+                'frames' => array_values($record->frames()
+                    ->get(['id', 'record_id', 'time_sec', 'description', 'ocr_text', 'objects'])
+                    ->map(fn (RecordFrame $frame): array => [
+                        'id' => $frame->id,
+                        'time_sec' => $frame->time_sec,
+                        'url' => route('catalogue.frames.image', ['record' => $record, 'frame' => $frame]),
+                        'description' => $frame->description,
+                        'ocr_text' => $frame->ocr_text,
+                        'objects' => array_values(array_map(fn (array $object): string => (string) $object['label'], $frame->objects ?? [])),
+                    ])
+                    ->all()),
                 'captions' => $record->transcripts
                     ->sortByDesc('is_original')
                     ->map(fn ($item): array => ['language' => $item->language, 'is_original' => $item->is_original])

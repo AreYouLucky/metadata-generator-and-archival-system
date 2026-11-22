@@ -4,6 +4,7 @@ import EditorPanel from '@/components/encoder/editor-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { StageState } from '@/types/records';
 import type { Visuals } from '@/types/visuals';
+import AddFrameButton from './add-frame-button';
 import VisualsFrames from './visuals-frames';
 import VisualsScenes from './visuals-scenes';
 import VisualsThumbnail from './visuals-thumbnail';
@@ -52,7 +53,7 @@ export default function VisualsPanel({
                 />
 
                 {failed && (
-                    <p className="rounded-md bg-red-500/10 p-3 text-xs text-red-300">
+                    <p className="rounded-md bg-red-500/10 p-3 text-xs text-red-700">
                         {failed.label}: {failed.message ?? 'failed'}
                     </p>
                 )}
@@ -69,7 +70,7 @@ export default function VisualsPanel({
                         className="grid gap-2"
                         aria-label="Analysing the frames"
                     >
-                        <p className="text-xs text-neutral-400">
+                        <p className="text-xs text-muted-foreground">
                             Finding shots and key frames…
                         </p>
                         <div className="grid grid-cols-3 gap-1.5">
@@ -82,11 +83,19 @@ export default function VisualsPanel({
                         </div>
                     </div>
                 ) : (
-                    <p className="rounded-md border border-dashed border-white/10 p-4 text-center text-sm text-neutral-500">
-                        {switchedOff
-                            ? 'Visual analysis was turned off for this video.'
-                            : 'No key frames yet.'}
-                    </p>
+                    <div className="grid justify-items-center gap-2 rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                        <p>
+                            {switchedOff
+                                ? 'Visual analysis was turned off for this video.'
+                                : 'No key frames yet.'}
+                        </p>
+                        {canEdit && (
+                            <AddFrameButton
+                                recordId={recordId}
+                                onAdded={() => undefined}
+                            />
+                        )}
+                    </div>
                 )}
 
                 {(visuals.shots.length > 0 || visuals.scenes.length > 0) && (
@@ -98,7 +107,7 @@ export default function VisualsPanel({
                     />
                 )}
 
-                <p className="mt-auto flex gap-2 rounded-md bg-white/5 p-3 text-xs text-neutral-400">
+                <p className="mt-auto flex gap-2 rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
                     <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                     Shots, on-screen text, objects and face counts are worked
                     out on this organisation's server. Small copies of the key

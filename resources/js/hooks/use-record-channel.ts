@@ -11,14 +11,18 @@ import type {
 } from '@/types/records';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { RecordDescriptiveSuggestedEvent } from '@/types/archive';
+import type { RecordClipUpdatedEvent } from '@/types/clips';
+import type { RecordPublicationUpdatedEvent } from '@/types/publishing';
 import { toast } from 'sonner';
 
 /** Workspace props each finished stage changes (Inertia partial reload). */
 const RELOAD_AFTER: Record<PipelineStageName, string[]> = {
+    import: ['media', 'archive'],
     checksum: [],
     probe: ['media'],
     extract_audio: ['media'],
     transcribe: ['transcript', 'translations'],
+    diarize: ['transcript', 'speakers'],
     scenes: ['visuals', 'archive'],
     frames: ['visuals'],
     vision: ['visuals'],
@@ -111,6 +115,38 @@ export function useRecordChannel(
                 toast.error(
                     event.error ?? `The ${name} audio could not be made.`,
                 );
+            }
+        },
+        [recordId],
+    );
+
+    // A clip started, was cut, or failed.
+    useEcho<RecordClipUpdatedEvent>(
+        channel,
+        '.record.clip-updated',
+        (event) => {
+            router.reload({ only: ['clips'] });
+
+            if (event.status === 'done') {
+                toast.success(`${event.title} is ready to download.`);
+            } else if (event.status === 'failed') {
+                toast.error(event.error ?? `${event.title} could not be cut.`);
+            }
+        },
+        [recordId],
+    );
+
+    // A YouTube publication was queued, uploaded further, finished or failed.
+    useEcho<RecordPublicationUpdatedEvent>(
+        channel,
+        '.record.publication-updated',
+        (event) => {
+            router.reload({ only: ['publications'] });
+
+            if (event.status === 'published') {
+                toast.success('The video is published on YouTube.');
+            } else if (event.status === 'failed') {
+                toast.error(event.error ?? 'Publishing to YouTube failed.');
             }
         },
         [recordId],

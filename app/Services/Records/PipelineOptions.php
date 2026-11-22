@@ -14,7 +14,8 @@ final readonly class PipelineOptions
     /**
      * The visual flags are chosen on upload (and again on retry): frames,
      * scenes and descriptions; on-screen text; objects and face counts.
-     * OCR and objects only run with visual analysis.
+     * OCR and objects only run with visual analysis. `diarization` labels
+     * the speakers of the transcript (Phase 6).
      */
     public function __construct(
         public Preset $preset = Preset::Generic,
@@ -22,7 +23,70 @@ final readonly class PipelineOptions
         public bool $visualAnalysis = false,
         public bool $ocr = false,
         public bool $objectDetection = false,
+        public bool $diarization = false,
     ) {}
+
+    /**
+     * Build the options from validated request input (upload, batch, retry).
+     *
+     * @param  array<string, mixed>  $input
+     */
+    public static function fromInput(array $input): self
+    {
+        $prompt = trim((string) ($input['custom_prompt'] ?? ''));
+
+        return new self(
+            Preset::from((string) $input['preset']),
+            $prompt !== '' ? $prompt : null,
+            visualAnalysis: (bool) ($input['visual_analysis'] ?? false),
+            ocr: (bool) ($input['ocr'] ?? false),
+            objectDetection: (bool) ($input['object_detection'] ?? false),
+            diarization: (bool) ($input['diarization'] ?? false),
+        );
+    }
+
+    /**
+     * The options as kept on the record (`records.pipeline_options`), so a URL
+     * import can start processing once downloaded and a retry can offer them.
+     *
+     * @return array{preset: string, custom_prompt: string|null, visual_analysis: bool, ocr: bool, object_detection: bool, diarization: bool}
+     */
+    public function toArray(): array
+    {
+        return [
+            'preset' => $this->preset->value,
+            'custom_prompt' => $this->customPrompt,
+            'visual_analysis' => $this->visualAnalysis,
+            'ocr' => $this->ocr,
+            'object_detection' => $this->objectDetection,
+            'diarization' => $this->diarization,
+        ];
+    }
+
+    /**
+     * Options stored on a record; defaults when none were kept (records from
+     * before Phase 6) or the preset has since been switched off.
+     *
+     * @param  array<string, mixed>|null  $stored
+     */
+    public static function fromStored(?array $stored): self
+    {
+        if ($stored === null || ! in_array($stored['preset'] ?? null, self::enabledPresets(), true)) {
+            return new self;
+        }
+
+        return self::fromInput($stored);
+    }
+
+    /**
+     * Every flag as the AI service's JobOptions expects it.
+     *
+     * @return array{visual_analysis: bool, ocr: bool, object_detection: bool, diarization: bool}
+     */
+    public function jobFlags(): array
+    {
+        return [...$this->visualFlags(), 'diarization' => $this->diarization];
+    }
 
     /**
      * The flags as the AI service's JobOptions expects them.
@@ -50,6 +114,16 @@ final readonly class PipelineOptions
             'ocr' => ['sometimes', 'boolean'],
             'object_detection' => ['sometimes', 'boolean'],
         ];
+    }
+
+    /**
+     * Rules for every processing switch chosen on upload, batch and retry.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public static function processingRules(): array
+    {
+        return [...self::visualRules(), 'diarization' => ['sometimes', 'boolean']];
     }
 
     /**

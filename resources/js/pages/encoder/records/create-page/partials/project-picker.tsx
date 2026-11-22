@@ -76,7 +76,7 @@ export default function ProjectPicker({
                                     {project.title}
                                 </span>
                             </p>
-                            <p className="mt-0.5 text-xs text-neutral-400">
+                            <p className="mt-0.5 text-xs text-muted-foreground">
                                 {formatDate(project.date)}
                                 {formatPlace(project.location, project.place) &&
                                     ` · ${formatPlace(project.location, project.place)}`}
@@ -199,7 +199,7 @@ export default function ProjectPicker({
             </div>
             <div className="relative">
                 <Search
-                    className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-neutral-500"
+                    className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden
                 />
                 <Input
@@ -214,17 +214,17 @@ export default function ProjectPicker({
             </div>
             <ul
                 className={cn(
-                    'max-h-56 overflow-y-auto rounded-md ring-1 ring-white/10',
+                    'max-h-56 overflow-y-auto rounded-md ring-1 ring-border',
                     options.isFetching && 'opacity-70',
                 )}
                 aria-label="Projects"
             >
                 {options.isPending ? (
-                    <li className="flex items-center gap-2 p-3 text-xs text-neutral-400">
+                    <li className="flex items-center gap-2 p-3 text-xs text-muted-foreground">
                         <Spinner /> Loading projects…
                     </li>
                 ) : (options.data ?? []).length === 0 ? (
-                    <li className="p-3 text-xs text-neutral-400">
+                    <li className="p-3 text-xs text-muted-foreground">
                         {debounced
                             ? 'No project matches. Create it with “New project”.'
                             : 'No projects yet. Create the event first.'}
@@ -236,10 +236,10 @@ export default function ProjectPicker({
                                 type="button"
                                 disabled={disabled}
                                 onClick={() => onChange(option, null)}
-                                className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-white/5 focus-visible:bg-white/10 focus-visible:outline-none"
+                                className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-muted/60 focus-visible:bg-muted focus-visible:outline-none"
                             >
                                 <span className="text-sm">{option.title}</span>
-                                <span className="flex items-center gap-1 text-[11px] text-neutral-400">
+                                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                                     <CalendarDays
                                         className="size-3"
                                         aria-hidden
@@ -252,7 +252,7 @@ export default function ProjectPicker({
                     ))
                 )}
             </ul>
-            <p className="text-[11px] text-neutral-500">
+            <p className="text-[11px] text-muted-foreground">
                 Every video is filed under a project (event).
             </p>
         </div>

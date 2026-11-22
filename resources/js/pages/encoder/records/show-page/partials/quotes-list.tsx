@@ -1,4 +1,4 @@
-import { Quote as QuoteIcon, X } from 'lucide-react';
+import { Quote as QuoteIcon, Scissors, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatTimestamp } from '@/lib/utilities';
 import { useWorkspaceStore } from '@/stores/workspace-store';
@@ -16,6 +16,15 @@ type Props = {
  */
 export default function QuotesList({ quotes, disabled, onChange }: Props) {
     const seek = useWorkspaceStore((state) => state.seek);
+    const markClip = useWorkspaceStore((state) => state.markClip);
+    const setInspectorTab = useWorkspaceStore((state) => state.setInspectorTab);
+
+    const clipQuote = (quote: Quote) => {
+        const title =
+            quote.text.length > 80 ? `${quote.text.slice(0, 79)}…` : quote.text;
+        markClip(quote.start, Math.max(quote.end, quote.start + 1), title);
+        setInspectorTab('clips');
+    };
 
     return (
         <div className="grid gap-2">
@@ -29,7 +38,7 @@ export default function QuotesList({ quotes, disabled, onChange }: Props) {
                     {quotes.map((quote, index) => (
                         <li
                             key={`${quote.start}-${index}`}
-                            className="group flex items-start gap-2 rounded-md bg-white/5 p-2"
+                            className="group flex items-start gap-2 rounded-md bg-muted/60 p-2"
                         >
                             <QuoteIcon
                                 className="mt-0.5 size-3.5 shrink-0 text-brand"
@@ -46,6 +55,17 @@ export default function QuotesList({ quotes, disabled, onChange }: Props) {
                                 </span>
                                 “{quote.text}”
                             </button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-6 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                                onClick={() => clipQuote(quote)}
+                                aria-label="Make a clip of this quote"
+                                title="Clip this quote"
+                            >
+                                <Scissors className="size-3" />
+                            </Button>
                             {!disabled && (
                                 <Button
                                     type="button"

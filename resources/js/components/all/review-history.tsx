@@ -2,7 +2,7 @@ import { formatDateTime, formatEnumLabel } from '@/lib/utilities';
 import type { ReviewHistoryItem } from '@/types/reviews';
 
 const TONES: Record<ReviewHistoryItem['action'], string> = {
-    submitted: 'bg-sky-500',
+    submitted: 'bg-yellow-400',
     approved: 'bg-emerald-500',
     changes_requested: 'bg-amber-500',
     rejected: 'bg-rose-500',

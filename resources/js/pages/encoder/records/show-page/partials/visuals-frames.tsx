@@ -7,7 +7,8 @@ import { formatTimestamp, getErrorMessage } from '@/lib/utilities';
 import { cn } from '@/lib/utils';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { Thumbnail, VisualFrame } from '@/types/visuals';
-import FrameDetails from './frame-details';
+import AddFrameButton from './add-frame-button';
+import FrameDialog from './frame-dialog';
 import FrameTile from './frame-tile';
 
 type Props = {
@@ -20,7 +21,8 @@ type Props = {
 /**
  * The thumbnail picker: key frames (scene starts and one every few
  * seconds), optionally only those with faces counted. Clicking one jumps
- * the player there and shows what was found in it, with "Use as thumbnail".
+ * the player there and opens it in a dialog with what was found in it, to
+ * correct, and "Use as thumbnail".
  */
 export default function VisualsFrames({
     recordId,
@@ -32,6 +34,7 @@ export default function VisualsFrames({
     const seek = useWorkspaceStore((state) => state.seek);
     const formatTime = useTimeFormat(formatTimestamp);
     const setThumbnail = useSetThumbnail(recordId);
+    const [dialogOpen, setDialogOpen] = useState(false);
     const [facesOnly, setFacesOnly] = useState(false);
     const selected = frames.find((frame) => frame.id === selectedId) ?? null;
     const framesWithFaces = useMemo(
@@ -44,6 +47,7 @@ export default function VisualsFrames({
 
     const select = (frame: VisualFrame) => {
         setSelectedId(frame.id);
+        setDialogOpen(true);
         seek(frame.time_sec);
     };
 
@@ -67,30 +71,42 @@ export default function VisualsFrames({
             <div className="flex items-center justify-between gap-2">
                 <h3
                     id="visuals-frames"
-                    className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase"
+                    className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
                 >
                     Key frames{' '}
-                    <span className="text-neutral-500 tabular-nums">
+                    <span className="text-muted-foreground tabular-nums">
                         {shown.length}
                     </span>
                 </h3>
-                {withFaces > 0 && (
-                    <button
-                        type="button"
-                        onClick={() => setFacesOnly((value) => !value)}
-                        aria-pressed={facesOnly}
-                        className={cn(
-                            'flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-neutral-400 ring-1 ring-white/10 transition hover:text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                            facesOnly && 'bg-white/10 text-white',
-                        )}
-                    >
-                        <ScanFace className="size-3" aria-hidden />
-                        People on screen
-                        <span className="text-neutral-500 tabular-nums">
-                            {withFaces}
-                        </span>
-                    </button>
-                )}
+                <div className="flex items-center gap-1.5">
+                    {canEdit && (
+                        <AddFrameButton
+                            recordId={recordId}
+                            onAdded={(frame) => {
+                                setFacesOnly(false);
+                                setSelectedId(frame.id);
+                                setDialogOpen(true);
+                            }}
+                        />
+                    )}
+                    {withFaces > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setFacesOnly((value) => !value)}
+                            aria-pressed={facesOnly}
+                            className={cn(
+                                'flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                facesOnly && 'bg-muted text-foreground',
+                            )}
+                        >
+                            <ScanFace className="size-3" aria-hidden />
+                            People on screen
+                            <span className="text-muted-foreground tabular-nums">
+                                {withFaces}
+                            </span>
+                        </button>
+                    )}
+                </div>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
                 {shown.map((frame) => (
@@ -104,21 +120,27 @@ export default function VisualsFrames({
                     />
                 ))}
             </div>
-            {selected ? (
-                <FrameDetails
-                    frame={selected}
-                    label={formatTime(selected.time_sec)}
-                    isThumbnail={thumbnail?.frame_id === selected.id}
-                    canEdit={canEdit}
-                    pending={setThumbnail.isPending}
-                    onUseAsThumbnail={() => chooseAsThumbnail(selected)}
-                />
-            ) : (
-                <p className="text-xs text-neutral-500">
-                    Pick a frame to see its description, the text on screen,
-                    objects and faces counted.
-                </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+                Click a frame to see it large with its description, the text on
+                screen, objects and faces counted
+                {canEdit ? ', and to correct them' : ''}.
+            </p>
+            <FrameDialog
+                recordId={recordId}
+                frame={dialogOpen ? selected : null}
+                label={selected ? formatTime(selected.time_sec) : ''}
+                isThumbnail={
+                    selected !== null && thumbnail?.frame_id === selected.id
+                }
+                canEdit={canEdit}
+                thumbnailPending={setThumbnail.isPending}
+                onUseAsThumbnail={() => selected && chooseAsThumbnail(selected)}
+                onClose={() => setDialogOpen(false)}
+                onRemoved={() => {
+                    setDialogOpen(false);
+                    setSelectedId(null);
+                }}
+            />
         </section>
     );
 }

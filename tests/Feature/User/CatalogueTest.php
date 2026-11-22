@@ -16,6 +16,7 @@ use App\Models\Project;
 use App\Models\ProjectSeries;
 use App\Models\Record;
 use App\Models\RecordFile;
+use App\Models\RecordFrame;
 use App\Models\RecordRights;
 use App\Models\RecordSegment;
 use App\Models\RecordTranscript;
@@ -272,6 +273,42 @@ class CatalogueTest extends TestCase
         Storage::disk('media')->put($record->thumbnail_path, 'image');
 
         $this->get(route('catalogue.thumbnail', $record))->assertNotFound();
+    }
+
+    public function test_the_watch_page_lists_the_key_frames_without_face_counts_and_serves_their_images(): void
+    {
+        Storage::fake('media');
+        $record = $this->publicRecord();
+        $frame = RecordFrame::factory()->for($record)->create([
+            'time_sec' => 8,
+            'description' => 'A title card.',
+            'ocr_text' => 'Regional S&T Fair',
+            'objects' => [['label' => 'person', 'confidence' => 0.9]],
+            'face_count' => 2,
+        ]);
+        Storage::disk('media')->put($frame->path, 'frame image');
+
+        $this->get(route('catalogue.watch', $record))->assertInertia(fn (Assert $page) => $page
+            ->where('frames.0.id', $frame->id)
+            ->where('frames.0.description', 'A title card.')
+            ->where('frames.0.ocr_text', 'Regional S&T Fair')
+            ->where('frames.0.objects', ['person'])
+            ->where('frames.0.url', route('catalogue.frames.image', [$record, $frame]))
+            ->missing('frames.0.face_count'));
+        $this->get(route('catalogue.frames.image', [$record, $frame]))->assertOk();
+    }
+
+    public function test_a_frame_of_a_record_that_may_not_be_distributed_is_not_found(): void
+    {
+        Storage::fake('media');
+        $draft = Record::factory()->create();
+        $frame = RecordFrame::factory()->for($draft)->create();
+        Storage::disk('media')->put($frame->path, 'frame image');
+        $public = $this->publicRecord();
+
+        $this->get(route('catalogue.frames.image', [$draft, $frame]))->assertNotFound();
+        // Nor through another, public record.
+        $this->get(route('catalogue.frames.image', [$public, $frame]))->assertNotFound();
     }
 
     public function test_the_home_page_lists_the_latest_records(): void

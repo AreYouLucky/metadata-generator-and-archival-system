@@ -53,18 +53,18 @@ class FrameDescriptions(BaseModel):
     frames: list[FrameDescription]
 
 
-THUMBNAIL_PATH_PATTERN = (
-    r"^records/[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}/thumbnail/[A-Za-z0-9_-]{1,64}\.jpg$"
+CAPTURE_PATH_PATTERN = (
+    r"^records/[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}/(thumbnail|frames)/[A-Za-z0-9_-]{1,64}\.jpg$"
 )
 
 
 class CaptureRequest(BaseModel):
-    """POST /frames/capture: one frame of the master as the record's thumbnail."""
+    """POST /frames/capture: one frame of the master as the thumbnail or an added key frame."""
 
     record_id: str = Field(pattern=ULID_PATTERN)
     video_path: str = Field(min_length=1, max_length=1024)
     time_sec: float = Field(ge=0)
-    output_path: str = Field(pattern=THUMBNAIL_PATH_PATTERN)
+    output_path: str = Field(pattern=CAPTURE_PATH_PATTERN)
 
 
 class CaptureResult(BaseModel):

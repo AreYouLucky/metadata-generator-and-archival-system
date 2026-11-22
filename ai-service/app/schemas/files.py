@@ -37,6 +37,31 @@ class AudioExportRequest(BaseModel):
         return self
 
 
+CLIP_PATH_PATTERN = r"^records/[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}/clips/[1-9][0-9]{0,18}\.mp4$"
+
+
+class ClipRequest(BaseModel):
+    """POST /clips: a part of the master cut to its own MP4, then checksummed and probed."""
+
+    record_id: str = Field(pattern=ULID_PATTERN)
+    clip_id: int = Field(ge=1)
+    video_path: str = Field(min_length=1, max_length=1024)
+    start: float = Field(ge=0)
+    end: float = Field(gt=0)
+    output_path: str = Field(pattern=CLIP_PATH_PATTERN)
+    max_height: int = Field(default=1080, ge=240, le=2160)
+
+    @model_validator(mode="after")
+    def _valid_clip(self) -> "ClipRequest":
+        if self.end <= self.start:
+            raise ValueError("The clip must end after it starts.")
+        if self.end - self.start > 3600:
+            raise ValueError("A clip can be at most an hour long.")
+        if self.output_path != f"records/{self.record_id}/clips/{self.clip_id}.mp4":
+            raise ValueError("The clip must be stored with its record, named for its id.")
+        return self
+
+
 class FixityRequest(BaseModel):
     record_file_id: str = Field(pattern=ULID_PATTERN)
     path: str = Field(min_length=1, max_length=1024)

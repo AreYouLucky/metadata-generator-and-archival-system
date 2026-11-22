@@ -1,6 +1,8 @@
 import { RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import SpeakerOption from '@/components/encoder/speaker-option';
+import VisualAnalysisOptions from '@/components/encoder/visual-analysis-options';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -9,11 +11,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
-import VisualAnalysisOptions, {
-    DEFAULT_VISUAL_ANALYSIS,
-} from '@/components/encoder/visual-analysis-options';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -25,36 +23,61 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useRetryProcessing } from '@/hooks/use-retry-processing';
 import { getErrorMessage } from '@/lib/utilities';
-import type { PresetName, PresetRules } from '@/types/records';
+import type {
+    PipelineOptionValues,
+    PresetName,
+    PresetRules,
+    StageState,
+} from '@/types/records';
 
 type Props = {
     recordId: string;
     presets: PresetRules[];
-    initialPreset: PresetName;
+    /** The choices made on upload; the form starts from them. */
+    initialOptions: PipelineOptionValues;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    /** One step to run again (with those reading its results); null runs every step. */
+    stage: StageState | null;
 };
 
 /**
- * Re-runs every stage of a failed or cancelled record. The upload's choices (platform,
- * visual analysis) aren't stored, so they are asked for again here.
+ * Runs processing again: every stage of a failed or cancelled record, or one
+ * failed or skipped step and the steps that use its results. The upload's
+ * choices are filled in and can be changed (e.g. switch on speakers).
  */
 export default function RetryProcessingDialog({
     recordId,
     presets,
-    initialPreset,
+    initialOptions,
+    open,
+    onOpenChange,
+    stage,
 }: Props) {
-    const [open, setOpen] = useState(false);
-    const [preset, setPreset] = useState<PresetName>(initialPreset);
-    const [prompt, setPrompt] = useState('');
-    const [visual, setVisual] = useState(DEFAULT_VISUAL_ANALYSIS);
+    const [options, setOptions] =
+        useState<PipelineOptionValues>(initialOptions);
     const retry = useRetryProcessing(recordId);
+    const set = (changes: Partial<PipelineOptionValues>) =>
+        setOptions((current) => ({ ...current, ...changes }));
+
+    // Start from the record's choices each time the dialog opens.
+    useEffect(() => {
+        if (open) {
+            setOptions(initialOptions);
+        }
+    }, [open, initialOptions]);
 
     const submit = () =>
         retry.mutate(
-            { preset, customPrompt: prompt, ...visual },
+            { options, stage: stage?.stage },
             {
                 onSuccess: () => {
-                    setOpen(false);
-                    toast.success('Processing restarted.');
+                    onOpenChange(false);
+                    toast.success(
+                        stage
+                            ? `${stage.label} queued again.`
+                            : 'Processing restarted.',
+                    );
                 },
                 onError: (error) =>
                     toast.error(
@@ -64,27 +87,25 @@ export default function RetryProcessingDialog({
         );
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm" variant="secondary" className="h-7">
-                    <RotateCcw aria-hidden />
-                    Retry
-                </Button>
-            </DialogTrigger>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Retry processing</DialogTitle>
+                    <DialogTitle>
+                        {stage ? `Retry ${stage.label}` : 'Retry processing'}
+                    </DialogTitle>
                     <DialogDescription>
-                        Every stage runs again, from checksums to metadata.
+                        {stage
+                            ? 'This step runs again, with the steps that use its results. Finished steps keep theirs.'
+                            : 'Every stage runs again, from checksums to metadata.'}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-3">
                     <div className="grid gap-1.5">
                         <Label htmlFor="retry-preset">Platform</Label>
                         <Select
-                            value={preset}
+                            value={options.preset}
                             onValueChange={(value) =>
-                                setPreset(value as PresetName)
+                                set({ preset: value as PresetName })
                             }
                         >
                             <SelectTrigger id="retry-preset">
@@ -110,21 +131,38 @@ export default function RetryProcessingDialog({
                             id="retry-prompt"
                             rows={2}
                             maxLength={2000}
-                            value={prompt}
+                            value={options.custom_prompt ?? ''}
                             placeholder="e.g. More formal. Mention the province."
-                            onChange={(event) => setPrompt(event.target.value)}
+                            onChange={(event) =>
+                                set({ custom_prompt: event.target.value })
+                            }
                         />
                     </div>
+                    <SpeakerOption
+                        idPrefix="retry"
+                        checked={options.diarization}
+                        onChange={(diarization) => set({ diarization })}
+                    />
                     <VisualAnalysisOptions
                         idPrefix="retry"
-                        values={visual}
-                        onChange={setVisual}
+                        values={{
+                            visualAnalysis: options.visual_analysis,
+                            ocr: options.ocr,
+                            objectDetection: options.object_detection,
+                        }}
+                        onChange={(visual) =>
+                            set({
+                                visual_analysis: visual.visualAnalysis,
+                                ocr: visual.ocr,
+                                object_detection: visual.objectDetection,
+                            })
+                        }
                     />
                 </div>
                 <DialogFooter>
                     <Button onClick={submit} disabled={retry.isPending}>
                         <RotateCcw aria-hidden />
-                        Retry processing
+                        {stage ? 'Retry this step' : 'Retry processing'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

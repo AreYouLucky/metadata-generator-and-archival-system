@@ -1,6 +1,6 @@
 [project]
 name = "mgas-ai-service"
-version = "0.3.0"
+version = "0.5.0"
 description = "Media and AI worker for the Metadata Generator and Archival System"
 requires-python = ">=3.12"
 # Media/AI libraries are added in the phase that uses them. Phase 1: probing
@@ -33,6 +33,11 @@ vision = [
     "pillow>=11",
     "numpy>=2",
 ]
+# Speaker diarization (Phase 6): pyannote.audio 4.x, on the CPU build of torch the
+# Dockerfile installs (as for vision). Needs HF_TOKEN and the model's terms accepted.
+diarization = ["pyannote.audio>=4,<5"]
+# URL import (Phase 6). [default] brings yt-dlp-ejs; YouTube also needs Deno (Dockerfile).
+import = ["yt-dlp[default]>=2025.11"]
 dev = ["pytest>=8.3,<9", "ruff>=0.8", "mypy>=1.13"]
 
 [build-system]
@@ -77,6 +82,9 @@ module = [
     "ultralytics.*",
     # Typed, but absent from images built with VISION=false.
     "PIL.*",
+    "pyannote.*",
+    "torch.*",
+    "yt_dlp.*",
 ]
 ignore_missing_imports = true
 
@@ -87,5 +95,6 @@ module = [
     "app.pipeline.tasks",
     "app.pipeline.translation",
     "app.pipeline.files",
+    "app.pipeline.imports",
 ]
 disallow_untyped_decorators = false

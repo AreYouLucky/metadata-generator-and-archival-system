@@ -243,7 +243,7 @@ export default function MetadataPanel({
                             onChange={(quotes) => change({ quotes })}
                         />
 
-                        <p className="text-xs text-neutral-500">
+                        <p className="text-xs text-muted-foreground">
                             Generated with {metadata.model}
                             {preset && ` for ${preset.label}`}
                         </p>

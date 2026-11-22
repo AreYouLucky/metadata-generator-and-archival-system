@@ -33,7 +33,7 @@ export default function ArchiveSubjects({
     const onError = (error: unknown) => toast.error(getErrorMessage(error));
 
     return (
-        <section className="grid gap-2 border-t border-white/10 pt-4">
+        <section className="grid gap-2 border-t border-border pt-4">
             <h3 className="text-sm font-medium">
                 Subjects
                 {pending > 0 && (
@@ -54,7 +54,7 @@ export default function ArchiveSubjects({
                             label={
                                 <>
                                     {item.subject}
-                                    <span className="ml-1 text-neutral-500">
+                                    <span className="ml-1 text-muted-foreground">
                                         {formatEnumLabel(item.type)}
                                     </span>
                                 </>

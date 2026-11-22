@@ -1,39 +1,46 @@
 import { Head } from '@inertiajs/react';
 import { useCallback, useRef, useState } from 'react';
 import RecordGrid from '@/components/user/record-grid';
+import { useAskMePage } from '@/hooks/use-ask-me-page';
+import { useStartTime } from '@/hooks/use-start-time';
 import { formatDate, languageName } from '@/lib/utilities';
 import { captions as captionsRoute } from '@/routes/catalogue';
 import type {
     CatalogueCard,
     WatchCaption,
+    WatchFrame,
     WatchRecord,
     WatchTranscriptLine,
 } from '@/types/catalogue';
 import WatchChapters from './partials/watch-chapters';
 import WatchDetails from './partials/watch-details';
+import WatchFrames from './partials/watch-frames';
 import WatchTranscript from './partials/watch-transcript';
 
 type Props = {
     record: WatchRecord;
     transcript: { language: string | null; lines: WatchTranscriptLine[] };
     captions: WatchCaption[];
+    frames: WatchFrame[];
     related: CatalogueCard[];
     mediaUrl: string;
 };
 
 /**
  * The public player: the access copy with captions in every finished
- * language, chapters and a synced transcript (click to jump), and the public
- * catalogue fields. Never a download of the master.
+ * language, chapters and a synced transcript (click to jump), the key frames
+ * as a table, and the public catalogue fields. Never a download of the master.
  */
 export default function Watch({
     record,
     transcript,
     captions,
+    frames,
     related,
     mediaUrl,
 }: Props) {
     const video = useRef<HTMLVideoElement>(null);
+    const [player, setPlayer] = useState<HTMLVideoElement | null>(null);
     const [currentTime, setCurrentTime] = useState(0);
 
     const seek = useCallback((seconds: number) => {
@@ -45,6 +52,10 @@ export default function Watch({
         void video.current.play().catch(() => undefined);
     }, []);
 
+    // "Ask me": this record is the chat's "this video"; ?t= opens a cited moment.
+    useAskMePage(record.id, seek);
+    useStartTime(player);
+
     return (
         <>
             <Head title={record.title} />
@@ -53,7 +64,10 @@ export default function Watch({
                     <div className="grid content-start gap-4">
                         <div className="overflow-hidden rounded-xl bg-black">
                             <video
-                                ref={video}
+                                ref={(element) => {
+                                    video.current = element;
+                                    setPlayer(element);
+                                }}
                                 src={mediaUrl}
                                 poster={record.thumbnail ?? undefined}
                                 controls
@@ -137,6 +151,13 @@ export default function Watch({
                         </section>
                     </aside>
                 </div>
+
+                {frames.length > 0 && (
+                    <section className="grid gap-4">
+                        <h2 className="text-xl font-semibold">On screen</h2>
+                        <WatchFrames frames={frames} onSeek={seek} />
+                    </section>
+                )}
 
                 {related.length > 0 && (
                     <section className="grid gap-4">

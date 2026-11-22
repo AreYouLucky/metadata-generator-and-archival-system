@@ -1,20 +1,21 @@
-import { usePage } from '@inertiajs/react';
+import BrandLogo from '@/components/all/brand-logo';
 
-import AppLogoIcon from '@/components/app-logo-icon';
-
+/**
+ * The staff navigation's logo: the KeepFrame wordmark, or just the mark when
+ * the sidebar is collapsed to icons.
+ */
 export default function AppLogo() {
-    const { name } = usePage().props;
-
     return (
         <>
-            <div className="flex aspect-square size-8 items-center justify-center rounded-md bg-brand text-brand-foreground">
-                <AppLogoIcon className="size-5 fill-current" />
-            </div>
-            <div className="ml-1 grid flex-1 text-left text-sm">
-                <span className="mb-0.5 truncate leading-tight font-semibold">
-                    {name}
-                </span>
-            </div>
+            <BrandLogo
+                variant="compact"
+                className="h-7 group-data-[collapsible=icon]:hidden"
+            />
+            <BrandLogo
+                variant="mark"
+                alt="KeepFrame"
+                className="hidden size-7 group-data-[collapsible=icon]:block"
+            />
         </>
     );
 }

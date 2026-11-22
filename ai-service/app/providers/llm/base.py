@@ -1,4 +1,4 @@
-from typing import Literal, Protocol, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel
 
@@ -54,4 +54,60 @@ class VisionLlmProvider(Protocol):
         images: list[ImageInput] | None = None,
     ) -> tuple[T, LlmUsage]:
         """Like LlmProvider.complete, with images attached to the last message."""
+        ...
+
+
+class FunctionSpec(BaseModel):
+    """A function tool offered to the model (strict JSON schema parameters)."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+
+
+class TurnMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class TurnToolCall(BaseModel):
+    """A tool call the model made earlier in this turn (replayed, the service is stateless)."""
+
+    call_id: str
+    name: str
+    arguments: str
+
+
+class TurnToolOutput(BaseModel):
+    call_id: str
+    output: str
+
+
+ChatTurn = TurnMessage | TurnToolCall | TurnToolOutput
+
+
+class RequestedToolCall(BaseModel):
+    call_id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+ToolChoice = Literal["required", "auto", "none"]
+
+
+class ToolLlmProvider(Protocol):
+    def converse(
+        self,
+        *,
+        model: str,
+        instructions: str,
+        turns: list[ChatTurn],
+        tools: list[FunctionSpec],
+        tool_choice: ToolChoice,
+        schema: type[T],
+        reasoning_effort: ReasoningEffort,
+        max_output_tokens: int,
+    ) -> tuple[list[RequestedToolCall] | T, LlmUsage]:
+        """One step of a tool loop: the tool calls the model wants next, or its structured
+        answer. With `tool_choice="none"` it always answers."""
         ...

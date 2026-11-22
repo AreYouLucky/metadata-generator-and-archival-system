@@ -27,6 +27,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * @property string $id
  * @property int $created_by
+ * @property string|null $batch_id
+ * @property string|null $source_url
+ * @property string|null $webhook_url
+ * @property Carbon|null $webhook_sent_at
  * @property string|null $accession_number
  * @property string|null $project_id
  * @property string|null $project_series_id
@@ -69,6 +73,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property ProcessingStatus $processing_status
  * @property string|null $processing_error
  * @property string|null $processing_job_id
+ * @property array<string, mixed>|null $pipeline_options
  * @property ReviewStatus $review_status
  * @property Carbon|null $submitted_at
  * @property int|null $reviewed_by
@@ -121,10 +126,12 @@ class Record extends Model
             'disposition_date' => 'date',
             'disposition_action' => DispositionAction::class,
             'processing_status' => ProcessingStatus::class,
+            'pipeline_options' => 'array',
             'review_status' => ReviewStatus::class,
             'submitted_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'published_at' => 'datetime',
+            'webhook_sent_at' => 'datetime',
         ];
     }
 
@@ -134,6 +141,14 @@ class Record extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * @return BelongsTo<Batch, $this>
+     */
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(Batch::class);
     }
 
     /**
@@ -400,5 +415,46 @@ class Record extends Model
     public function usageRecords(): HasMany
     {
         return $this->hasMany(UsageRecord::class);
+    }
+
+    /**
+     * Parts of the master cut to their own files (Phase 7).
+     *
+     * @return HasMany<Clip, $this>
+     */
+    public function clips(): HasMany
+    {
+        return $this->hasMany(Clip::class);
+    }
+
+    /**
+     * Transcript passages for chat search (Phase 7).
+     *
+     * @return HasMany<TranscriptChunk, $this>
+     */
+    public function transcriptChunks(): HasMany
+    {
+        return $this->hasMany(TranscriptChunk::class);
+    }
+
+    /**
+     * Everyone's chat messages about this record (Phase 7); each person sees
+     * only their own.
+     *
+     * @return HasMany<ChatMessage, $this>
+     */
+    public function chatMessages(): HasMany
+    {
+        return $this->hasMany(ChatMessage::class);
+    }
+
+    /**
+     * Every attempt to publish this record to YouTube (Phase 7), newest last.
+     *
+     * @return HasMany<YoutubePublication, $this>
+     */
+    public function youtubePublications(): HasMany
+    {
+        return $this->hasMany(YoutubePublication::class);
     }
 }

@@ -9,6 +9,7 @@ use App\Enums\FileRole;
 use App\Enums\PipelineStage;
 use App\Enums\Preset;
 use App\Enums\SecurityClassification;
+use App\Enums\StageStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Encoder\CreateRecordRequest;
 use App\Http\Requests\Encoder\DestroyRecordRequest;
@@ -24,16 +25,21 @@ use App\Models\RecordMetadata;
 use App\Models\RecordStage;
 use App\Models\User;
 use App\Models\VideoAuditLog;
+use App\Services\AiService\AiProviders;
+use App\Services\Batches\BatchProgress;
 use App\Services\Records\ArchivePresenter;
 use App\Services\Records\AudioExports;
 use App\Services\Records\AuditTrail;
+use App\Services\Records\ClipCutter;
 use App\Services\Records\PipelineOptions;
 use App\Services\Records\ProcessingCanceller;
+use App\Services\Records\ProcessingRetry;
 use App\Services\Records\RecordContent;
 use App\Services\Records\RecordIngestService;
 use App\Services\Records\ReviewHistory;
 use App\Services\Records\VisualsPresenter;
 use App\Services\Usage\ProcessingLimit;
+use App\Services\YouTube\PublishPanel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
@@ -57,7 +63,7 @@ class RecordController extends Controller
         $filters = $request->validated();
 
         $records = Record::query()
-            ->select(['id', 'created_by', 'project_id', 'project_series_id', 'title', 'accession_number', 'security_classification', 'processing_status', 'review_status', 'created_at'])
+            ->select(['id', 'created_by', 'batch_id', 'project_id', 'project_series_id', 'title', 'accession_number', 'security_classification', 'processing_status', 'review_status', 'created_at'])
             ->when(! $user->isAdmin(), fn (Builder $query) => $query->where('created_by', $user->id))
             // Title or accession number (PROJECT_SPEC §13, Phase 3).
             ->when($filters['q'] ?? null, function (Builder $query, string $search): void {
@@ -81,6 +87,7 @@ class RecordController extends Controller
                 'masterFile.technicalMetadata:id,record_file_id,duration',
                 'project:id,title',
                 'projectSeries:id,title',
+                'batch:id,name,created_at',
                 'rights:id,record_id,embargo_until',
                 ...($user->isAdmin() ? ['creator:id,name'] : []),
             ])
@@ -97,8 +104,11 @@ class RecordController extends Controller
                 'duration' => $record->masterFile?->technicalMetadata?->duration,
                 'project' => $record->project?->title,
                 'series' => $record->projectSeries?->title,
+                'batch' => $record->batch === null ? null : ['id' => $record->batch->id, 'name' => $record->batch->label()],
                 'created_at' => $record->created_at?->toIso8601String(),
                 'creator' => $user->isAdmin() ? $record->creator?->name : null,
+                // Row actions: delete, and cancel while processing (the policy decides; the server checks again).
+                'can_delete' => $user->can('delete', $record),
             ]);
 
         return Inertia::render('encoder/dashboard-page/dashboard', [
@@ -114,7 +124,7 @@ class RecordController extends Controller
         ]);
     }
 
-    public function create(CreateRecordRequest $request, ProcessingLimit $limit): Response
+    public function create(CreateRecordRequest $request, ProcessingLimit $limit, AiProviders $providers): Response
     {
         $project = $request->validated('project')
             ? Project::with(['series' => fn (HasMany $query) => $query->select(['id', 'project_id', 'title', 'date', 'end_date'])->orderBy('date')->orderBy('title')])
@@ -143,25 +153,32 @@ class RecordController extends Controller
             'limits' => [
                 'max_upload_mb' => config('archive.max_upload_mb'),
                 'max_video_minutes' => config('archive.max_video_minutes'),
+                'max_batch_size' => config('archive.max_batch_size'),
             ],
             'dailyLimit' => $request->user() instanceof User ? $limit->status($request->user()) : null,
+            // Which providers hear the audio, for the privacy notice (deferred: it may ask the AI service).
+            'providers' => Inertia::defer(fn (): array => $providers->current()),
         ]);
     }
 
     /**
-     * Turn a finished chunked upload into a record and start processing.
+     * Turn a finished chunked upload into a record and start processing, or
+     * create the record of a URL import and queue the download.
      */
     public function store(StoreRecordRequest $request, RecordIngestService $ingest): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
+        $url = $request->validated('url');
 
-        $record = $ingest->ingest(
-            $user,
-            $request->validated('upload_id'),
-            $request->safe()->only(['title', 'project_id', 'project_series_id', 'agency_id', 'division_id', 'expected_md5', 'expected_sha256']),
-            $request->pipelineOptions(),
-        );
+        $record = is_string($url)
+            ? $ingest->import($user, $url, [...$request->filing(), 'title' => $request->validated('title')], $request->pipelineOptions())
+            : $ingest->ingest(
+                $user,
+                (string) $request->validated('upload_id'),
+                $request->safe()->only(['title', 'project_id', 'project_series_id', 'agency_id', 'division_id', 'expected_md5', 'expected_sha256']),
+                $request->pipelineOptions(),
+            );
 
         return response()->json([
             'id' => $record->id,
@@ -197,6 +214,13 @@ class RecordController extends Controller
                 // Only while the embargo is in force (EmbargoBadge).
                 'embargo_until' => $record->rights?->isEmbargoed() ? $record->rights->embargo_until?->toDateString() : null,
                 'created_at' => $record->created_at?->toIso8601String(),
+                'batch' => ($batch = $record->batch()->first(['id', 'name', 'created_at'])) === null ? null : [
+                    'id' => $batch->id,
+                    'name' => $batch->label(),
+                ],
+                'source_url' => $record->source_url,
+                // What processing was asked for on upload; the retry form starts from it.
+                'pipeline_options' => PipelineOptions::fromStored($record->pipeline_options)->toArray(),
                 'can_edit' => $user?->can('update', $record) ?? false,
                 // Permission only: the page shows Cancel while its live status is queued or processing.
                 'can_cancel' => $user?->can('cancel', $record) ?? false,
@@ -231,7 +255,15 @@ class RecordController extends Controller
             ),
             'exportFormats' => ExportFormat::options(),
             'audioExports' => fn (): array => app(AudioExports::class)->present($record),
+            'clips' => fn (): array => ClipCutter::list($record),
+            'clipLimits' => [
+                'min_seconds' => (float) config('archive.clips.min_seconds'),
+                'max_seconds' => (float) config('archive.clips.max_seconds'),
+            ],
             'exportSchemas' => fn (): array => $user instanceof User ? ExportSchemaController::list($user) : [],
+            // YouTube (Phase 7): the Publish panel's channel, starting values and history.
+            'publishing' => fn (): ?array => $user instanceof User ? app(PublishPanel::class)->present($record, $user) : null,
+            'publications' => fn (): array => PublishPanel::publications($record),
             // Approval workflow (Phase 4): notes from reviews and what this user may do next.
             'review' => fn (): array => [
                 'history' => app(ReviewHistory::class)->for($record),
@@ -286,7 +318,7 @@ class RecordController extends Controller
      * row, files and audit log stay (PROJECT_SPEC §8; files are purged later
      * by the cleanup job). Processing still running is cancelled first.
      */
-    public function destroy(DestroyRecordRequest $request, Record $record, ProcessingCanceller $canceller, AuditTrail $audit): JsonResponse
+    public function destroy(DestroyRecordRequest $request, Record $record, ProcessingCanceller $canceller, AuditTrail $audit, BatchProgress $batches): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -297,6 +329,10 @@ class RecordController extends Controller
             $audit->log($record, AuditAction::Deleted, $user, 'Record deleted.');
             $record->delete();
         });
+
+        if ($record->batch_id !== null) {
+            $batches->refresh($record->batch_id);
+        }
 
         return response()->json(['deleted' => true]);
     }
@@ -328,13 +364,19 @@ class RecordController extends Controller
     }
 
     /**
-     * @return list<array{stage: string, label: string, status: string, progress: int, message: string|null}>
+     * Each stage's state, and whether it can be retried on its own (the same
+     * rule the retry endpoint applies).
+     *
+     * @return list<array{stage: string, label: string, status: string, progress: int, message: string|null, retryable: bool}>
      */
     private function stages(Record $record): array
     {
         $rows = $record->stages()->get(['stage', 'status', 'progress', 'message'])->keyBy(fn (RecordStage $stage): string => $stage->stage->value);
+        $statuses = $rows->map(fn (RecordStage $row): StageStatus => $row->status)->all();
+        $hasMaster = $record->files()->where('role', FileRole::Master)->exists();
+        $processing = $record->processing_status;
 
-        return array_values(array_filter(array_map(function (PipelineStage $stage) use ($rows): ?array {
+        return array_values(array_filter(array_map(function (PipelineStage $stage) use ($rows, $statuses, $hasMaster, $processing): ?array {
             /** @var RecordStage|null $row */
             $row = $rows->get($stage->value);
 
@@ -344,8 +386,9 @@ class RecordController extends Controller
                 'status' => $row->status->value,
                 'progress' => $row->progress,
                 'message' => $row->message,
+                'retryable' => ProcessingRetry::refusal($processing, $statuses, $stage, $hasMaster) === null,
             ];
-        }, PipelineStage::active())));
+        }, PipelineStage::tracked())));
     }
 
     /**

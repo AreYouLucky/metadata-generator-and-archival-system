@@ -28,19 +28,7 @@ class VisualsPresenter
         $segments = $record->scenes()->get(['id', 'record_id', 'kind', 'start', 'end', 'tc_in', 'tc_out', 'label', 'description']);
 
         return [
-            'frames' => array_values($record->frames()
-                ->get(['id', 'record_id', 'time_sec', 'is_scene_start', 'description', 'ocr_text', 'objects', 'face_count'])
-                ->map(fn (RecordFrame $frame): array => [
-                    'id' => $frame->id,
-                    'time_sec' => $frame->time_sec,
-                    'url' => route('records.frames.image', ['record' => $record, 'frame' => $frame]),
-                    'is_scene_start' => $frame->is_scene_start,
-                    'description' => $frame->description,
-                    'ocr_text' => $frame->ocr_text,
-                    'objects' => $frame->objects,
-                    'face_count' => $frame->face_count,
-                ])
-                ->all()),
+            'frames' => $this->frames($record),
             'shots' => array_values($segments
                 ->where('kind', SceneKind::Shot)
                 ->map(fn (RecordScene $shot): array => [
@@ -57,6 +45,20 @@ class VisualsPresenter
                 ->all()),
             'thumbnail' => $this->thumbnails->present($record),
         ];
+    }
+
+    /**
+     * Every key frame in time order, with its analysis (the workspace's
+     * picker and the review page's Visuals table).
+     *
+     * @return list<array{id: int, time_sec: float, url: string, is_scene_start: bool, description: string|null, ocr_text: string|null, objects: list<array{label: string, confidence: float}>|null, face_count: int|null}>
+     */
+    public function frames(Record $record): array
+    {
+        return array_values($record->frames()
+            ->get(['id', 'record_id', 'time_sec', 'is_scene_start', 'description', 'ocr_text', 'objects', 'face_count'])
+            ->map(fn (RecordFrame $frame): array => self::frame($record, $frame))
+            ->all());
     }
 
     /**
@@ -101,6 +103,37 @@ class VisualsPresenter
             // No rights row means the defaults, which have no release forms.
             'release_consent' => ($record->rights->release_consent ?? ReleaseConsent::NotAvailable)->value,
         ];
+    }
+
+    /**
+     * One key frame as resources/js/types/visuals.ts `VisualFrame`.
+     *
+     * @return array{id: int, time_sec: float, url: string, is_scene_start: bool, description: string|null, ocr_text: string|null, objects: list<array{label: string, confidence: float}>|null, face_count: int|null}
+     */
+    public static function frame(Record $record, RecordFrame $frame): array
+    {
+        return [
+            'id' => $frame->id,
+            'time_sec' => $frame->time_sec,
+            'url' => route('records.frames.image', ['record' => $record, 'frame' => $frame]),
+            'is_scene_start' => $frame->is_scene_start,
+            'description' => $frame->description,
+            'ocr_text' => $frame->ocr_text,
+            'objects' => $frame->objects,
+            'face_count' => $frame->face_count,
+        ];
+    }
+
+    /**
+     * "1:05" or "1:02:05", as the workspace shows times.
+     */
+    public static function clock(float $seconds): string
+    {
+        $total = (int) floor(max(0.0, $seconds));
+
+        return $total >= 3600
+            ? sprintf('%d:%02d:%02d', intdiv($total, 3600), intdiv($total % 3600, 60), $total % 60)
+            : sprintf('%d:%02d', intdiv($total, 60), $total % 60);
     }
 
     /**

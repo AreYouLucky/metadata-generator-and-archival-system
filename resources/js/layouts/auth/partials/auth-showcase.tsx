@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { BadgeCheck, Check, LockKeyhole, ShieldCheck } from 'lucide-react';
-import AppLogoIcon from '@/components/app-logo-icon';
+import BrandLogo from '@/components/all/brand-logo';
 import { home } from '@/routes';
 import AuthPipelineCard from './auth-pipeline-card';
 
@@ -41,10 +41,12 @@ export default function AuthShowcase() {
                     href={home()}
                     className="group flex items-center gap-3 font-semibold"
                 >
-                    <span className="flex size-9 items-center justify-center rounded-lg bg-brand text-brand-foreground shadow-lg shadow-brand/30 transition-transform duration-300 group-hover:-rotate-6">
-                        <AppLogoIcon className="size-5 fill-current" />
-                    </span>
-                    {name}
+                    <BrandLogo
+                        variant="compact"
+                        tone="white"
+                        alt={name}
+                        className="h-9 transition-transform duration-300 group-hover:-translate-y-0.5"
+                    />
                 </Link>
                 <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
                     <span className="relative flex size-2">

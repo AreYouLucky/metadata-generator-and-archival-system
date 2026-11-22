@@ -22,9 +22,9 @@ export default function WelcomeHero() {
         <WelcomeFold className="bg-ink text-white">
             <div aria-hidden className="pointer-events-none absolute inset-0">
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,oklch(1_0_0/0.05)_1px,transparent_1px),linear-gradient(to_bottom,oklch(1_0_0/0.05)_1px,transparent_1px)] mask-[radial-gradient(ellipse_at_center,black_35%,transparent_80%)] bg-size-[56px_56px]" />
-                <div className="absolute -top-40 -left-24 size-[28rem] animate-aurora rounded-full bg-brand/40 blur-3xl" />
-                <div className="absolute -right-24 -bottom-40 size-[30rem] animate-aurora rounded-full bg-amber-400/15 blur-3xl [animation-delay:-6s]" />
-                <div className="absolute top-1/3 left-1/2 size-72 animate-aurora rounded-full bg-sky-400/15 blur-3xl [animation-delay:-11s]" />
+                <div className="absolute -top-40 -left-24 size-[28rem] animate-aurora rounded-full bg-sky-400/30 blur-3xl" />
+                <div className="absolute -right-24 -bottom-40 size-[30rem] animate-aurora rounded-full bg-yellow-400/20 blur-3xl [animation-delay:-6s]" />
+                <div className="absolute top-1/3 left-1/2 size-72 animate-aurora rounded-full bg-sky-300/15 blur-3xl [animation-delay:-11s]" />
             </div>
 
             <div className="relative grid flex-1 items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
