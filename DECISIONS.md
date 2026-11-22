@@ -3,6 +3,128 @@
 Choices made while building, and any deviation from [PROJECT_SPEC.md](PROJECT_SPEC.md). Newest
 phase first.
 
+## Phase 4 — Approvals, usage and public catalogue (built)
+
+### Approval workflow
+
+- **Submit** (`POST /records/{record}/submit`) takes an optional note for the reviewer and needs
+  processing to have finished (422 otherwise): there is nothing to review before the transcript
+  and metadata exist. The record's encoder or an admin may submit, from draft or changes
+  requested.
+- **Decisions** (`POST /admin/approvals/{record}`) return JSON like the app's other mutations
+  (TanStack Query), not an Inertia redirect. Notes are required for reject and request changes.
+  Approving sets `published_at`; every other step clears it.
+- **Reopen** works from **approved and rejected** (the spec names approved only): otherwise a
+  rejected record could never be worked on again.
+- Every step locks the row (`ReviewWorkflow`), so a double click or two admins at once can't apply
+  two decisions; the loser gets 409.
+- **Review notes in the workspace:** the header's review status is a button that opens the review
+  history with notes (highlighted when changes are requested) and, for admins, Review, Reopen,
+  Public page and Access log.
+- **"Pending reviews"** stays for encoders (their own submissions); admins are sent to the new
+  **Approvals** queue. The spec's `/admin/records` list isn't separate: `/records` already shows
+  admins every record.
+- **The review page** (`/admin/approvals/{record}`, owner's request) shows everything from the
+  workspace, read-only and **as tables**, in tabs: Overview (record, rights summary, credits),
+  Transcript (time, speaker, text, edited; filter, click to seek; virtualised), Metadata (the
+  active generation: titles, description, summary, tags, keywords, hashtags, chapters, quotes,
+  tone, flags), Archive (every Archive section, files with technical metadata, structure,
+  attachments, fixity) and Translations (each one's lines on demand). The player has caption
+  tracks for every finished language. The workspace and the review page share
+  `RecordContent` (transcript, speakers, active metadata) and `ArchivePresenter`. The decision box
+  stays in view while scrolling, and lists what would still keep the record off the public site
+  once approved (`Distribution::blockers`, the same code `RecordPolicy::distribute` uses).
+- **Unconfirmed suggestions (owner's report):** saving Archive → Descriptive never confirmed the
+  AI's subject and keyword chips, so records went to review with all of them unconfirmed.
+  Now a banner above Subjects and Keywords says so with **Confirm all** (one request, one audit
+  entry; replaces the per-chip loop the keywords had), the Submit dialog offers "Confirm them
+  now" (on by default, done in the same transaction as the submit), and admins can **Confirm
+  all** from the review page. Confirming stays a deliberate human step (PROJECT_SPEC §11).
+
+### Distribution and the public catalogue
+
+- **Public by default (owner's choice, deviates from §8):** new rights start as access **public**
+  and permission **approved** (model, column defaults via a migration, and the Rights form), and a
+  record whose rights were never filled in counts as public. A record stays off the site only
+  when it isn't approved, is classified, is under embargo, or its rights say Internal, Restricted,
+  or permission pending/denied. Existing rights rows keep what was chosen.
+
+- **`Distribution`** holds the rule twice: `blockers()` for one record (the policy) and
+  `constrain()` for list queries (the catalogue). Tests run the same blocker list through both.
+- **URLs:** the catalogue home is **`/catalogue`**, not `/`: `/` is the owner's landing page,
+  which now links to it. Public project and series pages are **`/browse/projects/{project}`** and
+  **`/browse/series/{series}`**, because `/projects/{project}` is the encoders' project page. The
+  watch page is `/watch/{record}`, as specified.
+- **Pages live in `pages/user/`** (the spec's paths) and render in their own `CatalogueLayout`
+  (header with search and account links), not the staff sidebar. Viewers who log in are sent from
+  `/dashboard` to the catalogue; the old placeholder page is gone.
+- **Not found, not forbidden:** a record that may not be distributed answers 404 on the watch,
+  media and caption routes, so its existence isn't revealed. A project or series appears only
+  while it has at least one public record (its cover too).
+- **Public fields only:** responses are built field by field (`Catalogue`), never from models. The
+  description falls back to the active generation's description when the catalogue description is
+  empty. Copyright holder and rights statement are not shown (the spec lists licence and usage
+  restrictions only).
+- **The catalogue date** is `date_recorded`, then the project's first day, then the publish date
+  (SQL `COALESCE`, so filtering and sorting happen in the database). Year/month extraction is
+  per driver (PostgreSQL `EXTRACT`, SQLite `strftime`); both were checked.
+- **The access copy** for the public player is an uploaded access file when browsers can play it,
+  else the proxy when the master can't play, else the master (streamed inline with Range support;
+  never offered as a download).
+- **Caching:** every catalogue result is cached under a version number; one increment retires them
+  all on any cache store (no tags needed). The version is bumped by approve/reject/reopen and by
+  the `catalogue.refresh` middleware after any successful write to an approved record, project,
+  series, agency, genre or video type. Entries also expire after 10 minutes, which covers an
+  embargo ending on its own.
+- **Rate limits:** 120 page requests a minute per user or IP; 600 for media and covers, since
+  seeking sends many Range requests.
+- **Access log:** one `view` row per watch-page visit (with IP and user agent). Media Range
+  requests are not logged, or a single viewing would write hundreds of rows.
+  `/admin/records/{record}/access-log` opens the existing Logs page filtered to the record (a new
+  `record` filter) instead of a separate page.
+
+### Usage and limits
+
+- **The daily limit counts transcription minutes** recorded today (calendar day in the app
+  timezone, UTC) against the encoder's own limit or `ENCODER_DAILY_PROCESSING_MINUTES`. It is
+  checked as a validation error (`daily_limit`) when a record is created and on retry, the two
+  places processing starts. **Admins have no limit.** Usage is written when transcription
+  finishes, so several uploads started at once can run past the limit by up to one batch; the
+  next upload is refused.
+- The **Import** page shows the minutes left and disables "Upload and process" once they are used
+  up, so nobody uploads a large file only to be refused. Upload start itself isn't blocked, as the
+  same endpoint uploads extra files (which don't transcribe).
+- **Usage page:** totals, a per-day chart of transcription minutes, per encoder and per record
+  (paginated), for a date range of at most a year (default: this month). Sums run in the database
+  with bound conditional sums. The CSV is streamed one record per row, and text cells starting
+  with `= + - @` get a leading quote so spreadsheets don't run them as formulas. Costs are the
+  providers' estimates in US dollars.
+- **Overview** (`/admin`): pending approvals (oldest five), the processing queue, the number of
+  public records and this month's usage with the top encoders.
+- New index on `usage_records.occurred_at` (date ranges across all encoders).
+
+### Genres and video types
+
+- One `LookupList` service behind both admin pages; the slug is generated from the name (made
+  unique with `-2`, `-3`…) and **kept when renaming**, so public filter links keep working. Items
+  that any record uses (deleted records included) can't be deleted.
+- `ListSearch`, the status badges and the processing badge moved to `components/all/`, as admin
+  pages use them now.
+
+### Sign-up
+
+- `ALLOW_PUBLIC_REGISTRATION` already switched Fortify's registration on or off (Phase 1), and
+  sign-up already created `user` accounts only (role isn't fillable; covered by a test). It is now
+  shared as `canRegister`, so the catalogue header offers **Sign up** only when it is enabled.
+
+### Later
+
+- Thumbnails for catalogue cards come from the project's cover until Phase 5 adds frames.
+- An in-app notification to the encoder when changes are requested (the note is in the
+  workspace; there is no email yet).
+- Full-text search over transcripts in the public catalogue (search covers titles, descriptions
+  and confirmed subjects and keywords).
+
 ## Phase 3 — Archival metadata (built)
 
 ### Catalogue

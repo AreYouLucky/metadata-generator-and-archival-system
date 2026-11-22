@@ -7,15 +7,15 @@ analyses them with AI, and produces editable metadata (titles, descriptions, tag
 quotes) plus a full archival record with checksums. An admin approves each record, and approved
 videos appear in a public catalogue that anyone can browse by date, event and category.
 
-> **Status:** Phase 3 (archival metadata) done. Phases 1–2 built users, chunked uploads,
-> checksums, local GPU transcription, the synced workspace, every platform preset, translations
-> with captions and six export formats. Phase 3 adds the **Archive** tab (descriptive, location,
-> credits, technical, rights, provenance, archival and structure records), accession numbers,
-> access copies for masters browsers can't play, extra files, private attachments, fixity checks
-> (scheduled and "Check now") with alerts, works (reels and parts), the distribution policy,
-> embargo and classification badges, timecode display and a disposition review list. The full
-> design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built phase by phase (see
-> [Roadmap](#roadmap)).
+> **Status:** Phase 4 (approvals, usage and public catalogue) done. Phases 1–3 built users,
+> chunked uploads, checksums, local GPU transcription, the synced workspace, every platform
+> preset, translations with captions, six export formats and the full archival record (Archive
+> tab, accession numbers, access copies, fixity checks, works, embargoes and the distribution
+> policy). Phase 4 adds the approval workflow (submit, request changes, reject, approve, reopen),
+> an admin overview, usage page with CSV and daily processing limits, admin lists of genres and
+> video types, and the public catalogue (home, browse, project and series pages, watch page)
+> with access logging. The full design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built
+> phase by phase (see [Roadmap](#roadmap)).
 
 ---
 
@@ -270,6 +270,45 @@ the scheduler (`schedule:work`, part of `composer run dev`).
 8. Click **TC** in the transport bar to show timecode (from the master's start timecode) instead
    of the clock. **Export → JSON** contains every archival block.
 9. As an admin, set a past disposition date on a record and open **Disposition review**.
+
+## Try Phase 4
+
+After pulling Phase 4: run `php artisan migrate` (one new index) and `npm run build` (or keep
+`composer run dev` running). The public catalogue is at `/catalogue`; the landing page at `/`
+links to it. Set `ALLOW_PUBLIC_REGISTRATION=false` to hide sign-up, and
+`PUBLIC_CATALOGUE_REQUIRES_LOGIN=true` to keep guests out.
+
+1. As an encoder, open a finished record (rights are public by default; set **Archive → Rights**
+   to Internal or Restricted to keep one off the site) and click **Submit** in the header. If AI
+   subject or keyword suggestions are still unconfirmed, the dialog offers to confirm them (or use
+   **Confirm all** in Archive → Descriptive). The record is now read-only for you and appears under
+   **Pending reviews**.
+2. As an admin, open **Approvals** and pick the record. Watch it and go through the tabs, all
+   tables: **Overview**, **Transcript** (filter, click a time to jump), **Metadata** (titles,
+   description, tags, chapters, quotes, tone), **Archive** (every Archive section, files,
+   fixity) and **Translations** (view each one's lines). The box on the right says whether
+   approving will publish it (or what keeps it off the public site). Choose **Request changes**
+   with a note.
+3. As the encoder, click the status button in the header (**Changes requested**) to read the
+   note, fix the record and submit again.
+4. As the admin, **Approve** it. Open `/browse` in a private window: the video is there under its
+   project, series and date (try the year → month timeline and the filters). Open it: it plays
+   (from the access copy when the master can't play in browsers), with captions, chapters and the
+   transcript, and none of the internal fields (accession number, rights notes, checksums,
+   unconfirmed suggestions).
+5. In the workspace, click the status button → **Access log**: the public view is listed with
+   its IP address.
+6. As the admin, click the status button → **Reopen as draft**. Reload the public page: the video
+   is gone. Records with an embargo in force, or a classification other than unclassified, stay
+   hidden even when approved.
+7. In **Users**, give an encoder a daily limit of 1 minute. Once their transcription minutes for
+   today reach it, the Import page says the limit is used up and **Upload and process** (and
+   **Retry**) are refused.
+8. Open **Usage**: minutes, tokens and estimated cost per encoder and per record for a date
+   range; click an encoder to narrow the record table, and **Download CSV**. **Overview** sums up
+   approvals, the processing queue and this month's usage.
+9. Add, rename and reorder entries in **Genres** and **Video types**; ones that records use can't
+   be deleted.
 
 ## Roadmap
 

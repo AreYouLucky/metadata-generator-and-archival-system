@@ -3,10 +3,10 @@
 namespace App\Policies;
 
 use App\Enums\ReviewStatus;
-use App\Enums\SecurityClassification;
 use App\Enums\UserRole;
 use App\Models\Record;
 use App\Models\User;
+use App\Services\Catalogue\Distribution;
 
 /**
  * Encoders see and edit only the records they created (and edit only while the
@@ -74,12 +74,42 @@ class RecordPolicy
      */
     public function distribute(?User $user, Record $record): bool
     {
-        $record->loadMissing('rights');
+        return app(Distribution::class)->blockers($record) === [];
+    }
 
-        return $record->review_status === ReviewStatus::Approved
-            && $record->published_at !== null
-            && ! $record->trashed()
-            && $record->security_classification === SecurityClassification::Unclassified
-            && ($record->rights?->allowsPublicAccess() ?? false);
+    /**
+     * Submit for approval: the record's encoder (or an admin), only from
+     * `draft` or `changes_requested`.
+     */
+    public function submit(User $user, Record $record): bool
+    {
+        return $this->view($user, $record) && $record->review_status->isEditableByEncoder();
+    }
+
+    /**
+     * Approve, request changes or reject: admins, only while submitted.
+     */
+    public function review(User $user, Record $record): bool
+    {
+        return $user->is_active && $user->isAdmin() && $record->review_status === ReviewStatus::Submitted;
+    }
+
+    /**
+     * Back to `draft` (and off the public site): admins, from approved or
+     * rejected, so a rejected record can be worked on again.
+     */
+    public function reopen(User $user, Record $record): bool
+    {
+        return $user->is_active
+            && $user->isAdmin()
+            && in_array($record->review_status, [ReviewStatus::Approved, ReviewStatus::Rejected], true);
+    }
+
+    /**
+     * Who viewed or streamed the record (IP addresses): admins only.
+     */
+    public function viewAccessLog(User $user, Record $record): bool
+    {
+        return $user->is_active && $user->isAdmin();
     }
 }

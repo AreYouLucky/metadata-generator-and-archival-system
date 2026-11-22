@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import SimplePagination from '@/components/all/simple-pagination';
-import ListSearch from '@/components/encoder/list-search';
-import ProcessingStatusBadge from '@/components/encoder/processing-status-badge';
+import ListSearch from '@/components/all/list-search';
+import ProcessingStatusBadge from '@/components/all/processing-status-badge';
 import Heading from '@/components/heading';
 import { formatDate } from '@/lib/utilities';
 import { show } from '@/routes/records';
@@ -16,8 +16,8 @@ type Props = {
 };
 
 /**
- * Videos submitted for approval, oldest first. Encoders see their own; admins
- * see everyone's. Open one to check it in the workspace.
+ * Your videos submitted for approval, oldest first (admins use the approval
+ * queue instead). Open one to see it in the workspace.
  */
 export default function Reviews({ records, filters, showCreator }: Props) {
     return (

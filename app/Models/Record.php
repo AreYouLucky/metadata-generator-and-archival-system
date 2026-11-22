@@ -10,6 +10,7 @@ use App\Enums\MetadataSource;
 use App\Enums\ProcessingStatus;
 use App\Enums\ReviewStatus;
 use App\Enums\SecurityClassification;
+use App\Models\Concerns\HasPhilippineLocation;
 use Carbon\CarbonImmutable as Carbon;
 use Database\Factories\RecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -78,7 +79,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Record extends Model
 {
     /** @use HasFactory<RecordFactory> */
-    use HasFactory, HasUlids, SoftDeletes;
+    use HasFactory, HasPhilippineLocation, HasUlids, SoftDeletes;
 
     /**
      * Defaults mirrored from the migration so new models see them before a refresh.

@@ -20,17 +20,18 @@ type Props = {
     canEdit: boolean;
 };
 
+/** Public by default (owner's choice): set Internal or Restricted to keep a video off the public site. */
 const EMPTY: Rights = {
     copyright_holder: null,
     copyright_year: null,
     rights_statement: null,
     license: null,
     license_url: null,
-    access_level: 'restricted',
+    access_level: 'public',
     usage_restrictions: null,
     territories: [],
     embargo_until: null,
-    permission_status: 'pending',
+    permission_status: 'approved',
     release_consent: 'not_available',
 };
 
@@ -155,7 +156,7 @@ export default function ArchiveRights({
                         options={options.accessLevels}
                         disabled={!canEdit}
                         onChange={(value) =>
-                            change({ access_level: value ?? 'restricted' })
+                            change({ access_level: value ?? 'public' })
                         }
                     />
                 </ArchiveField>
@@ -170,7 +171,7 @@ export default function ArchiveRights({
                         options={options.permissionStatuses}
                         disabled={!canEdit}
                         onChange={(value) =>
-                            change({ permission_status: value ?? 'pending' })
+                            change({ permission_status: value ?? 'approved' })
                         }
                     />
                 </ArchiveField>

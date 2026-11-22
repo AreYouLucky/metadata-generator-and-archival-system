@@ -1,9 +1,9 @@
 import { Link } from '@inertiajs/react';
 import { Film } from 'lucide-react';
-import ClassificationBadge from '@/components/encoder/classification-badge';
+import ClassificationBadge from '@/components/all/classification-badge';
 import EmbargoBadge from '@/components/encoder/embargo-badge';
-import ProcessingStatusBadge from '@/components/encoder/processing-status-badge';
-import ReviewStatusBadge from '@/components/encoder/review-status-badge';
+import ProcessingStatusBadge from '@/components/all/processing-status-badge';
+import ReviewStatusBadge from '@/components/all/review-status-badge';
 import { formatDate, formatTimestamp } from '@/lib/utilities';
 import { show } from '@/routes/records';
 import type { RecordListItem } from '@/types/records';

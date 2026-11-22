@@ -45,8 +45,8 @@ class RecordRights extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'access_level' => 'restricted',
-        'permission_status' => 'pending',
+        'access_level' => 'public',
+        'permission_status' => 'approved',
         'release_consent' => 'not_available',
     ];
 

@@ -2,11 +2,15 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     Archive,
+    BarChart3,
     Building2,
     ClipboardCheck,
+    Clapperboard,
     FolderKanban,
-    LayoutGrid,
+    Gauge,
+    Globe,
     ScrollText,
+    Tags,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -22,20 +26,27 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { overview } from '@/routes/admin';
+import { index as approvals } from '@/routes/admin/approvals';
 import { index as dispositions } from '@/routes/admin/dispositions';
+import { index as genres } from '@/routes/admin/genres';
 import { index as logs } from '@/routes/admin/logs';
 import { show as systemStatus } from '@/routes/admin/system';
+import { index as usage } from '@/routes/admin/usage';
 import { index as users } from '@/routes/admin/users';
+import { index as videoTypes } from '@/routes/admin/video-types';
 import { index as agencies } from '@/routes/agencies';
+import { home as catalogue } from '@/routes/catalogue';
 import { index as projects } from '@/routes/projects';
 import { index as reviews } from '@/routes/reviews';
 import type { NavItem } from '@/types';
 
+/** Public viewers mostly use the catalogue; the sidebar shows on their settings pages. */
 const viewerNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
+        title: 'Catalogue',
+        href: catalogue(),
+        icon: Globe,
     },
 ];
 
@@ -55,6 +66,15 @@ const archiveNavItems: NavItem[] = [
         icon: Building2,
     },
     {
+        title: 'Public catalogue',
+        href: catalogue(),
+        icon: Globe,
+    },
+];
+
+/** Encoders follow their submissions here; admins review in Approvals. */
+const encoderNavItems: NavItem[] = [
+    {
         title: 'Pending reviews',
         href: reviews(),
         icon: ClipboardCheck,
@@ -62,6 +82,31 @@ const archiveNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
+    {
+        title: 'Overview',
+        href: overview(),
+        icon: Gauge,
+    },
+    {
+        title: 'Approvals',
+        href: approvals(),
+        icon: ClipboardCheck,
+    },
+    {
+        title: 'Usage',
+        href: usage(),
+        icon: BarChart3,
+    },
+    {
+        title: 'Genres',
+        href: genres(),
+        icon: Tags,
+    },
+    {
+        title: 'Video types',
+        href: videoTypes(),
+        icon: Clapperboard,
+    },
     {
         title: 'Users',
         href: users(),
@@ -106,7 +151,14 @@ export function AppSidebar() {
             <SidebarContent>
                 {isStaff ? (
                     <>
-                        <NavMain label="Archive" items={archiveNavItems} />
+                        <NavMain
+                            label="Archive"
+                            items={
+                                role === 'admin'
+                                    ? archiveNavItems
+                                    : [...archiveNavItems, ...encoderNavItems]
+                            }
+                        />
                         {role === 'admin' && (
                             <NavMain
                                 label="Administration"

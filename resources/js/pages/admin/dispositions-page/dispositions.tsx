@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import SimplePagination from '@/components/all/simple-pagination';
-import ClassificationBadge from '@/components/encoder/classification-badge';
+import ClassificationBadge from '@/components/all/classification-badge';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import {

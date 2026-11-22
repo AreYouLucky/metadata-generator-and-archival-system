@@ -2,7 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { FolderPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import SimplePagination from '@/components/all/simple-pagination';
-import ListSearch from '@/components/encoder/list-search';
+import ListSearch from '@/components/all/list-search';
 import ProjectFormDialog from '@/components/encoder/project-form-dialog';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';

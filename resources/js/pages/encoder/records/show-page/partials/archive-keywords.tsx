@@ -39,23 +39,6 @@ export default function ArchiveKeywords({
                         </span>
                     )}
                 </h3>
-                {canEdit && pending.length > 1 && (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 text-xs"
-                        onClick={() =>
-                            pending.forEach((item) =>
-                                update.mutate(
-                                    { id: item.id, is_confirmed: true },
-                                    { onError },
-                                ),
-                            )
-                        }
-                    >
-                        Confirm all
-                    </Button>
-                )}
             </div>
             {keywords.length === 0 ? (
                 <p className="text-sm text-muted-foreground">

@@ -67,6 +67,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Chunked uploads: one request per 8 MB chunk.
         RateLimiter::for('uploads', fn (Request $request): Limit => Limit::perMinute(600)->by($request->user()?->id ?: $request->ip()));
+
+        // Public catalogue pages, and the player's media requests (seeking sends many Range requests).
+        RateLimiter::for('catalogue', fn (Request $request): Limit => Limit::perMinute(120)->by($request->user()?->id ?: $request->ip()));
+        RateLimiter::for('catalogue-media', fn (Request $request): Limit => Limit::perMinute(600)->by($request->user()?->id ?: $request->ip()));
     }
 
     /**

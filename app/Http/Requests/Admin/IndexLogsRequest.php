@@ -33,6 +33,8 @@ class IndexLogsRequest extends FormRequest
         return [
             'type' => ['nullable', Rule::in([self::AUDIT, self::ACCESS])],
             'action' => ['nullable', Rule::enum($actions)],
+            // One record's entries (the workspace's "Access log" link).
+            'record' => ['nullable', 'ulid'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

@@ -20,6 +20,7 @@ import ArchiveKeywords from './archive-keywords';
 import ArchiveSaveBar from './archive-save-bar';
 import ArchiveSelect from './archive-select';
 import ArchiveSubjects from './archive-subjects';
+import SuggestionsBanner from './suggestions-banner';
 
 type Props = {
     recordId: string;
@@ -476,6 +477,15 @@ export default function ArchiveDescriptive({
                 />
             )}
 
+            <SuggestionsBanner
+                recordId={recordId}
+                pending={
+                    archive.subjects.filter((item) => !item.is_confirmed)
+                        .length +
+                    archive.keywords.filter((item) => !item.is_confirmed).length
+                }
+                canEdit={canEdit}
+            />
             <ArchiveSubjects
                 recordId={recordId}
                 subjects={archive.subjects}

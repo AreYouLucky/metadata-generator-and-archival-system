@@ -20,14 +20,15 @@ use App\Models\ProjectSeries;
 use App\Models\Record;
 use App\Models\RecordFile;
 use App\Models\RecordMetadata;
-use App\Models\RecordSegment;
-use App\Models\RecordSpeaker;
 use App\Models\RecordStage;
 use App\Models\User;
 use App\Models\VideoAuditLog;
 use App\Services\Records\ArchivePresenter;
 use App\Services\Records\PipelineOptions;
+use App\Services\Records\RecordContent;
 use App\Services\Records\RecordIngestService;
+use App\Services\Records\ReviewHistory;
+use App\Services\Usage\ProcessingLimit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
@@ -107,7 +108,7 @@ class RecordController extends Controller
         ]);
     }
 
-    public function create(CreateRecordRequest $request): Response
+    public function create(CreateRecordRequest $request, ProcessingLimit $limit): Response
     {
         $project = $request->validated('project')
             ? Project::with(['series' => fn (HasMany $query) => $query->select(['id', 'project_id', 'title', 'date', 'end_date'])->orderBy('date')->orderBy('title')])
@@ -137,6 +138,7 @@ class RecordController extends Controller
                 'max_upload_mb' => config('archive.max_upload_mb'),
                 'max_video_minutes' => config('archive.max_video_minutes'),
             ],
+            'dailyLimit' => $request->user() instanceof User ? $limit->status($request->user()) : null,
         ]);
     }
 
@@ -193,15 +195,11 @@ class RecordController extends Controller
             ],
             'media' => fn (): array => $this->media($record),
             'stages' => fn (): array => $this->stages($record),
-            'transcript' => fn (): ?array => $this->transcript($record),
+            'transcript' => fn (): ?array => app(RecordContent::class)->transcript($record),
             'contributors' => fn (): array => ContributorController::list($record),
             'contributorRoles' => ContributorRole::options(),
-            'speakers' => fn (): array => $record->speakers()
-                ->orderBy('id')
-                ->get(['id', 'label', 'display_name'])
-                ->map(fn (RecordSpeaker $speaker): array => SpeakerController::present($speaker))
-                ->all(),
-            'metadata' => fn (): ?array => $this->activeMetadata($record),
+            'speakers' => fn (): array => app(RecordContent::class)->speakers($record),
+            'metadata' => fn (): ?array => app(RecordContent::class)->activeMetadata($record),
             'metadataHistory' => fn (): array => $record->metadata()
                 ->latest()
                 ->limit(20)
@@ -224,6 +222,15 @@ class RecordController extends Controller
             ),
             'exportFormats' => ExportFormat::options(),
             'exportSchemas' => fn (): array => $user instanceof User ? ExportSchemaController::list($user) : [],
+            // Approval workflow (Phase 4): notes from reviews and what this user may do next.
+            'review' => fn (): array => [
+                'history' => app(ReviewHistory::class)->for($record),
+                'can_submit' => $user?->can('submit', $record) ?? false,
+                'can_review' => $user?->can('review', $record) ?? false,
+                'can_reopen' => $user?->can('reopen', $record) ?? false,
+                'can_view_access_log' => $user?->can('viewAccessLog', $record) ?? false,
+                'is_public' => Gate::forUser(null)->allows('distribute', $record),
+            ],
             'archive' => fn (): array => app(ArchivePresenter::class)->present($record),
             'archiveOptions' => fn (): array => $user instanceof User ? app(ArchivePresenter::class)->options($user) : [],
         ]);
@@ -307,56 +314,6 @@ class RecordController extends Controller
                 'message' => $row->message,
             ];
         }, PipelineStage::active())));
-    }
-
-    /**
-     * @return array{language: string, segments: list<array{id: int, start: float, end: float, text: string, is_edited: bool, speaker_id: int|null}>}|null
-     */
-    private function transcript(Record $record): ?array
-    {
-        $transcript = $record->originalTranscript()->first(['id', 'record_id', 'language']);
-
-        if ($transcript === null) {
-            return null;
-        }
-
-        return [
-            'language' => $transcript->language,
-            'segments' => array_values($transcript->segments()
-                ->get(['id', 'start', 'end', 'text', 'is_edited', 'record_speaker_id'])
-                ->map(fn (RecordSegment $segment): array => [
-                    'id' => $segment->id,
-                    'start' => $segment->start,
-                    'end' => $segment->end,
-                    'text' => $segment->text,
-                    'is_edited' => $segment->is_edited,
-                    'speaker_id' => $segment->record_speaker_id,
-                ])
-                ->all()),
-        ];
-    }
-
-    /**
-     * @return array{id: int, preset: string, model: string, custom_prompt: string|null, created_at: string|null, payload: array<string, mixed>}|null
-     */
-    private function activeMetadata(Record $record): ?array
-    {
-        $metadata = $record->activeMetadata()->first();
-
-        return $metadata === null ? null : [
-            'id' => $metadata->id,
-            'preset' => $metadata->preset->value,
-            'model' => $metadata->model,
-            'custom_prompt' => $metadata->custom_prompt,
-            'created_at' => $metadata->created_at?->toIso8601String(),
-            // Generations from before Phase 2 have no quotes, tone or flags.
-            'payload' => [
-                'quotes' => [],
-                'tone' => null,
-                'contentFlags' => null,
-                ...$metadata->payload,
-            ],
-        ];
     }
 
     /**

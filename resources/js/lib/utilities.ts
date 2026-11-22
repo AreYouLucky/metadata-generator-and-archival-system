@@ -386,3 +386,23 @@ export function formatTimecode(
  */
 export const SELECT_FILL_TRUNCATE =
     'w-full min-w-0 *:data-[slot=select-value]:block! *:data-[slot=select-value]:truncate';
+
+/**
+ * A whole or decimal number with thousands separators, e.g. 12345.6 → "12,345.6".
+ */
+export function formatNumber(value: number, maximumFractionDigits = 0): string {
+    return value.toLocaleString([], { maximumFractionDigits });
+}
+
+/**
+ * An estimated cost in US dollars, e.g. 0.4213 → "$0.42"; tiny amounts keep
+ * more digits so they don't read as zero.
+ */
+export function formatCost(value: number): string {
+    return value.toLocaleString([], {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2,
+    });
+}

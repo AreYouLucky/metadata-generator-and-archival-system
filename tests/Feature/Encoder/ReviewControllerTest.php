@@ -29,19 +29,11 @@ class ReviewControllerTest extends TestCase
                 ->where('showCreator', false));
     }
 
-    public function test_an_admin_sees_every_submitted_record_oldest_first(): void
+    public function test_admins_are_sent_to_the_approval_queue(): void
     {
-        $newer = Record::factory()->submitted()->create(['submitted_at' => now()->subDay()]);
-        $older = Record::factory()->submitted()->create(['submitted_at' => now()->subDays(3)]);
-        Record::factory()->approved()->create();
-
         $this->actingAs(User::factory()->admin()->create())
             ->get(route('reviews.index'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->has('records.data', 2)
-                ->where('records.data.0.id', $older->id)
-                ->where('records.data.1.id', $newer->id)
-                ->where('showCreator', true));
+            ->assertRedirect(route('admin.approvals.index'));
     }
 
     public function test_viewers_cannot_open_the_queue(): void

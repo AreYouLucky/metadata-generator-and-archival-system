@@ -10,6 +10,7 @@ use App\Http\Controllers\Encoder\AgencyController;
 use App\Http\Controllers\Encoder\AgencyOptionsController;
 use App\Http\Controllers\Encoder\AttachmentController;
 use App\Http\Controllers\Encoder\CaptionController;
+use App\Http\Controllers\Encoder\ConfirmSuggestionsController;
 use App\Http\Controllers\Encoder\ContributorController;
 use App\Http\Controllers\Encoder\DescriptiveSuggestionController;
 use App\Http\Controllers\Encoder\ExportSchemaController;
@@ -31,13 +32,16 @@ use App\Http\Controllers\Encoder\RightsController;
 use App\Http\Controllers\Encoder\SegmentController;
 use App\Http\Controllers\Encoder\SpeakerController;
 use App\Http\Controllers\Encoder\SubjectController;
+use App\Http\Controllers\Encoder\SubmitRecordController;
 use App\Http\Controllers\Encoder\TitleController;
 use App\Http\Controllers\Encoder\TranslationController;
 use App\Http\Controllers\Encoder\UploadController;
 use App\Http\Controllers\Encoder\WorkController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified', 'role:encoder,admin'])->group(function () {
+// `catalogue.refresh` clears the public catalogue cache after an admin edits an
+// approved record, or anyone edits a project or series.
+Route::middleware(['auth', 'verified', 'role:encoder,admin', 'catalogue.refresh'])->group(function () {
     Route::get('records', [RecordController::class, 'index'])->name('records.index');
     Route::get('records/create', [RecordController::class, 'create'])->name('records.create');
     Route::post('records', [RecordController::class, 'store'])->middleware('throttle:ai')->name('records.store');
@@ -54,6 +58,7 @@ Route::middleware(['auth', 'verified', 'role:encoder,admin'])->group(function ()
     Route::get('records/{record}/waveform', RecordWaveformController::class)->name('records.waveform');
     Route::get('records/{record}/export', RecordExportController::class)->name('records.export');
     Route::post('records/{record}/retry', RetryProcessingController::class)->middleware('throttle:ai')->name('records.retry');
+    Route::post('records/{record}/submit', SubmitRecordController::class)->middleware('throttle:30,1')->name('records.submit');
 
     Route::patch('records/{record}/transcript/speaker', [SegmentController::class, 'assignSpeaker'])->name('records.transcript.speaker');
     Route::patch('records/{record}/segments/{segment}', [SegmentController::class, 'update'])->name('records.segments.update');
@@ -74,6 +79,7 @@ Route::middleware(['auth', 'verified', 'role:encoder,admin'])->group(function ()
     Route::post('records/{record}/keywords', [KeywordController::class, 'store'])->name('records.keywords.store');
     Route::patch('records/{record}/keywords/{keyword}', [KeywordController::class, 'update'])->scopeBindings()->name('records.keywords.update');
     Route::delete('records/{record}/keywords/{keyword}', [KeywordController::class, 'destroy'])->scopeBindings()->name('records.keywords.destroy');
+    Route::post('records/{record}/suggestions/confirm', ConfirmSuggestionsController::class)->middleware('throttle:30,1')->name('records.suggestions.confirm');
     Route::post('records/{record}/descriptive-suggestions', DescriptiveSuggestionController::class)->middleware('throttle:ai')->name('records.descriptive-suggestions.store');
     Route::put('records/{record}/rights', RightsController::class)->name('records.rights.update');
     Route::put('records/{record}/provenance', ProvenanceController::class)->name('records.provenance.update');

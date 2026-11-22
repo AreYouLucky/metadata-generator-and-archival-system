@@ -13,6 +13,7 @@ import { show } from '@/routes/records';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { Archive, ArchiveOptions } from '@/types/archive';
 import type { ExportSchema } from '@/types/export-schemas';
+import type { WorkspaceReview } from '@/types/reviews';
 import type {
     ActiveMetadata,
     Contributor,
@@ -62,6 +63,7 @@ type Props = {
     exportSchemas: ExportSchema[];
     archive: Archive;
     archiveOptions: ArchiveOptions;
+    review: WorkspaceReview;
 };
 
 type SavedSegment = Pick<TranscriptSegment, 'id'> & Partial<TranscriptSegment>;
@@ -90,6 +92,7 @@ export default function ShowRecord(props: Props) {
         exportSchemas,
         archive,
         archiveOptions,
+        review,
     } = props;
     const [stages, setStages] = useState(props.stages);
     const [processingStatus, setProcessingStatus] = useState(
@@ -285,6 +288,12 @@ export default function ShowRecord(props: Props) {
                 processingStatus={processingStatus}
                 presets={presets}
                 initialPreset={initialPreset}
+                review={review}
+                pendingSuggestions={
+                    archive.subjects.filter((item) => !item.is_confirmed)
+                        .length +
+                    archive.keywords.filter((item) => !item.is_confirmed).length
+                }
             />
             {/* data-workspace makes the page exactly the visible height on wide
                 screens (app.css); the timeline takes 30% of it and the

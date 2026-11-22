@@ -71,6 +71,16 @@ class RecordPolicyTest extends TestCase
         $this->assertTrue(Gate::forUser(null)->allows('distribute', $record));
     }
 
+    public function test_rights_are_public_by_default(): void
+    {
+        $record = $this->distributable();
+        $record->rights()->delete();
+
+        $this->assertTrue(Gate::forUser(null)->allows('distribute', $record->refresh()));
+        $this->assertSame(AccessLevel::Public, (new RecordRights)->access_level);
+        $this->assertSame(PermissionStatus::Approved, (new RecordRights)->permission_status);
+    }
+
     /**
      * @param  Closure(Record): void  $spoil
      */
@@ -93,7 +103,6 @@ class RecordPolicyTest extends TestCase
             'not published' => [fn (Record $record) => $record->forceFill(['published_at' => null])->save()],
             'deleted' => [fn (Record $record) => $record->delete()],
             'classified' => [fn (Record $record) => $record->forceFill(['security_classification' => SecurityClassification::Restricted])->save()],
-            'no rights' => [fn (Record $record) => $record->rights()->delete()],
             'internal access' => [fn (Record $record) => $record->rights()->update(['access_level' => AccessLevel::Internal])],
             'permission pending' => [fn (Record $record) => $record->rights()->update(['permission_status' => PermissionStatus::Pending])],
             'embargo in force' => [fn (Record $record) => $record->rights()->update(['embargo_until' => now()->addDay()])],
