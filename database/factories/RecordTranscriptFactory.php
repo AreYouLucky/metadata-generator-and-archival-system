@@ -26,4 +26,12 @@ class RecordTranscriptFactory extends Factory
             'status' => TaskStatus::Done,
         ];
     }
+
+    /**
+     * A finished translation into `$language`.
+     */
+    public function translation(string $language = 'fil'): static
+    {
+        return $this->state(['language' => $language, 'is_original' => false]);
+    }
 }

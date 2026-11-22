@@ -1,18 +1,18 @@
-import { Link, usePage } from "@inertiajs/react";
-import RecordPreview from "./record-preview";
-import WelcomeFold from "./welcome-fold";
-import WelcomeMarquee from "./welcome-marquee";
-import { Sparkles } from "lucide-react";
+import { Link, usePage } from '@inertiajs/react';
+import RecordPreview from './record-preview';
+import WelcomeFold from './welcome-fold';
+import WelcomeMarquee from './welcome-marquee';
+import { Sparkles } from 'lucide-react';
 
 type Props = {
     canRegister: boolean;
 };
 
 const HIGHLIGHTS = [
-    { value: "EN · FIL", label: "Transcripts" },
-    { value: "SHA-256", label: "Fixity checks" },
-    { value: "4 steps", label: "From upload to publish" },
-    { value: "100%", label: "Human-reviewed" },
+    { value: 'EN · FIL', label: 'Transcripts' },
+    { value: 'SHA-256', label: 'Fixity checks' },
+    { value: '4 steps', label: 'From upload to publish' },
+    { value: '100%', label: 'Human-reviewed' },
 ];
 
 export default function WelcomeHero() {
@@ -29,13 +29,13 @@ export default function WelcomeHero() {
 
             <div className="relative grid flex-1 items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
                 <div className="space-y-7">
-                    <p className="inline-flex animate-in items-center gap-2  py-1 text-xs font-medium text-brand-glow backdrop-blur duration-700 fill-mode-both fade-in slide-in-from-bottom-3">
+                    <p className="inline-flex animate-in items-center gap-2 py-1 text-xs font-medium text-brand-glow backdrop-blur duration-700 fill-mode-both fade-in slide-in-from-bottom-3">
                         <Sparkles className="size-3.5" />
                         Video archive and AI-assisted metadata
                     </p>
 
                     <h1 className="animate-in text-4xl font-semibold tracking-tight text-balance delay-100 duration-700 fill-mode-both fade-in slide-in-from-bottom-4 sm:text-5xl xl:text-6xl">
-                        Every recording described, preserved and{" "}
+                        Every recording described, preserved and{' '}
                         <span className="animate-gradient-x bg-linear-to-r from-brand-glow via-amber-200 to-brand-glow bg-size-[200%_auto] bg-clip-text text-transparent">
                             easy to find.
                         </span>

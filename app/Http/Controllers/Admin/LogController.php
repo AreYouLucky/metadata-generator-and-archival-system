@@ -29,12 +29,17 @@ class LogController extends Controller
     {
         $type = $request->validated('type') ?? IndexLogsRequest::AUDIT;
         $action = $request->validated('action');
+        $recordId = $request->validated('record');
 
-        $logs = $type === IndexLogsRequest::ACCESS ? $this->access($action) : $this->audit($action);
+        $logs = $type === IndexLogsRequest::ACCESS ? $this->access($action, $recordId) : $this->audit($action, $recordId);
 
         return Inertia::render('admin/logs-page/logs', [
             'logs' => $logs->withQueryString(),
-            'filters' => ['type' => $type, 'action' => $action],
+            'filters' => [
+                'type' => $type,
+                'action' => $action,
+                'record' => $recordId === null ? null : $this->recordSummary($recordId, Record::withTrashed()->whereKey($recordId)->first(['id', 'title', 'deleted_at'])),
+            ],
             'actions' => array_column($type === IndexLogsRequest::ACCESS ? AccessAction::cases() : AuditAction::cases(), 'value'),
         ]);
     }
@@ -42,11 +47,12 @@ class LogController extends Controller
     /**
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
-    private function audit(?string $action): LengthAwarePaginator
+    private function audit(?string $action, ?string $recordId): LengthAwarePaginator
     {
         return VideoAuditLog::query()
             ->select(['id', 'record_id', 'action', 'performed_by', 'performed_at', 'remarks'])
             ->when($action, fn (Builder $query, string $value) => $query->where('action', $value))
+            ->when($recordId, fn (Builder $query, string $value) => $query->where('record_id', $value))
             ->with(['record' => $this->recordTitle(), 'performer:id,name'])
             ->orderByDesc('performed_at')
             ->orderByDesc('id')
@@ -64,11 +70,12 @@ class LogController extends Controller
     /**
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
-    private function access(?string $action): LengthAwarePaginator
+    private function access(?string $action, ?string $recordId): LengthAwarePaginator
     {
         return AccessLog::query()
             ->select(['id', 'record_id', 'user_id', 'action', 'ip_address', 'accessed_at'])
             ->when($action, fn (Builder $query, string $value) => $query->where('action', $value))
+            ->when($recordId, fn (Builder $query, string $value) => $query->where('record_id', $value))
             ->with(['record' => $this->recordTitle(), 'user:id,name'])
             ->orderByDesc('accessed_at')
             ->orderByDesc('id')

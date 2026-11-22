@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Encoder;
 
 use App\Enums\Preset;
+use App\Http\Requests\Concerns\ChecksDailyProcessingLimit;
 use App\Models\Record;
 use App\Services\Records\PipelineOptions;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class StoreRecordRequest extends FormRequest
 {
+    use ChecksDailyProcessingLimit;
+
     public function authorize(): bool
     {
         return $this->user()?->can('create', Record::class) ?? false;

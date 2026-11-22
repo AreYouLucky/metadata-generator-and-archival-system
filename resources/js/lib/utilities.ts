@@ -227,3 +227,182 @@ export function formatDateTime(value: string | null): string {
           })
         : '—';
 }
+
+/** Chip colours for speakers, by position in the record's speaker list. */
+const SPEAKER_COLORS = [
+    'bg-sky-500/15 text-sky-700 ring-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200 dark:ring-sky-400/40',
+    'bg-amber-500/15 text-amber-700 ring-amber-500/40 dark:bg-amber-500/20 dark:text-amber-200 dark:ring-amber-400/40',
+    'bg-emerald-500/15 text-emerald-700 ring-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/40',
+    'bg-fuchsia-500/15 text-fuchsia-700 ring-fuchsia-500/40 dark:bg-fuchsia-500/20 dark:text-fuchsia-200 dark:ring-fuchsia-400/40',
+    'bg-rose-500/15 text-rose-700 ring-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200 dark:ring-rose-400/40',
+    'bg-lime-500/15 text-lime-700 ring-lime-500/40 dark:bg-lime-500/20 dark:text-lime-200 dark:ring-lime-400/40',
+    'bg-violet-500/15 text-violet-700 ring-violet-500/40 dark:bg-violet-500/20 dark:text-violet-200 dark:ring-violet-400/40',
+    'bg-orange-500/15 text-orange-700 ring-orange-500/40 dark:bg-orange-500/20 dark:text-orange-200 dark:ring-orange-400/40',
+];
+
+export function speakerColor(position: number): string {
+    return SPEAKER_COLORS[Math.max(0, position) % SPEAKER_COLORS.length];
+}
+
+/** The name an encoder gave a speaker, or its label (S1, S2…). */
+export function speakerName(speaker: {
+    label: string;
+    display_name: string | null;
+}): string {
+    return speaker.display_name ?? speaker.label;
+}
+
+/**
+ * Whether a key press belongs to a text field, menu or dialog control rather
+ * than to the page (so page shortcuts must leave it alone).
+ */
+export function isTypingTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+        return false;
+    }
+
+    return (
+        target.isContentEditable ||
+        target.closest(
+            'input, textarea, select, [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"], [role="slider"]',
+        ) !== null
+    );
+}
+
+const languageNames =
+    typeof Intl !== 'undefined' && 'DisplayNames' in Intl
+        ? new Intl.DisplayNames(['en'], { type: 'language' })
+        : null;
+
+/**
+ * An ISO 639 / BCP 47 code as a name, e.g. "fil" -> "Filipino", "tl" ->
+ * "Tagalog"; the code itself when the browser doesn't know it.
+ */
+export function languageName(code: string | null): string {
+    if (!code || code === 'und') {
+        return 'Unknown language';
+    }
+
+    try {
+        return languageNames?.of(code) ?? code;
+    } catch {
+        return code;
+    }
+}
+
+/**
+ * A transcript line to paste elsewhere: "[1:02] Host: Welcome." (the
+ * timestamp only when asked).
+ */
+export function formatLineForCopy(
+    line: { start: number; text: string },
+    speaker: string | null,
+    withTimestamp: boolean,
+): string {
+    return `${withTimestamp ? `[${formatTimestamp(line.start)}] ` : ''}${speaker ? `${speaker}: ` : ''}${line.text}`;
+}
+
+/** "30000/1001" or "25" -> frames per second, or null. */
+export function parseFrameRate(rate: string | null): number | null {
+    if (!rate) {
+        return null;
+    }
+
+    const [numerator, denominator = '1'] = rate.split('/');
+    const value = Number(numerator) / Number(denominator);
+
+    return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** 29.97 and 59.94 fps count timecode in drop-frame (";" before the frames). */
+function isDropFrame(rate: number): boolean {
+    return Math.abs(rate - 29.97) < 0.01 || Math.abs(rate - 59.94) < 0.01;
+}
+
+/** A SMPTE timecode ("01:00:00:00" or ";" for drop-frame) as a frame count. */
+function timecodeToFrames(timecode: string, rate: number): number {
+    const match = /^(\d{2}):(\d{2}):(\d{2})[:;.](\d{2,3})$/.exec(timecode);
+
+    if (!match) {
+        return 0;
+    }
+
+    const [hours, minutes, seconds, frames] = match.slice(1).map(Number);
+    const nominal = Math.round(rate);
+    const total = (hours * 3600 + minutes * 60 + seconds) * nominal + frames;
+
+    if (!isDropFrame(rate)) {
+        return total;
+    }
+
+    const drop = Math.round(rate * 0.0666666);
+    const totalMinutes = hours * 60 + minutes;
+
+    return total - drop * (totalMinutes - Math.floor(totalMinutes / 10));
+}
+
+/**
+ * A position as SMPTE timecode (PROJECT_SPEC §11): HH:MM:SS:FF from the
+ * master's start timecode and frame rate, with ";" and dropped frame numbers
+ * at 29.97 and 59.94 fps. Falls back to 25 fps when the rate is unknown.
+ */
+export function formatTimecode(
+    seconds: number,
+    frameRate: string | null,
+    startTimecode: string | null,
+): string {
+    const rate = parseFrameRate(frameRate) ?? 25;
+    const nominal = Math.round(rate);
+    let frames =
+        Math.floor(Math.max(0, seconds) * rate + 1e-6) +
+        (startTimecode ? timecodeToFrames(startTimecode, rate) : 0);
+    const drop = isDropFrame(rate);
+
+    if (drop) {
+        const dropped = Math.round(rate * 0.0666666);
+        const perTenMinutes = Math.round(rate * 600);
+        const perMinute = nominal * 60 - dropped;
+        const tens = Math.floor(frames / perTenMinutes);
+        const rest = frames % perTenMinutes;
+        frames +=
+            9 * dropped * tens +
+            (rest > dropped
+                ? dropped * Math.floor((rest - dropped) / perMinute)
+                : 0);
+    }
+
+    const pad = (value: number) => String(value).padStart(2, '0');
+    const ff = frames % nominal;
+    const totalSeconds = Math.floor(frames / nominal);
+
+    return `${pad(Math.floor(totalSeconds / 3600) % 24)}:${pad(Math.floor(totalSeconds / 60) % 60)}:${pad(totalSeconds % 60)}${drop ? ';' : ':'}${pad(ff)}`;
+}
+
+/**
+ * For a shadcn <SelectTrigger> in a narrow column: fill the column and cut a
+ * long value with an ellipsis instead of spilling over the next field (the
+ * shipped trigger is `w-fit` and its value span is a flex box, which can't
+ * truncate).
+ */
+export const SELECT_FILL_TRUNCATE =
+    'w-full min-w-0 *:data-[slot=select-value]:block! *:data-[slot=select-value]:truncate';
+
+/**
+ * A whole or decimal number with thousands separators, e.g. 12345.6 → "12,345.6".
+ */
+export function formatNumber(value: number, maximumFractionDigits = 0): string {
+    return value.toLocaleString([], { maximumFractionDigits });
+}
+
+/**
+ * An estimated cost in US dollars, e.g. 0.4213 → "$0.42"; tiny amounts keep
+ * more digits so they don't read as zero.
+ */
+export function formatCost(value: number): string {
+    return value.toLocaleString([], {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2,
+    });
+}

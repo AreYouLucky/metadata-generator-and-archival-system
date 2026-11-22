@@ -1,7 +1,9 @@
 import { Link } from '@inertiajs/react';
 import { Film } from 'lucide-react';
-import ProcessingStatusBadge from '@/components/encoder/processing-status-badge';
-import ReviewStatusBadge from '@/components/encoder/review-status-badge';
+import ClassificationBadge from '@/components/all/classification-badge';
+import EmbargoBadge from '@/components/encoder/embargo-badge';
+import ProcessingStatusBadge from '@/components/all/processing-status-badge';
+import ReviewStatusBadge from '@/components/all/review-status-badge';
 import { formatDate, formatTimestamp } from '@/lib/utilities';
 import { show } from '@/routes/records';
 import type { RecordListItem } from '@/types/records';
@@ -55,8 +57,16 @@ export default function RecordsTable({
                                         <span className="block truncate">
                                             {record.title}
                                         </span>
-                                        {record.project && (
+                                        {(record.accession_number ||
+                                            record.project) && (
                                             <span className="block truncate text-xs font-normal text-muted-foreground">
+                                                {record.accession_number && (
+                                                    <span className="mr-2 font-mono">
+                                                        {
+                                                            record.accession_number
+                                                        }
+                                                    </span>
+                                                )}
                                                 {record.project}
                                                 {record.series &&
                                                     ` › ${record.series}`}
@@ -64,6 +74,21 @@ export default function RecordsTable({
                                         )}
                                     </span>
                                 </Link>
+                                {(record.classification !== 'unclassified' ||
+                                    record.embargo_until) && (
+                                    <span className="mt-1.5 ml-12 flex flex-wrap gap-1.5">
+                                        <ClassificationBadge
+                                            classification={
+                                                record.classification
+                                            }
+                                        />
+                                        {record.embargo_until && (
+                                            <EmbargoBadge
+                                                until={record.embargo_until}
+                                            />
+                                        )}
+                                    </span>
+                                )}
                             </td>
                             <td className="px-4 py-3 text-muted-foreground tabular-nums">
                                 {record.duration !== null

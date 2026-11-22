@@ -4,18 +4,21 @@ import { cn } from '@/lib/utils';
 type Props = {
     title: string;
     icon?: ReactNode;
+    /** Replaces the small caps title in the header, e.g. with tabs. */
+    heading?: ReactNode;
     actions?: ReactNode;
     className?: string;
     children: ReactNode;
 };
 
 /**
- * A docked editor panel: a slim header strip with a small caps title, and a
- * body that fills the remaining height.
+ * A docked editor panel: a slim header strip with a small caps title (or
+ * custom heading such as tabs), and a body that fills the remaining height.
  */
 export default function EditorPanel({
     title,
     icon,
+    heading,
     actions,
     className,
     children,
@@ -26,10 +29,12 @@ export default function EditorPanel({
             className={cn('flex h-full min-h-0 flex-col', className)}
         >
             <header className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3">
-                <h2 className="flex items-center gap-2 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
-                    {icon}
-                    {title}
-                </h2>
+                {heading ?? (
+                    <h2 className="flex min-w-0 items-center gap-2 truncate text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
+                        {icon}
+                        {title}
+                    </h2>
+                )}
                 {actions}
             </header>
             {children}

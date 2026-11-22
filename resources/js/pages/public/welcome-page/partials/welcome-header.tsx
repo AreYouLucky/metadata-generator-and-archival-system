@@ -3,6 +3,7 @@ import AppearanceToggle from '@/components/all/appearance-toggle';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { dashboard, home, login, register } from '@/routes';
+import { home as catalogue } from '@/routes/catalogue';
 import { WELCOME_SECTIONS } from './welcome-sections';
 
 type Props = {
@@ -44,6 +45,9 @@ export default function WelcomeHeader({ canRegister }: Props) {
 
                 <div className="flex shrink-0 items-center gap-2">
                     <AppearanceToggle />
+                    <Button asChild variant="ghost" size="sm">
+                        <Link href={catalogue()}>Catalogue</Link>
+                    </Button>
                     {auth.user ? (
                         <Button asChild size="sm">
                             <Link href={dashboard()}>Dashboard</Link>

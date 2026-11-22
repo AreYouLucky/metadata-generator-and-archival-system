@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useLocalVideo } from '@/hooks/use-local-video';
 import { useUploadRecord } from '@/hooks/use-upload-record';
-import { getErrorMessage } from '@/lib/utilities';
+import { formatNumber, getErrorMessage } from '@/lib/utilities';
 import { index as projectsIndex, show as showProject } from '@/routes/projects';
 import { create } from '@/routes/records';
 import type { ProjectOption } from '@/types/projects';
 import type { PresetName, PresetRules } from '@/types/records';
+import type { DailyLimit } from '@/types/usage';
 import ImportPreview from './partials/import-preview';
 import ProjectPicker from './partials/project-picker';
 import MediaBin from './partials/media-bin';
@@ -25,6 +26,8 @@ type Props = {
     initialSeriesId: string | null;
     presets: PresetRules[];
     limits: { max_upload_mb: number; max_video_minutes: number };
+    /** Today's processing allowance (checked again on the server). */
+    dailyLimit: DailyLimit | null;
 };
 
 /**
@@ -37,6 +40,7 @@ export default function CreateRecord({
     initialSeriesId,
     presets,
     limits,
+    dailyLimit,
 }: Props) {
     const [file, setFile] = useState<File | null>(null);
     const [project, setProject] = useState<ProjectOption | null>(
@@ -59,9 +63,13 @@ export default function CreateRecord({
     const tooLong =
         video.duration !== null &&
         video.duration > limits.max_video_minutes * 60;
+    const limitReached =
+        dailyLimit?.remaining !== null &&
+        dailyLimit?.remaining !== undefined &&
+        dailyLimit.remaining <= 0;
 
     const start = () => {
-        if (!file || !project || tooLarge || tooLong) {
+        if (!file || !project || tooLarge || tooLong || limitReached) {
             return;
         }
 
@@ -100,7 +108,18 @@ export default function CreateRecord({
                         </span>
                         <h1 className="text-sm font-semibold">Import media</h1>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                        {dailyLimit?.limit !== null &&
+                            dailyLimit?.limit !== undefined && (
+                                <span
+                                    className={`text-xs ${limitReached ? 'text-amber-300' : 'text-muted-foreground'}`}
+                                    title="Transcription minutes you can still process today"
+                                >
+                                    {limitReached
+                                        ? `Today's ${dailyLimit.limit}-minute processing limit is used up`
+                                        : `${formatNumber(dailyLimit.remaining ?? 0, 1)} of ${dailyLimit.limit} min left today`}
+                                </span>
+                            )}
                         <Button
                             size="sm"
                             variant="ghost"
@@ -123,6 +142,7 @@ export default function CreateRecord({
                                 !project ||
                                 tooLarge ||
                                 tooLong ||
+                                limitReached ||
                                 upload.isPending
                             }
                         >

@@ -10,6 +10,8 @@
 4. Identical requests are answered from the cache (`fresh=True` skips that, but still
    uses the core).
 5. Prompts put static instructions first so OpenAI's prompt caching applies.
+6. Quotes come back as verbatim text with their block time; code aligns them to the exact
+   transcript lines (start/end), so the model never needs per-line timestamps.
 """
 
 import hashlib
@@ -30,7 +32,12 @@ from app.schemas.metadata import (
     ChunkSummary,
     GeneratedMetadata,
     GenerateMetadataResult,
+    GenerateTitlesResult,
     PresetCopy,
+    Quote,
+    QuoteDraft,
+    SubjectSuggestion,
+    TitleOptions,
     TranscriptCore,
 )
 from app.services.cache import Cache, get_cache
@@ -45,7 +52,12 @@ _templates = Environment(
 
 MIN_CHAPTER_GAP_SECONDS = 10.0
 MAX_KEYWORDS = 15
-CACHE_VERSION = "v1"
+MAX_QUOTES = 5
+MAX_QUOTE_CHARS = 300
+MAX_SENSITIVE_TOPICS = 5
+MAX_SUBJECTS = 12
+# v2: quotes, tone and content flags (Phase 2); v3: subject and location suggestions.
+CACHE_VERSION = "v3"
 
 
 def render(template: str, **context: object) -> str:
@@ -159,10 +171,24 @@ class MetadataGenerator:
                 max_output_tokens=self.settings.llm_max_output_tokens,
             )
             usages.append(usage)
+            flags = generated.content_flags
             core = TranscriptCore(
                 summary=generated.summary,
                 chapters=normalise_chapters(generated.chapters, duration),
                 keywords=normalise_list(generated.keywords, MAX_KEYWORDS),
+                quotes=align_quotes(generated.quotes, segments),
+                tone=generated.tone,
+                content_flags=flags.model_copy(
+                    update={
+                        "sensitive_topics": normalise_list(
+                            flags.sensitive_topics, MAX_SENSITIVE_TOPICS
+                        )
+                    }
+                ),
+                subjects=normalise_subjects(generated.subjects),
+                location=generated.location
+                if generated.location and generated.location.text.strip()
+                else None,
             )
             copy = PresetCopy.model_validate(generated.model_dump())
             self.cache.set(core_key, core.model_dump_json(), self.settings.llm_cache_ttl_seconds)
@@ -171,7 +197,7 @@ class MetadataGenerator:
         result = GenerateMetadataResult(
             model=model,
             metadata=finalise(core, copy, preset, title_count, duration),
-            usage=_usage_records(usages),
+            usage=usage_records(usages),
             source=source,
         )
         self.cache.set(result_key, result.model_dump_json(), self.settings.llm_cache_ttl_seconds)
@@ -203,8 +229,54 @@ class MetadataGenerator:
             )
             usages.append(usage)
             chapters = "\n".join(f"[{format_time(c.start)}] {c.title}" for c in summary.chapters)
-            condensed.append(f"Part {index} of {len(parts)}:\n{summary.summary}\n{chapters}")
+            quotes = "\n".join(f'[{format_time(q.start)}] "{q.text}"' for q in summary.quotes)
+            condensed.append(
+                f"Part {index} of {len(parts)}:\n{summary.summary}\n{chapters}"
+                + (f"\nQuotable lines:\n{quotes}" if quotes else "")
+            )
         return "\n\n".join(condensed), usages
+
+    def generate_titles(
+        self,
+        summary: str,
+        preset: PresetRules,
+        *,
+        count: int = 3,
+        avoid: list[str] | None = None,
+        language: str | None = None,
+        custom_prompt: str | None = None,
+    ) -> GenerateTitlesResult:
+        """Generate more: new title options from the summary alone (a few hundred tokens),
+        never from the transcript. Not cached: asking again should give new options."""
+        model = self.settings.llm_model
+        avoid = normalise_list(avoid or [], 30)
+        request = render(
+            "titles_request.j2",
+            preset=preset,
+            count=count,
+            avoid=avoid,
+            language=language,
+            custom_prompt=(custom_prompt or "").strip() or None,
+        )
+        options, usage = self.llm.complete(
+            model=model,
+            instructions=render("titles_system.j2"),
+            messages=[f"Summary:\n{summary.strip()}", request],
+            schema=TitleOptions,
+            reasoning_effort=self.settings.llm_reasoning_effort,
+            max_output_tokens=self.settings.llm_max_output_tokens,
+        )
+        taken = {title.lower() for title in avoid}
+        fresh = [
+            truncate(title, preset.title_max)
+            for title in normalise_list(options.titles, count + len(avoid))
+            if title.lower() not in taken
+        ]
+        return GenerateTitlesResult(
+            model=model,
+            titles=[title for title in fresh if title][:count],
+            usage=usage_records([usage]),
+        )
 
 
 def _core_brief(core: TranscriptCore) -> str:
@@ -223,16 +295,84 @@ def finalise(
     duration: float | None,
 ) -> AiMetadata:
     """Enforce the preset limits on whatever the model returned."""
-    titles = [_truncate(t, preset.title_max) for t in normalise_list(copy.titles, title_count)]
+    titles = [truncate(t, preset.title_max) for t in normalise_list(copy.titles, title_count)]
     return AiMetadata(
         titles=[t for t in titles if t],
-        description=_truncate(copy.description.strip(), preset.description_max),
+        description=truncate(copy.description.strip(), preset.description_max),
         summary=core.summary.strip(),
         tags=normalise_tags(copy.tags, preset),
         keywords=normalise_list(core.keywords, MAX_KEYWORDS),
         hashtags=normalise_hashtags(copy.hashtags, preset),
         chapters=normalise_chapters(core.chapters, duration),
+        quotes=core.quotes,
+        tone=core.tone,
+        content_flags=core.content_flags,
+        suggested_subjects=core.subjects,
+        suggested_location=core.location,
     )
+
+
+def normalise_subjects(subjects: list[SubjectSuggestion]) -> list[SubjectSuggestion]:
+    """One entry per name (case-insensitive), at most MAX_SUBJECTS."""
+    seen: set[str] = set()
+    result: list[SubjectSuggestion] = []
+    for subject in subjects:
+        name = " ".join(subject.name.split())[:250]
+        if name and name.lower() not in seen:
+            seen.add(name.lower())
+            result.append(SubjectSuggestion(name=name, type=subject.type))
+    return result[:MAX_SUBJECTS]
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"\w+", text.lower())
+
+
+def align_quotes(
+    drafts: list[QuoteDraft], segments: list[TranscriptSegment], limit: int = MAX_QUOTES
+) -> list[Quote]:
+    """Find the transcript lines each quote was taken from and use their exact times.
+
+    The model sees one time per ~30 s block, so its `start` is approximate. Near that time,
+    the line that best matches the quote's opening (as many of its first words as the line
+    has) starts the quote; following lines are added until they hold about as many words
+    as the quote. A quote whose opening matches no line is dropped (the model did not take
+    it from the transcript)."""
+    quotes: list[Quote] = []
+    for draft in drafts:
+        text = " ".join(draft.text.split()).strip(" \"'“”")[:MAX_QUOTE_CHARS]
+        words = _words(text)
+        if not words or not segments:
+            continue
+
+        def opening_match(index: int, words: list[str] = words) -> int:
+            line = _words(segments[index].text)
+            return len(set(words[: len(line)]) & set(line))
+
+        nearby = [
+            index
+            for index, segment in enumerate(segments)
+            if draft.start - 45 <= segment.start <= draft.start + 75
+        ] or list(range(len(segments)))
+        first = max(
+            nearby,
+            key=lambda index: (opening_match(index), -abs(segments[index].start - draft.start)),
+        )
+        line_length = len(_words(segments[first].text))
+        if opening_match(first) * 2 < min(line_length, len(words)):
+            continue
+        last, count = first, len(_words(segments[first].text))
+        while (
+            count < len(words)
+            and last + 1 < len(segments)
+            and segments[last + 1].start - segments[first].start < 60
+        ):
+            last += 1
+            count += len(_words(segments[last].text))
+        quote = Quote(start=segments[first].start, end=segments[last].end, text=text)
+        if all(abs(existing.start - quote.start) >= 1 for existing in quotes):
+            quotes.append(quote)
+    return sorted(quotes, key=lambda quote: quote.start)[:limit]
 
 
 def normalise_list(values: list[str], limit: int) -> list[str]:
@@ -282,7 +422,7 @@ def normalise_chapters(chapters: list[Chapter], duration: float | None) -> list[
     return result
 
 
-def _truncate(text: str, limit: int | None) -> str:
+def truncate(text: str, limit: int | None) -> str:
     text = text.strip()
     if limit is None or len(text) <= limit:
         return text
@@ -290,7 +430,7 @@ def _truncate(text: str, limit: int | None) -> str:
     return cut + "…"
 
 
-def _usage_records(usages: list[LlmUsage]) -> list[Usage]:
+def usage_records(usages: list[LlmUsage]) -> list[Usage]:
     records: list[Usage] = []
     for usage in usages:
         records.append(

@@ -8,7 +8,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from app.pipeline import audio, checksum, probe
+from app.config import get_settings
+from app.pipeline import audio, checksum, probe, proxy
 from app.providers.transcription import get_transcription_provider
 from app.schemas.pipeline import PipelineContext
 from app.services.metadata import MetadataGenerator
@@ -42,6 +43,9 @@ def run_probe(context: PipelineContext, on_progress: Progress) -> dict[str, Any]
             f"The video is {duration / 60:.0f} minutes long; the limit is {limit / 60:.0f} minutes."
         )
     context.duration = duration
+    context.container = str(raw_ffprobe.get("format", {}).get("format_name") or "") or None
+    context.playable = proxy.is_browser_playable(context.container, summary)
+    context.interlaced = str(summary.get("scan_type") or "").startswith("interlaced")
     return {**summary, "raw_probe": {"ffprobe": raw_ffprobe, "mediainfo": raw_mediainfo}}
 
 
@@ -83,6 +87,33 @@ def run_transcribe(context: PipelineContext, on_progress: Progress) -> dict[str,
     context.segments = result.segments
     context.language = result.language
     return result.model_dump()
+
+
+def run_proxy(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
+    """An access copy only when browsers can't play the master (ProRes, MXF, 10-bit...)."""
+    if context.playable:
+        raise SkipStage("The master plays in browsers, so no access copy is needed.")
+    record_id = context.request.record_id
+    target = resolve(f"records/{record_id}/proxy/access.mp4")
+    proxy.transcode(
+        resolve(context.request.video_path),
+        target,
+        context.duration,
+        get_settings().proxy_max_height,
+        context.interlaced,
+        on_progress,
+    )
+    on_progress(92)
+    sums = checksum.compute(target)
+    on_progress(96)
+    summary = probe.summarise(probe.run_ffprobe(target), probe.run_mediainfo(target))
+    return {
+        "path": relative(target),
+        "md5": sums["md5"],
+        "sha256": sums["sha256"],
+        "file_size": sums["file_size"],
+        "probe": summary,
+    }
 
 
 def run_generate_metadata(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:

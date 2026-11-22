@@ -10,12 +10,14 @@ job fail fast with a clear message instead of hanging inside a multi-GB download
 """
 
 import logging
+import subprocess  # noqa: S404 - fixed argv, no shell
 import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from app.config import Settings, get_settings
+from app.pipeline.audio import EXTRACT_TIMEOUT_SECONDS, AudioError
 from app.pricing import transcription_cost
 from app.providers.transcription.base import TranscriptionResult, clean_segments
 from app.schemas.common import TranscriptSegment, Usage
@@ -69,6 +71,43 @@ def _load(settings: Settings) -> Any:
         return _models[key]
 
 
+WHISPER_SAMPLE_RATE = 16000
+
+
+def decode_audio(audio: Path) -> Any:
+    """The audio as 16 kHz mono float32 samples, decoded by the image's ffmpeg.
+
+    faster-whisper's own decoder goes through PyAV, whose newer releases dropped an
+    argument faster-whisper still passes; handing it samples skips that path entirely.
+    """
+    import numpy as np
+
+    completed = subprocess.run(  # noqa: S603 - fixed argv, path confined to storage
+        [  # noqa: S607 - ffmpeg from the image PATH
+            "ffmpeg",
+            "-nostdin",
+            "-loglevel",
+            "error",
+            "-i",
+            str(audio),
+            "-ac",
+            "1",
+            "-ar",
+            str(WHISPER_SAMPLE_RATE),
+            "-f",
+            "f32le",
+            "pipe:1",
+        ],
+        capture_output=True,
+        timeout=EXTRACT_TIMEOUT_SECONDS,
+        check=False,
+    )
+    if completed.returncode != 0:
+        message = completed.stderr.decode(errors="replace").strip()[:500]
+        raise AudioError(f"ffmpeg could not read the audio: {message or 'unknown error'}")
+    return np.frombuffer(completed.stdout, dtype=np.float32)
+
+
 class LocalWhisperProvider:
     def __init__(self, settings: Settings | None = None, model: Any = None) -> None:
         self.settings = settings or get_settings()
@@ -81,6 +120,7 @@ class LocalWhisperProvider:
         on_progress: Callable[[int], None],
     ) -> TranscriptionResult:
         model = self._model or _load(self.settings)
+        samples = decode_audio(audio)
         options: dict[str, Any] = {
             "beam_size": 5,
             # Skips long silences: faster, and fewer hallucinated lines in quiet parts.
@@ -96,10 +136,10 @@ class LocalWhisperProvider:
             # Timestamps stay on, or each segment would be a whole ~30 s chunk and the
             # transcript editor and timeline would lose their sentence-level lines.
             segments_iter, info = BatchedInferencePipeline(model=model).transcribe(
-                str(audio), batch_size=batch_size, without_timestamps=False, **options
+                samples, batch_size=batch_size, without_timestamps=False, **options
             )
         else:
-            segments_iter, info = model.transcribe(str(audio), **options)
+            segments_iter, info = model.transcribe(samples, **options)
         total = float(getattr(info, "duration", None) or duration or 0.0)
 
         segments: list[TranscriptSegment] = []

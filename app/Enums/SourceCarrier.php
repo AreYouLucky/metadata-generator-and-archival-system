@@ -2,11 +2,15 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasOptions;
+
 /**
  * Physical or digital carrier a record was transferred from.
  */
 enum SourceCarrier: string
 {
+    use HasOptions;
+
     case BornDigital = 'born_digital';
     case CameraCard = 'camera_card';
     case Digibeta = 'digibeta';

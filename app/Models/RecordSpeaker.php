@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use Carbon\CarbonImmutable as Carbon;
+use Database\Factories\RecordSpeakerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,6 +23,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['label', 'display_name'])]
 class RecordSpeaker extends Model
 {
+    /** @use HasFactory<RecordSpeakerFactory> */
+    use HasFactory;
+
     /**
      * @return BelongsTo<Record, $this>
      */

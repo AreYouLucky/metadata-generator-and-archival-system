@@ -184,6 +184,36 @@ class RecordCallbacksTest extends TestCase
         $this->assertSame(2, $record->usageRecords()->count());
     }
 
+    public function test_quotes_tone_and_content_flags_are_kept_with_the_generation(): void
+    {
+        $record = $this->recordWithStages();
+        $quote = ['start' => 36.5, 'end' => 41.5, 'speaker' => null, 'text' => 'Buhay ang agham.'];
+
+        $this->postSigned("/internal/records/{$record->id}/results/generate_metadata", [
+            'preset' => 'tiktok',
+            'custom_prompt' => null,
+            'model' => 'gpt-6.2-sol',
+            'metadata' => [
+                'titles' => ['Fair opens'],
+                'description' => 'A caption.',
+                'summary' => 'Officials open the fair.',
+                'tags' => [],
+                'keywords' => [],
+                'hashtags' => ['#STFair', '#DOST', '#Science'],
+                'chapters' => [],
+                'quotes' => [$quote],
+                'tone' => 'celebratory',
+                'contentFlags' => ['profanity' => false, 'sensitiveTopics' => ['politics']],
+            ],
+            'usage' => [],
+        ])->assertOk();
+
+        $payload = $record->activeMetadata()->sole()->payload;
+        $this->assertSame([$quote], $payload['quotes']);
+        $this->assertSame('celebratory', $payload['tone']);
+        $this->assertSame(['profanity' => false, 'sensitiveTopics' => ['politics']], $payload['contentFlags']);
+    }
+
     public function test_a_failed_stage_marks_the_record_failed_once_every_stage_has_finished(): void
     {
         $record = $this->recordWithStages();

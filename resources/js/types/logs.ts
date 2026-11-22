@@ -14,4 +14,6 @@ export type LogEntry = {
 export type LogFilters = {
     type: LogType;
     action: string | null;
+    /** Set when the log is narrowed to one record (the workspace's "Access log"). */
+    record?: { id: string; title: string | null; deleted: boolean } | null;
 };

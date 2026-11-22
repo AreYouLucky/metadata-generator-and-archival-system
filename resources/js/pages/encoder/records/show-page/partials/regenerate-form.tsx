@@ -22,6 +22,8 @@ type Props = {
     initialPrompt: string;
     generating: boolean;
     hasMetadata: boolean;
+    /** Called once generation has been queued (the dialog closes). */
+    onStarted?: () => void;
 };
 
 export default function RegenerateForm({
@@ -31,6 +33,7 @@ export default function RegenerateForm({
     initialPrompt,
     generating,
     hasMetadata,
+    onStarted,
 }: Props) {
     const [preset, setPreset] = useState<PresetName>(initialPreset);
     const [prompt, setPrompt] = useState(initialPrompt);
@@ -40,7 +43,10 @@ export default function RegenerateForm({
         generate.mutate(
             { preset, customPrompt: prompt },
             {
-                onSuccess: () => toast.success('Generating new metadata…'),
+                onSuccess: () => {
+                    toast.success('Generating new metadata…');
+                    onStarted?.();
+                },
                 onError: (error) =>
                     toast.error(
                         getErrorMessage(

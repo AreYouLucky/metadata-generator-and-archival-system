@@ -1,4 +1,6 @@
 import { router } from '@inertiajs/react';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
     Select,
     SelectContent,
@@ -21,7 +23,8 @@ type Props = {
 
 /**
  * Switch between the audit and access logs, and filter by action. Switching
- * logs clears the action, as each log has its own.
+ * logs clears the action, as each log has its own. A record filter (from the
+ * workspace's "Access log") stays until cleared.
  */
 export default function LogsFilters({ filters, actions }: Props) {
     const visit = (next: LogFilters) =>
@@ -30,6 +33,7 @@ export default function LogsFilters({ filters, actions }: Props) {
             {
                 type: next.type,
                 ...(next.action ? { action: next.action } : {}),
+                ...(next.record ? { record: next.record.id } : {}),
             },
             { preserveScroll: true, replace: true },
         );
@@ -41,7 +45,12 @@ export default function LogsFilters({ filters, actions }: Props) {
                 variant="outline"
                 value={filters.type}
                 onValueChange={(value) =>
-                    value && visit({ type: value as LogType, action: null })
+                    value &&
+                    visit({
+                        type: value as LogType,
+                        action: null,
+                        record: filters.record,
+                    })
                 }
                 aria-label="Log"
             >
@@ -56,7 +65,7 @@ export default function LogsFilters({ filters, actions }: Props) {
                 value={filters.action ?? ALL}
                 onValueChange={(value) =>
                     visit({
-                        type: filters.type,
+                        ...filters,
                         action: value === ALL ? null : value,
                     })
                 }
@@ -73,6 +82,16 @@ export default function LogsFilters({ filters, actions }: Props) {
                     ))}
                 </SelectContent>
             </Select>
+            {filters.record && (
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => visit({ ...filters, record: null })}
+                >
+                    {filters.record.title ?? 'Deleted record'}
+                    <X aria-label="Show every record" />
+                </Button>
+            )}
         </div>
     );
 }

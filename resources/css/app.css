@@ -188,12 +188,12 @@
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.87 0 0);
 
-    /* Archive brand: deep teal accent on near-black "ink" panels. */
-    --brand: oklch(0.52 0.1 205);
+    /* Archive brand: sky blue accent on near-black "ink" panels (owner's choice). */
+    --brand: oklch(0.55 0.16 245);
     --brand-foreground: oklch(0.985 0 0);
-    --brand-muted: oklch(0.95 0.025 205);
-    --brand-glow: oklch(0.8 0.1 200);
-    --ink: oklch(0.2 0.02 230);
+    --brand-muted: oklch(0.95 0.03 240);
+    --brand-glow: oklch(0.8 0.12 235);
+    --ink: oklch(0.2 0.025 250);
 }
 
 .dark {
@@ -230,11 +230,11 @@
     --sidebar-border: oklch(0.269 0 0);
     --sidebar-ring: oklch(0.439 0 0);
 
-    --brand: oklch(0.74 0.11 200);
-    --brand-foreground: oklch(0.2 0.02 230);
-    --brand-muted: oklch(0.3 0.04 210);
-    --brand-glow: oklch(0.8 0.1 200);
-    --ink: oklch(0.17 0.015 230);
+    --brand: oklch(0.75 0.14 235);
+    --brand-foreground: oklch(0.2 0.025 250);
+    --brand-muted: oklch(0.3 0.06 245);
+    --brand-glow: oklch(0.8 0.12 235);
+    --ink: oklch(0.17 0.02 250);
 }
 
 @layer base {
@@ -244,6 +244,63 @@
 
     body {
         @apply bg-background text-foreground;
+    }
+
+    /*
+     * Thin scrollbars everywhere: a slim rounded thumb on a clear track, in the
+     * theme's muted colour (so the dark workspace gets a dark one), a little
+     * stronger while the pointer is over the scrolling area.
+     */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(
+                in oklab,
+                var(--muted-foreground) 35%,
+                transparent
+            )
+            transparent;
+    }
+
+    *:hover {
+        scrollbar-color: color-mix(
+                in oklab,
+                var(--muted-foreground) 60%,
+                transparent
+            )
+            transparent;
+    }
+
+    /* Browsers without scrollbar-color (older Safari) use these instead. */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        border: 2px solid transparent;
+        border-radius: 9999px;
+        background-clip: padding-box;
+        background-color: color-mix(
+            in oklab,
+            var(--muted-foreground) 45%,
+            transparent
+        );
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: color-mix(
+            in oklab,
+            var(--muted-foreground) 70%,
+            transparent
+        );
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
     }
 
     /* Snap the welcome page to each fold where the folds are full-screen. */
@@ -266,5 +323,20 @@
             animation-iteration-count: 1 !important;
             transition-duration: 0.01ms !important;
         }
+    }
+}
+
+/*
+ * The record workspace is an editor: on wide screens the page is exactly the
+ * visible height (no page scroll), so the timeline can take 30% of it and the
+ * breadcrumbs plus the panels the other 70%. The sidebar's inset style leaves
+ * 0.5rem above and below the page. Unlayered so it beats the inset's
+ * min-height utility.
+ */
+@media (width >= 80rem) {
+    [data-slot='sidebar-inset']:has([data-workspace]) {
+        height: calc(100svh - 1rem);
+        min-height: 0;
+        overflow: hidden;
     }
 }

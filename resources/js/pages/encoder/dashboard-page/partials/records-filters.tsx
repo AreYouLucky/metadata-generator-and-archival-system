@@ -29,6 +29,11 @@ const REVIEW_OPTIONS = [
     ['rejected', 'Rejected'],
 ] as const;
 
+const FLAG_OPTIONS = [
+    ['embargoed', 'Embargoed'],
+    ['classified', 'Classified'],
+] as const;
+
 const SORT_OPTIONS = [
     ['newest', 'Newest first'],
     ['oldest', 'Oldest first'],
@@ -89,8 +94,8 @@ export default function RecordsFilters({
                     type="search"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search titles"
-                    aria-label="Search records by title"
+                    placeholder="Search titles or accession numbers"
+                    aria-label="Search records by title or accession number"
                     className="pl-9"
                 />
             </div>
@@ -136,6 +141,30 @@ export default function RecordsFilters({
                 <SelectContent>
                     <SelectItem value={ALL}>Any review status</SelectItem>
                     {REVIEW_OPTIONS.map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                            {label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
+            <Select
+                value={filters.flag ?? ALL}
+                onValueChange={(value) =>
+                    apply({
+                        flag:
+                            value === ALL
+                                ? null
+                                : (value as RecordFilters['flag']),
+                    })
+                }
+            >
+                <SelectTrigger className="w-40" aria-label="Archival flags">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value={ALL}>Any access</SelectItem>
+                    {FLAG_OPTIONS.map(([value, label]) => (
                         <SelectItem key={value} value={value}>
                             {label}
                         </SelectItem>

@@ -1,14 +1,14 @@
-import { Link, usePage } from "@inertiajs/react";
-import AppLogoIcon from "@/components/app-logo-icon";
-import { dashboard, home, login, register } from "@/routes";
-import { WELCOME_SECTIONS } from "./welcome-sections";
+import { Link, usePage } from '@inertiajs/react';
+import AppLogoIcon from '@/components/app-logo-icon';
+import { dashboard, home, login, register } from '@/routes';
+import { WELCOME_SECTIONS } from './welcome-sections';
 
 type Props = {
     canRegister: boolean;
 };
 
 const LINK_CLASS =
-    "text-muted-foreground transition-colors hover:text-foreground";
+    'text-muted-foreground transition-colors hover:text-foreground';
 
 /**
  * Page footer. Positioned (`relative`) so it paints above the sticky folds.

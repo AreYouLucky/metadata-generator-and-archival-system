@@ -8,9 +8,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import SimplePagination from '@/components/all/simple-pagination';
-import ProcessingStatusBadge from '@/components/encoder/processing-status-badge';
+import ProcessingStatusBadge from '@/components/all/processing-status-badge';
 import ProjectFormDialog from '@/components/encoder/project-form-dialog';
-import ReviewStatusBadge from '@/components/encoder/review-status-badge';
+import ReviewStatusBadge from '@/components/all/review-status-badge';
 import { Button } from '@/components/ui/button';
 import { useCreateSeries } from '@/hooks/use-projects';
 import { formatDate, formatDateRange, formatPlace } from '@/lib/utilities';

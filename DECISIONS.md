@@ -3,6 +3,323 @@
 Choices made while building, and any deviation from [PROJECT_SPEC.md](PROJECT_SPEC.md). Newest
 phase first.
 
+## Phase 4 — Approvals, usage and public catalogue (built)
+
+### Approval workflow
+
+- **Submit** (`POST /records/{record}/submit`) takes an optional note for the reviewer and needs
+  processing to have finished (422 otherwise): there is nothing to review before the transcript
+  and metadata exist. The record's encoder or an admin may submit, from draft or changes
+  requested.
+- **Decisions** (`POST /admin/approvals/{record}`) return JSON like the app's other mutations
+  (TanStack Query), not an Inertia redirect. Notes are required for reject and request changes.
+  Approving sets `published_at`; every other step clears it.
+- **Reopen** works from **approved and rejected** (the spec names approved only): otherwise a
+  rejected record could never be worked on again.
+- Every step locks the row (`ReviewWorkflow`), so a double click or two admins at once can't apply
+  two decisions; the loser gets 409.
+- **Review notes in the workspace:** the header's review status is a button that opens the review
+  history with notes (highlighted when changes are requested) and, for admins, Review, Reopen,
+  Public page and Access log.
+- **"Pending reviews"** stays for encoders (their own submissions); admins are sent to the new
+  **Approvals** queue. The spec's `/admin/records` list isn't separate: `/records` already shows
+  admins every record.
+- **The review page** (`/admin/approvals/{record}`, owner's request) shows everything from the
+  workspace, read-only and **as tables**, in tabs: Overview (record, rights summary, credits),
+  Transcript (time, speaker, text, edited; filter, click to seek; virtualised), Metadata (the
+  active generation: titles, description, summary, tags, keywords, hashtags, chapters, quotes,
+  tone, flags), Archive (every Archive section, files with technical metadata, structure,
+  attachments, fixity) and Translations (each one's lines on demand). The player has caption
+  tracks for every finished language. The workspace and the review page share
+  `RecordContent` (transcript, speakers, active metadata) and `ArchivePresenter`. The decision box
+  stays in view while scrolling, and lists what would still keep the record off the public site
+  once approved (`Distribution::blockers`, the same code `RecordPolicy::distribute` uses).
+- **Unconfirmed suggestions (owner's report):** saving Archive → Descriptive never confirmed the
+  AI's subject and keyword chips, so records went to review with all of them unconfirmed.
+  Now a banner above Subjects and Keywords says so with **Confirm all** (one request, one audit
+  entry; replaces the per-chip loop the keywords had), the Submit dialog offers "Confirm them
+  now" (on by default, done in the same transaction as the submit), and admins can **Confirm
+  all** from the review page. Confirming stays a deliberate human step (PROJECT_SPEC §11).
+
+### Distribution and the public catalogue
+
+- **Public by default (owner's choice, deviates from §8):** new rights start as access **public**
+  and permission **approved** (model, column defaults via a migration, and the Rights form), and a
+  record whose rights were never filled in counts as public. A record stays off the site only
+  when it isn't approved, is classified, is under embargo, or its rights say Internal, Restricted,
+  or permission pending/denied. Existing rights rows keep what was chosen.
+
+- **`Distribution`** holds the rule twice: `blockers()` for one record (the policy) and
+  `constrain()` for list queries (the catalogue). Tests run the same blocker list through both.
+- **URLs:** the catalogue home is **`/catalogue`**, not `/`: `/` is the owner's landing page,
+  which now links to it. Public project and series pages are **`/browse/projects/{project}`** and
+  **`/browse/series/{series}`**, because `/projects/{project}` is the encoders' project page. The
+  watch page is `/watch/{record}`, as specified.
+- **Pages live in `pages/user/`** (the spec's paths) and render in their own `CatalogueLayout`
+  (header with search and account links), not the staff sidebar. Viewers who log in are sent from
+  `/dashboard` to the catalogue; the old placeholder page is gone.
+- **Not found, not forbidden:** a record that may not be distributed answers 404 on the watch,
+  media and caption routes, so its existence isn't revealed. A project or series appears only
+  while it has at least one public record (its cover too).
+- **Public fields only:** responses are built field by field (`Catalogue`), never from models. The
+  description falls back to the active generation's description when the catalogue description is
+  empty. Copyright holder and rights statement are not shown (the spec lists licence and usage
+  restrictions only).
+- **The catalogue date** is `date_recorded`, then the project's first day, then the publish date
+  (SQL `COALESCE`, so filtering and sorting happen in the database). Year/month extraction is
+  per driver (PostgreSQL `EXTRACT`, SQLite `strftime`); both were checked.
+- **The access copy** for the public player is an uploaded access file when browsers can play it,
+  else the proxy when the master can't play, else the master (streamed inline with Range support;
+  never offered as a download).
+- **Caching:** every catalogue result is cached under a version number; one increment retires them
+  all on any cache store (no tags needed). The version is bumped by approve/reject/reopen and by
+  the `catalogue.refresh` middleware after any successful write to an approved record, project,
+  series, agency, genre or video type. Entries also expire after 10 minutes, which covers an
+  embargo ending on its own.
+- **Rate limits:** 120 page requests a minute per user or IP; 600 for media and covers, since
+  seeking sends many Range requests.
+- **Access log:** one `view` row per watch-page visit (with IP and user agent). Media Range
+  requests are not logged, or a single viewing would write hundreds of rows.
+  `/admin/records/{record}/access-log` opens the existing Logs page filtered to the record (a new
+  `record` filter) instead of a separate page.
+
+### Usage and limits
+
+- **The daily limit counts transcription minutes** recorded today (calendar day in the app
+  timezone, UTC) against the encoder's own limit or `ENCODER_DAILY_PROCESSING_MINUTES`. It is
+  checked as a validation error (`daily_limit`) when a record is created and on retry, the two
+  places processing starts. **Admins have no limit.** Usage is written when transcription
+  finishes, so several uploads started at once can run past the limit by up to one batch; the
+  next upload is refused.
+- The **Import** page shows the minutes left and disables "Upload and process" once they are used
+  up, so nobody uploads a large file only to be refused. Upload start itself isn't blocked, as the
+  same endpoint uploads extra files (which don't transcribe).
+- **Usage page:** totals, a per-day chart of transcription minutes, per encoder and per record
+  (paginated), for a date range of at most a year (default: this month). Sums run in the database
+  with bound conditional sums. The CSV is streamed one record per row, and text cells starting
+  with `= + - @` get a leading quote so spreadsheets don't run them as formulas. Costs are the
+  providers' estimates in US dollars.
+- **Overview** (`/admin`): pending approvals (oldest five), the processing queue, the number of
+  public records and this month's usage with the top encoders.
+- New index on `usage_records.occurred_at` (date ranges across all encoders).
+
+### Genres and video types
+
+- One `LookupList` service behind both admin pages; the slug is generated from the name (made
+  unique with `-2`, `-3`…) and **kept when renaming**, so public filter links keep working. Items
+  that any record uses (deleted records included) can't be deleted.
+- `ListSearch`, the status badges and the processing badge moved to `components/all/`, as admin
+  pages use them now.
+
+### Sign-up
+
+- `ALLOW_PUBLIC_REGISTRATION` already switched Fortify's registration on or off (Phase 1), and
+  sign-up already created `user` accounts only (role isn't fillable; covered by a test). It is now
+  shared as `canRegister`, so the catalogue header offers **Sign up** only when it is enabled.
+
+### Later
+
+- Thumbnails for catalogue cards come from the project's cover until Phase 5 adds frames.
+- An in-app notification to the encoder when changes are requested (the note is in the
+  workspace; there is no email yet).
+- Full-text search over transcripts in the public catalogue (search covers titles, descriptions
+  and confirmed subjects and keywords).
+
+## Phase 3 — Archival metadata (built)
+
+### Catalogue
+
+- **`PATCH /records/{record}` saves one Archive sub-tab at a time:** every rule is `sometimes`,
+  and groups are sent whole (project with series, agency with unit, the location chain). Paired
+  fields (latitude/longitude, date and its precision, disposition date and action) are always
+  checked, so leaving one out can't slip past `required_with`. Each save logs `updated` with the
+  names of the changed fields.
+- **Accession numbers** are assigned at ingest from `ACCESSION_NUMBER_FORMAT` using a locked row
+  in a new `sequences` table (works on PostgreSQL and SQLite). A number typed by hand is skipped
+  by the generator. `archive:assign-accession-numbers` numbers older records once, oldest first.
+  The number is editable (letters, digits and `. _ / -`) and unique.
+- **Subjects and keywords:** ones added by hand are confirmed at once; AI ones are created
+  unconfirmed (source `ai`) when metadata is stored and wait for a tick; rejecting deletes them.
+  The AI's keywords become archive keyword suggestions too. Every change is in the audit log.
+- **Location suggestion:** the AI names the place; Laravel matches the names (case-insensitive,
+  top-down, also the region's description such as "Central Visayas") to location ids and keeps
+  them with the suggestion. A level that doesn't match stops the chain; the encoder applies it.
+- **Container tags** give two hints, shown with a "Use" button: the creation date (with a warning
+  that it's often the copy date; 1904/1970 and future dates are ignored) and ISO 6709 GPS.
+- **"Fill with AI" (owner's request)** in Archive → Descriptive suggests the title, alternative
+  title, catalogue description, genre and video type (only names from the admin lists), country
+  and recording date (only a real past date; from the series or project dates when the video
+  doesn't say). It reads the active generation's summary, chapters and keywords plus the project
+  and series, never the transcript (a few hundred tokens). Queued like "Generate more"; the
+  suggestions fill the form unsaved, with Undo, and a date from the AI is stored with source `ai`.
+- **GPS map picker (owner's choice):** `leaflet` + `react-leaflet` with OpenStreetMap tiles, no
+  API key. Click the map to drop the pin (a vector circle; Leaflet's image icon breaks under
+  bundlers), or "Use my location" (the browser asks first). The map loads lazily (its own ~45 kB
+  gzipped chunk) only when the Location section opens, and is isolated so its layers can't cover
+  menus or dialogs. OSM's tile policy suits light internal use; for public or heavy traffic set
+  `VITE_MAP_TILE_URL` / `VITE_MAP_ATTRIBUTION` to your own tile server or a provider. Viewing the
+  map sends tile requests (the area shown, not the record) to that provider.
+- **Credits:** the Archive tab holds the agency and unit; people stay in the existing Credits tab
+  (one place to edit them).
+- **Works:** `POST /works`, `GET|PATCH /works/{work}`; a record joins a work through the record
+  update (`work_id`, part number and label). Encoders use only their own works; admins any.
+
+### Files and integrity
+
+- **The proxy stage runs last** in the chain (after metadata) on the normal worker, so a long
+  transcode never delays the transcript. It runs only when the master isn't browser-playable:
+  the container isn't MP4/MOV/WebM, a codec isn't H.264/VP8/VP9/AV1 + AAC/MP3/Opus/Vorbis, or the
+  H.264 is 10-bit or 4:2:2 (which most browsers can't decode). The copy is H.264 (CRF 23, 8-bit
+  4:2:0) + AAC in MP4, `faststart`, never upscaled, deinterlaced with yadif when the master is
+  interlaced, at `records/{id}/proxy/access.mp4` (written to a `.part` file first). It gets its
+  own checksums and technical record, logged as `transcoded`; a new proxy replaces the old row.
+  The media route streams the proxy only when the master can't play.
+- **Extra files** (mezzanine, access) go through the same chunked upload, then
+  `/jobs/ingest-file` checksums and probes them; results arrive on
+  `/internal/record-files/{file}/results/{checksum|probe|failed}`. The master can't be written
+  through that route.
+- **Ingest fixity:** when an expected checksum was supplied, the comparison at ingest is also
+  stored in `fixity_checks` (`triggered_by: ingest`), for masters and added files.
+- **Fixity checks** re-hash masters and mezzanines (proxies and access copies can be remade).
+  The AI service only computes checksums; Laravel compares them (`hash_equals`), stores one row
+  per algorithm, logs `checksum_verified`/`checksum_failed`, and on a mismatch or a missing file
+  sets `checksum_status = mismatch` and emails the owner and every active admin. A check that
+  couldn't run is logged, not counted as a mismatch.
+- **Scheduled checks:** `archive:fixity` runs daily at 02:00 and queues files never checked since
+  ingest or not checked within `FIXITY_CHECK_INTERVAL_DAYS`, oldest first, at most 500 per run, so
+  a big archive is spread over several nights. One check per file at a time (`ShouldBeUnique`).
+- **"Check now"** needs only view access (it changes nothing unless a file has changed) and is
+  limited to 6 a minute.
+- **Attachments** (release forms, contracts, sidecars, documents) are stored on the private media
+  disk under a generated name with their SHA-256, downloaded only through the record policy, and
+  limited to documents, images, subtitles and sidecars (`MAX_ATTACHMENT_MB`, default 50). HTML and
+  executables are refused.
+
+### Distribution policy
+
+- `RecordPolicy::distribute(?User, Record)` needs: approved with `published_at` set, not deleted,
+  `unclassified`, and rights that allow public access (public, permission approved, no embargo in
+  force). There is no `is_approved` column; approval is `review_status = approved`. Nothing calls
+  it yet: the public catalogue, YouTube, API export and ZIPs (Phases 4, 6, 7) must.
+
+### Workspace and lists
+
+- A new **Archive** inspector tab with eight sections; the tab shows how many AI suggestions wait.
+- **TimecodeToggle (TC)** in the transport bar switches the transport clock and the transcript
+  times to SMPTE timecode from the master's start timecode and frame rate (drop-frame with `;` at
+  29.97/59.94; 25 fps if the rate is unknown).
+- The header shows the accession number, a classification badge (above unclassified) and an
+  embargo badge (while one is in force); so does the record list, which also searches accession
+  numbers and filters embargoed or classified records.
+- **Disposition review** (`/admin/dispositions`, admin sidebar): records whose disposition date has
+  passed, oldest first. A page instead of a scheduled job: the list is always current, and nothing
+  is ever destroyed automatically.
+
+### Later
+
+- Shot/scene segments in the Structure tab arrive with Phase 5 (visual analysis).
+- An in-app notification for fixity mismatches (email only for now).
+- Moving a record to another project resets the series; series of other projects aren't listed
+  until the project is changed.
+
+## Phase 2 — More AI output and export formats (built)
+
+### Presets (limits checked 2026-11-22)
+
+- **TikTok:** 2,200-character caption. The Content Posting API's limit is 2,200; in-app captions
+  reportedly allow 4,000, but the API limit is the safe one. 3–5 hashtags.
+- **Instagram:** 2,200-character caption, **at most 5 hashtags**. Instagram reportedly cut the
+  limit from 30 to 5 in December 2025; this wasn't confirmed on an official Meta page, so 5 is
+  used because it is valid either way.
+- **LinkedIn:** 3,000 characters, 3–5 hashtags, professional tone.
+- TikTok, Instagram and LinkedIn have no title field (`title_max` null): their titles are short
+  working titles for the archive and are not cut. They still get up to 10 tags for the archive.
+- The guidance text of each preset says how much of the caption shows before "more".
+
+### AI output
+
+- **Quotes, tone and content flags come from the same metadata call** (no extra request) and
+  belong to the cached, preset-independent "core", so switching preset keeps them. The core's
+  cache version moved to `v2`: the first regeneration of a Phase 1 record reads its transcript
+  once more.
+- **Quote times are aligned in code, not by the model.** The model sees one time per ~30 s block,
+  returns each quote word for word with its block time, and the AI service finds the transcript
+  lines it came from (exact start and end). A quote whose opening matches no line is dropped,
+  so made-up quotes don't reach the record. For long transcripts the map step picks verbatim
+  quotes per part, because the final call only sees summaries.
+- **Tone** is one of ten fixed values (structured output guarantees it); **content flags** are
+  profanity plus up to 5 sensitive-topic labels. They are shown as badges. Speakers on quotes
+  stay empty until diarization (Phase 6).
+- **"Generate more" titles** (`POST /records/{record}/titles` → `/generate/titles`) are written
+  from the generation's summary only (a few hundred tokens), never cached, and told the existing
+  titles to avoid. The job appends them to the generation under a row lock and broadcasts
+  `record.titles-generated`; a cache lock stops double requests. A generation holds at most 12
+  titles. The request names the generation, so a regeneration in between returns 409.
+- Older generations get `quotes: []`, `tone: null`, `contentFlags: null` when shown; the new
+  fields are optional in validation, so they still save.
+
+### Translations
+
+- **Async with callbacks**, as §7 suggests for long transcripts: `StartTranslationJob` →
+  `POST /jobs/translate` → a Celery task on the normal (non-GPU) queue → signed callbacks
+  `/internal/records/{record}/translations/{transcript}/progress|result`. The transcript route
+  value is scoped to the record and must not be the original.
+- **Only line ids and text are sent**, in batches of up to 60 lines / 6,000 characters
+  ("index|text", indexes restarting per batch). Laravel copies each line's timing, order and
+  speaker from the original line, so the model can't break a timestamp. Lines the model skips
+  are asked for once more, then keep the source text.
+- **Model:** the main model (`LLM_TRANSLATION_MODEL`, default `gpt-6.2-sol`) rather than the light
+  one, because Filipino and regional languages are where a small model's subtitles read badly.
+  Usage is summed per kind, so a long translation writes two usage rows.
+- **Languages** are a fixed list in `config/archive.php` (`translation_languages`, code → English
+  name; the name is what the model is told). The original's language is refused. Translating
+  again replaces the lines (useful after editing the original).
+- `record_transcripts` gained `progress` and `error`, so a failure keeps its message after a
+  reload. A re-run of the pipeline whose transcript comes out in a language that already has a
+  translation replaces that translation (the table is unique per record and language).
+- **Not built:** choosing translation languages at upload (needs the pipeline options stored on
+  the record; see "Later").
+
+### Exports
+
+- `ExportFormat` enum maps each format to its exporter. SRT and VTT add the speaker (`Name: ` /
+  `<v Name>`); VTT escapes `&`, `<`, `>` and `-->`. CSV is `start,end,speaker,text` with a UTF-8
+  BOM (Excel) and an apostrophe before cells starting with `= + - @` (CSV injection). Markdown
+  escapes formatting characters in record text, so it can't turn into links, images or HTML.
+- **Markdown uses the record's description and falls back to the AI description**; it also
+  includes the AI summary.
+- **The JSON export gained two §10 fields** Phase 1 left out: `record.isApproved` (derived from
+  `review_status`; there is no `is_approved` column) and `endDate` on project and series. The
+  generator version is now 0.3.0; `schemaVersion` stays 1.0 (only additions).
+- **Custom schemas** keep only the chosen dot-paths, from a fixed list of 60 paths
+  (`ExportSchemaFields`), in document order. `schemaVersion` and `generatedAt` always stay, so a
+  consumer can tell which shape it got. A chosen sub-field of an empty block keeps the block as
+  `null`. Schemas are personal (admins included); one may be the default, which the Export panel
+  picks first. Without a `schema` parameter the export is always the full document.
+- **Previews aren't logged.** The Export panel fetches `export?…&preview=1` (inline, plain text,
+  no-store); only downloads write an `exported` audit entry, now with the language and schema.
+- **Captions** use their own route (`GET /records/{record}/captions/{language}`, inline VTT,
+  not cached, not logged) rather than the export route, so playing a video doesn't fill the
+  audit log with exports. Tracks reload after a line is edited or deleted.
+
+### Workspace
+
+- New inspector tabs **Languages** (the spec's TranslationsPanel; "Translations" didn't fit the
+  tab bar) and **Export**. The header's "Export JSON" button now opens the Export tab.
+- **Keyboard shortcuts:** Space/K, J/L, ←/→ (previous/next line), C and Shift+C (copy the current
+  line, with its time), / (search), E (edit the current line), ? (shortcuts dialog). **T (set the
+  current frame as thumbnail) waits for Phase 5**, which adds frames and thumbnails; the dialog
+  lists only keys that work. The arrow keys move between transcript lines, not frames.
+- Export schemas live under **Settings → Export schemas** (the settings layout, shown to encoders
+  and admins only); the route is in `routes/encoder.php`.
+
+### Later
+
+- Translation languages chosen at upload (store the pipeline options on the record).
+- Detect translations stuck in "processing" when a worker dies (same as stages).
+- Three Phase 1 PHPStan errors remain in `Admin/LogController` (paginator generics and
+  `withTrashed()` on a BelongsTo); untouched by Phase 2.
+
 ## Phase 1 — Core app (built)
 
 ### Token budget (owner: "reduce token usage as much as possible")

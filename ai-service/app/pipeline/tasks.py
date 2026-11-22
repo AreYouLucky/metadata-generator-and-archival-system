@@ -17,6 +17,7 @@ from app.callbacks import ProgressReporter, report_progress, report_result
 from app.pipeline import stages
 from app.pipeline.audio import AudioError
 from app.pipeline.probe import ProbeError
+from app.pipeline.proxy import ProxyError
 from app.providers.llm import LlmError
 from app.providers.transcription.local import ModelNotReadyError
 from app.schemas.pipeline import PipelineContext, ProcessRequest, StageName
@@ -32,6 +33,7 @@ StageFunction = Callable[[PipelineContext, Callable[[int], None]], dict[str, Any
 # Errors whose message is safe and useful to show the encoder as-is.
 _EXPLAINED = (
     ProbeError,
+    ProxyError,
     AudioError,
     LlmError,
     UnsafePathError,
@@ -40,7 +42,7 @@ _EXPLAINED = (
 )
 
 
-def user_message(stage: StageName, error: Exception) -> str:
+def user_message(stage: str, error: Exception) -> str:
     if isinstance(error, _EXPLAINED):
         return str(error)
     if isinstance(error, openai.AuthenticationError):
@@ -112,6 +114,11 @@ def generate_metadata_task(context: dict[str, Any]) -> dict[str, Any]:
     return run_stage("generate_metadata", context, stages.run_generate_metadata)
 
 
+@celery_app.task(name="pipeline.proxy", soft_time_limit=6 * 60 * 60)
+def proxy_task(context: dict[str, Any]) -> dict[str, Any]:
+    return run_stage("proxy", context, stages.run_proxy)
+
+
 def start_pipeline(request: ProcessRequest) -> str:
     """Queue the chain; returns the id of the last task (the job id)."""
     context = PipelineContext(request=request).model_dump()
@@ -121,5 +128,6 @@ def start_pipeline(request: ProcessRequest) -> str:
         extract_audio_task.s(),
         transcribe_task.s().set(queue=GPU_QUEUE),
         generate_metadata_task.s(),
+        proxy_task.s(),
     )
     return str(workflow.apply_async().id)

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Internal;
 
 use App\Enums\PipelineStage;
 use App\Enums\ScanType;
+use App\Enums\SubjectType;
 use App\Enums\UsageKind;
 use App\Services\Records\PipelineOptions;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -17,6 +18,11 @@ use Illuminate\Validation\Rule;
  */
 class ReceiveStageResultRequest extends FormRequest
 {
+    /**
+     * Title options a generation may hold (three generated, plus "Generate more").
+     */
+    public const int MAX_TITLES = 12;
+
     public function authorize(): bool
     {
         return true;
@@ -48,6 +54,13 @@ class ReceiveStageResultRequest extends FormRequest
                 'segments.*.end' => ['required', 'numeric', 'min:0'],
                 'segments.*.text' => ['required', 'string', 'max:5000'],
                 ...$this->usageRules(),
+            ],
+            PipelineStage::Proxy => [
+                'path' => ['required', 'string', 'max:1024', 'regex:/^records\/[0-9a-z]{26}\/proxy\/[A-Za-z0-9._-]+\.mp4$/i'],
+                'md5' => ['required', 'string', 'regex:/^[a-f0-9]{32}$/'],
+                'sha256' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+                'file_size' => ['required', 'integer', 'min:0'],
+                ...self::prefixed('probe.', $this->probeRules(withRaw: false)),
             ],
             PipelineStage::GenerateMetadata => [
                 'preset' => ['required', Rule::in(PipelineOptions::enabledPresets())],
@@ -111,6 +124,23 @@ class ReceiveStageResultRequest extends FormRequest
     }
 
     /**
+     * @return array{path: string, md5: string, sha256: string, file_size: int, probe: array<string, mixed>}
+     */
+    public function proxyResult(): array
+    {
+        /** @var array<string, mixed> $probe */
+        $probe = $this->validated('probe');
+
+        return [
+            'path' => (string) $this->validated('path'),
+            'md5' => (string) $this->validated('md5'),
+            'sha256' => (string) $this->validated('sha256'),
+            'file_size' => (int) $this->validated('file_size'),
+            'probe' => $probe,
+        ];
+    }
+
+    /**
      * @return list<array{kind: string, quantity: float, estimated_cost: float|null}>
      */
     private function usage(): array
@@ -145,7 +175,8 @@ class ReceiveStageResultRequest extends FormRequest
 
         return [
             ...$parent,
-            "{$prefix}titles" => ['present', 'array', 'max:10'],
+            // Room for "Generate more" options on top of the first three.
+            "{$prefix}titles" => ['present', 'array', 'max:'.self::MAX_TITLES],
             "{$prefix}titles.*" => ['string', 'max:300'],
             "{$prefix}description" => ['present', 'nullable', 'string', 'max:10000'],
             "{$prefix}summary" => ['present', 'nullable', 'string', 'max:5000'],
@@ -158,13 +189,51 @@ class ReceiveStageResultRequest extends FormRequest
             "{$prefix}chapters" => ['present', 'array', 'max:200'],
             "{$prefix}chapters.*.start" => ['required', 'numeric', 'min:0'],
             "{$prefix}chapters.*.title" => ['required', 'string', 'max:150'],
+            // Phase 2. Optional, so generations stored before them still save.
+            "{$prefix}quotes" => ['sometimes', 'array', 'max:20'],
+            "{$prefix}quotes.*.start" => ['required', 'numeric', 'min:0'],
+            "{$prefix}quotes.*.end" => ['required', 'numeric', 'min:0'],
+            "{$prefix}quotes.*.speaker" => ['nullable', 'string', 'max:100'],
+            "{$prefix}quotes.*.text" => ['required', 'string', 'max:1000'],
+            "{$prefix}tone" => ['sometimes', 'nullable', 'string', 'max:40'],
+            "{$prefix}contentFlags" => ['sometimes', 'nullable', 'array'],
+            "{$prefix}contentFlags.profanity" => ["required_with:{$prefix}contentFlags", 'boolean'],
+            "{$prefix}contentFlags.sensitiveTopics" => ["present_with:{$prefix}contentFlags", 'array', 'max:10'],
+            "{$prefix}contentFlags.sensitiveTopics.*" => ['string', 'max:60'],
+            // Phase 3 suggestions (stored as unconfirmed archive entries, not edited here).
+            "{$prefix}suggestedSubjects" => ['sometimes', 'array', 'max:20'],
+            "{$prefix}suggestedSubjects.*.name" => ['required', 'string', 'max:250'],
+            "{$prefix}suggestedSubjects.*.type" => ['required', Rule::enum(SubjectType::class)],
+            "{$prefix}suggestedLocation" => ['sometimes', 'nullable', 'array'],
+            "{$prefix}suggestedLocation.text" => ["required_with:{$prefix}suggestedLocation", 'string', 'max:250'],
+            "{$prefix}suggestedLocation.region" => ['nullable', 'string', 'max:120'],
+            "{$prefix}suggestedLocation.province" => ['nullable', 'string', 'max:120'],
+            "{$prefix}suggestedLocation.city" => ['nullable', 'string', 'max:120'],
+            "{$prefix}suggestedLocation.barangay" => ['nullable', 'string', 'max:120'],
         ];
     }
 
     /**
+     * @param  array<string, array<int, mixed>>  $rules
      * @return array<string, array<int, mixed>>
      */
-    private function probeRules(): array
+    private static function prefixed(string $prefix, array $rules): array
+    {
+        $result = [rtrim($prefix, '.') => ['required', 'array']];
+
+        foreach ($rules as $key => $rule) {
+            $result[$prefix.$key] = $rule;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Rules for a probe summary (also used for added files and proxies).
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    public function probeRules(bool $withRaw = true): array
     {
         $text = fn (int $max): array => ['nullable', 'string', "max:{$max}"];
 
@@ -196,7 +265,7 @@ class ReceiveStageResultRequest extends FormRequest
             'container_tags' => ['present', 'array'],
             'container_tags.creation_time' => $text(64),
             'container_tags.location' => $text(64),
-            'raw_probe' => ['present', 'array'],
+            ...($withRaw ? ['raw_probe' => ['present', 'array']] : []),
         ];
     }
 

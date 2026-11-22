@@ -22,13 +22,14 @@ enum PipelineStage: string
 
     /**
      * The stages the pipeline runs today, in run order (checksums first, before
-     * anything else reads the file). Later phases add their stages here.
+     * anything else reads the file; the access copy last, so a long transcode
+     * never delays the transcript). Later phases add their stages here.
      *
      * @return list<self>
      */
     public static function active(): array
     {
-        return [self::Checksum, self::Probe, self::ExtractAudio, self::Transcribe, self::GenerateMetadata];
+        return [self::Checksum, self::Probe, self::ExtractAudio, self::Transcribe, self::GenerateMetadata, self::Proxy];
     }
 
     public function label(): string

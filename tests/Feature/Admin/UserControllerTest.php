@@ -88,10 +88,10 @@ class UserControllerTest extends TestCase
 
     public function test_the_user_list_is_searchable(): void
     {
-        User::factory()->encoder()->create(['name' => 'Ana Encoder']);
-        User::factory()->encoder()->create(['name' => 'Ben Encoder']);
+        User::factory()->encoder()->create(['name' => 'Ana Encoder', 'email' => 'first@example.com']);
+        User::factory()->encoder()->create(['name' => 'Ben Encoder', 'email' => 'second@example.com']);
 
-        $this->actingAs(User::factory()->admin()->create(['name' => 'Zed Admin']))
+        $this->actingAs(User::factory()->admin()->create(['name' => 'Zed Admin', 'email' => 'third@example.com']))
             ->get(route('admin.users.index', ['q' => 'ana']))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('admin/users-page/users')

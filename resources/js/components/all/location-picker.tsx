@@ -13,6 +13,7 @@ import {
     useProvinces,
     useRegions,
 } from '@/hooks/use-locations';
+import { SELECT_FILL_TRUNCATE } from '@/lib/utilities';
 import { EMPTY_LOCATION } from '@/hooks/use-locations';
 import type { LocationOption, LocationValue } from '@/hooks/use-locations';
 
@@ -93,50 +94,54 @@ export default function LocationPicker({
     ];
 
     return (
-        <div className="grid gap-4 sm:grid-cols-2">
-            {levels.map((level) => (
-                <div key={level.key} className="grid gap-2">
-                    <Label htmlFor={`${idPrefix}-${level.key}`}>
-                        {level.label}
-                    </Label>
-                    <Select
-                        value={
-                            value[level.key] === null
-                                ? NONE
-                                : String(value[level.key])
-                        }
-                        disabled={disabled || !level.enabled || level.loading}
-                        onValueChange={(selected) =>
-                            level.onSelect(
-                                selected === NONE ? null : Number(selected),
-                            )
-                        }
-                    >
-                        <SelectTrigger
-                            id={`${idPrefix}-${level.key}`}
-                            className="w-full"
+        <div className="@container">
+            <div className="grid gap-4 @md:grid-cols-2">
+                {levels.map((level) => (
+                    <div key={level.key} className="grid min-w-0 gap-2">
+                        <Label htmlFor={`${idPrefix}-${level.key}`}>
+                            {level.label}
+                        </Label>
+                        <Select
+                            value={
+                                value[level.key] === null
+                                    ? NONE
+                                    : String(value[level.key])
+                            }
+                            disabled={
+                                disabled || !level.enabled || level.loading
+                            }
+                            onValueChange={(selected) =>
+                                level.onSelect(
+                                    selected === NONE ? null : Number(selected),
+                                )
+                            }
                         >
-                            <SelectValue
-                                placeholder={
-                                    level.loading ? 'Loading…' : 'Not set'
-                                }
-                            />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-72">
-                            <SelectItem value={NONE}>Not set</SelectItem>
-                            {(level.options ?? []).map((option) => (
-                                <SelectItem
-                                    key={option.id}
-                                    value={String(option.id)}
-                                >
-                                    {option.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <InputError message={errors[level.key]} />
-                </div>
-            ))}
+                            <SelectTrigger
+                                className={SELECT_FILL_TRUNCATE}
+                                id={`${idPrefix}-${level.key}`}
+                            >
+                                <SelectValue
+                                    placeholder={
+                                        level.loading ? 'Loading…' : 'Not set'
+                                    }
+                                />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-72">
+                                <SelectItem value={NONE}>Not set</SelectItem>
+                                {(level.options ?? []).map((option) => (
+                                    <SelectItem
+                                        key={option.id}
+                                        value={String(option.id)}
+                                    >
+                                        {option.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors[level.key]} />
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

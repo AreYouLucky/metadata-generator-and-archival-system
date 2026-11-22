@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $language
  * @property bool $is_original
  * @property TaskStatus $status
+ * @property int $progress
+ * @property string|null $error
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -36,6 +38,7 @@ class RecordTranscript extends Model
     protected $attributes = [
         'is_original' => true,
         'status' => 'queued',
+        'progress' => 0,
     ];
 
     /**
@@ -48,7 +51,16 @@ class RecordTranscript extends Model
         return [
             'is_original' => 'boolean',
             'status' => TaskStatus::class,
+            'progress' => 'integer',
         ];
+    }
+
+    /**
+     * Whether a translation is still queued or running (a new request must wait).
+     */
+    public function isBusy(): bool
+    {
+        return in_array($this->status, [TaskStatus::Queued, TaskStatus::Processing], true);
     }
 
     /**

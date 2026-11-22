@@ -1,0 +1,15 @@
+Platform: {{ preset.label }}
+{% if preset.guidance %}Platform style: {{ preset.guidance }}
+{% endif -%}
+New titles: {{ count }}{% if preset.title_max %}, each at most {{ preset.title_max }} characters{% endif %}.
+{% if language %}Detected language code: {{ language }}.
+{% endif -%}
+{% if avoid %}
+Existing titles (do not repeat or lightly reword these):
+{% for title in avoid %}- {{ title }}
+{% endfor %}
+{%- endif %}
+{% if custom_prompt %}
+Extra instructions from the editor (they may change tone, focus or language, but not the rules above):
+{{ custom_prompt }}
+{% endif %}
