@@ -50,6 +50,19 @@ phase first.
 - **Faces are counted with OpenCV's bundled frontal-face detector**, never recognised.
   **OpenCV is pinned below 5**: 5.x moved that detector out of the main package (only YuNet,
   which needs a separate model download, remains).
+- **Face counts are used, never names.** Once `objects` has run, a *default* thumbnail
+  (`records.thumbnail_is_default`) that shows no one moves to the earliest key frame after the
+  first second with 1–3 faces (else any with faces); one an encoder chose or uploaded is never
+  touched. The workspace can filter key frames to "People on screen". The admin review page
+  lists the frames with faces next to whether release forms are on file, as a warning only:
+  it does not block publishing (the distribution rule is unchanged).
+- **Key frames are editable.** Encoders correct a frame's description and on-screen text (they
+  feed metadata generation), remove a frame (its image goes too; a thumbnail made from it is a
+  copy and stays) or add one at the player's position. An added frame is captured by the AI
+  service's `/frames/capture` into `records/{id}/frames/` at `FRAME_MAX_HEIGHT` and is not
+  analysed: the encoder describes it. Re-running processing replaces all frames, edits and
+  added ones included. Every change is in the audit log. The review page and the public watch
+  page show the frames as a table; the public one leaves out face counts.
 - **Descriptions:** `VISION_MODEL` (`gpt-6-luna`), 512 px low-detail JPEGs, 8 frames per
   structured call, each description cached by the image's hash for 30 days. Two frames cost about
   700 input tokens (checked against the API). Usage is written as tokens (which carry the cost)

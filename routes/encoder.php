@@ -26,6 +26,7 @@ use App\Http\Controllers\Encoder\ProvenanceController;
 use App\Http\Controllers\Encoder\RecordController;
 use App\Http\Controllers\Encoder\RecordExportController;
 use App\Http\Controllers\Encoder\RecordFileController;
+use App\Http\Controllers\Encoder\RecordFrameController;
 use App\Http\Controllers\Encoder\RecordFrameImageController;
 use App\Http\Controllers\Encoder\RecordMediaController;
 use App\Http\Controllers\Encoder\RecordWaveformController;
@@ -101,6 +102,10 @@ Route::middleware(['auth', 'verified', 'role:encoder,admin', 'catalogue.refresh'
     Route::post('records/{record}/thumbnail', [ThumbnailController::class, 'store'])->middleware('throttle:20,1')->name('records.thumbnail.store');
     Route::get('records/{record}/thumbnail', [ThumbnailController::class, 'show'])->name('records.thumbnail');
     Route::get('records/{record}/frames/{frame}/image', RecordFrameImageController::class)->scopeBindings()->name('records.frames.image');
+    // Adding a key frame runs ffmpeg on the AI service, like a thumbnail at a time.
+    Route::post('records/{record}/frames', [RecordFrameController::class, 'store'])->middleware('throttle:20,1')->name('records.frames.store');
+    Route::patch('records/{record}/frames/{frame}', [RecordFrameController::class, 'update'])->middleware('throttle:60,1')->scopeBindings()->name('records.frames.update');
+    Route::delete('records/{record}/frames/{frame}', [RecordFrameController::class, 'destroy'])->middleware('throttle:60,1')->scopeBindings()->name('records.frames.destroy');
     Route::post('records/{record}/scenes', [SceneController::class, 'store'])->middleware('throttle:60,1')->name('records.scenes.store');
     Route::patch('records/{record}/scenes/{scene}', [SceneController::class, 'update'])->middleware('throttle:60,1')->scopeBindings()->name('records.scenes.update');
     Route::delete('records/{record}/scenes/{scene}', [SceneController::class, 'destroy'])->middleware('throttle:60,1')->scopeBindings()->name('records.scenes.destroy');

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.config import get_settings
 from app.pipeline.frames import extract_frame
 from app.pipeline.visual import VisualError
 from app.schemas.visual import CaptureRequest, CaptureResult
@@ -14,11 +15,17 @@ THUMBNAIL_MAX_HEIGHT = 1080
 
 @router.post("/frames/capture", response_model=CaptureResult)
 def capture(body: CaptureRequest) -> CaptureResult:
-    """Signed by Laravel ("Use current frame"): one frame of the master as a JPEG at the
-    given path. Synchronous; a single frame takes about a second."""
-    if not body.output_path.startswith(f"records/{body.record_id}/thumbnail/"):
+    """Signed by Laravel: one frame of the master as a JPEG at the given path, either the
+    thumbnail ("Use current frame") or a key frame an encoder adds. Synchronous; a single
+    frame takes about a second."""
+    if body.output_path.startswith(f"records/{body.record_id}/thumbnail/"):
+        max_height = THUMBNAIL_MAX_HEIGHT
+    elif body.output_path.startswith(f"records/{body.record_id}/frames/"):
+        # Added key frames match the ones the pipeline extracts.
+        max_height = get_settings().frame_max_height
+    else:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, "The thumbnail must be stored with its record."
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "The frame must be stored with its record."
         )
     try:
         source = resolve(body.video_path)
@@ -28,7 +35,7 @@ def capture(body: CaptureRequest) -> CaptureResult:
     if not source.is_file():
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The video file was not found.")
     try:
-        extract_frame(source, target, body.time_sec, THUMBNAIL_MAX_HEIGHT)
+        extract_frame(source, target, body.time_sec, max_height)
     except VisualError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
     return CaptureResult(path=relative(target))

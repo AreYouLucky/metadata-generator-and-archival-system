@@ -4,6 +4,7 @@ import EditorPanel from '@/components/encoder/editor-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { StageState } from '@/types/records';
 import type { Visuals } from '@/types/visuals';
+import AddFrameButton from './add-frame-button';
 import VisualsFrames from './visuals-frames';
 import VisualsScenes from './visuals-scenes';
 import VisualsThumbnail from './visuals-thumbnail';
@@ -82,11 +83,19 @@ export default function VisualsPanel({
                         </div>
                     </div>
                 ) : (
-                    <p className="rounded-md border border-dashed border-white/10 p-4 text-center text-sm text-neutral-500">
-                        {switchedOff
-                            ? 'Visual analysis was turned off for this video.'
-                            : 'No key frames yet.'}
-                    </p>
+                    <div className="grid justify-items-center gap-2 rounded-md border border-dashed border-white/10 p-4 text-center text-sm text-neutral-500">
+                        <p>
+                            {switchedOff
+                                ? 'Visual analysis was turned off for this video.'
+                                : 'No key frames yet.'}
+                        </p>
+                        {canEdit && (
+                            <AddFrameButton
+                                recordId={recordId}
+                                onAdded={() => undefined}
+                            />
+                        )}
+                    </div>
                 )}
 
                 {(visuals.shots.length > 0 || visuals.scenes.length > 0) && (

@@ -80,7 +80,10 @@ class ApprovalControllerTest extends TestCase
                 ->where('faces.release_consent', 'not_available')
                 ->where('faces.frames.0.id', $first->id)
                 ->where('faces.frames.0.face_count', 2)
-                ->has('faces.frames', 2));
+                ->has('faces.frames', 2)
+                // Every key frame, for the Visuals table.
+                ->has('frames', 4)
+                ->where('frames.1.id', $first->id));
     }
 
     public function test_the_review_page_has_no_face_check_when_faces_were_never_counted(): void

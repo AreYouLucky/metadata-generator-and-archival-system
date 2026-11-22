@@ -107,3 +107,14 @@ export type WatchTranscriptLine = {
 };
 
 export type WatchCaption = { language: string; is_original: boolean };
+
+/** A key frame on the public page: what it shows (no face counts). */
+export type WatchFrame = {
+    id: number;
+    time_sec: number;
+    url: string;
+    description: string | null;
+    ocr_text: string | null;
+    /** Object labels, most confident first. */
+    objects: string[];
+};

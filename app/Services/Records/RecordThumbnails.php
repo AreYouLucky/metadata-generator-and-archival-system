@@ -3,12 +3,10 @@
 namespace App\Services\Records;
 
 use App\Enums\AuditAction;
-use App\Enums\FileRole;
 use App\Models\Record;
 use App\Models\RecordFrame;
 use App\Models\User;
 use App\Models\VideoAuditLog;
-use App\Services\AiService\AiServiceClient;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -29,7 +27,7 @@ class RecordThumbnails
     /** Faces in a frame preferred for the default thumbnail. */
     private const int FEW_FACES = 3;
 
-    public function __construct(private AiServiceClient $client) {}
+    public function __construct(private FrameCapture $frames) {}
 
     /**
      * Use a key frame. `$by` is null for the default picked after processing
@@ -46,7 +44,7 @@ class RecordThumbnails
         $path = $this->newPath($record, 'jpg');
         $disk->copy($frame->path, $path);
 
-        $this->replace($record, $path, $frame->id, $frame->time_sec, $by, 'key frame at '.$this->clock($frame->time_sec));
+        $this->replace($record, $path, $frame->id, $frame->time_sec, $by, 'key frame at '.VisualsPresenter::clock($frame->time_sec));
     }
 
     /**
@@ -85,21 +83,10 @@ class RecordThumbnails
      */
     public function capture(Record $record, float $seconds, User $by): void
     {
-        $master = $record->files()->where('role', FileRole::Master)->firstOrFail(['id', 'storage_location']);
         $path = $this->newPath($record, 'jpg');
+        $this->frames->capture($record, $seconds, $path);
 
-        $stored = $this->client->captureFrame([
-            'record_id' => $record->id,
-            'video_path' => $master->storage_location,
-            'time_sec' => round($seconds, 3),
-            'output_path' => $path,
-        ]);
-
-        if ($stored !== $path || ! $this->disk()->exists($path)) {
-            throw new RuntimeException('The AI service did not store the frame.');
-        }
-
-        $this->replace($record, $path, null, round($seconds, 3), $by, 'frame captured at '.$this->clock($seconds));
+        $this->replace($record, $path, null, round($seconds, 3), $by, 'frame captured at '.VisualsPresenter::clock($seconds));
     }
 
     public function upload(Record $record, UploadedFile $image, User $by): void
@@ -158,18 +145,6 @@ class RecordThumbnails
     private function newPath(Record $record, string $extension): string
     {
         return "records/{$record->id}/thumbnail/".Str::lower(Str::random(20)).".{$extension}";
-    }
-
-    /**
-     * "1:05" or "1:02:05", as the workspace shows times.
-     */
-    private function clock(float $seconds): string
-    {
-        $total = (int) floor(max(0.0, $seconds));
-
-        return $total >= 3600
-            ? sprintf('%d:%02d:%02d', intdiv($total, 3600), intdiv($total % 3600, 60), $total % 60)
-            : sprintf('%d:%02d', intdiv($total, 60), $total % 60);
     }
 
     private function disk(): Filesystem

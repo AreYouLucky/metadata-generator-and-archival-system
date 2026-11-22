@@ -5,6 +5,7 @@ export type ReviewTab =
     | 'transcript'
     | 'metadata'
     | 'archive'
+    | 'visuals'
     | 'translations';
 
 type Props = {
@@ -18,12 +19,14 @@ const TABS: { value: ReviewTab; label: string }[] = [
     { value: 'transcript', label: 'Transcript' },
     { value: 'metadata', label: 'Metadata' },
     { value: 'archive', label: 'Archive' },
+    { value: 'visuals', label: 'Visuals' },
     { value: 'translations', label: 'Translations' },
 ];
 
 /**
  * Switches between the review page's tables: the record overview, the
- * transcript, the AI metadata, the archival record and the translations.
+ * transcript, the AI metadata, the archival record, the key frames and the
+ * translations.
  */
 export default function ReviewTabBar({ active, counts, onChange }: Props) {
     return (

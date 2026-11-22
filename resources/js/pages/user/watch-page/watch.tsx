@@ -6,30 +6,34 @@ import { captions as captionsRoute } from '@/routes/catalogue';
 import type {
     CatalogueCard,
     WatchCaption,
+    WatchFrame,
     WatchRecord,
     WatchTranscriptLine,
 } from '@/types/catalogue';
 import WatchChapters from './partials/watch-chapters';
 import WatchDetails from './partials/watch-details';
+import WatchFrames from './partials/watch-frames';
 import WatchTranscript from './partials/watch-transcript';
 
 type Props = {
     record: WatchRecord;
     transcript: { language: string | null; lines: WatchTranscriptLine[] };
     captions: WatchCaption[];
+    frames: WatchFrame[];
     related: CatalogueCard[];
     mediaUrl: string;
 };
 
 /**
  * The public player: the access copy with captions in every finished
- * language, chapters and a synced transcript (click to jump), and the public
- * catalogue fields. Never a download of the master.
+ * language, chapters and a synced transcript (click to jump), the key frames
+ * as a table, and the public catalogue fields. Never a download of the master.
  */
 export default function Watch({
     record,
     transcript,
     captions,
+    frames,
     related,
     mediaUrl,
 }: Props) {
@@ -137,6 +141,13 @@ export default function Watch({
                         </section>
                     </aside>
                 </div>
+
+                {frames.length > 0 && (
+                    <section className="grid gap-4">
+                        <h2 className="text-xl font-semibold">On screen</h2>
+                        <WatchFrames frames={frames} onSeek={seek} />
+                    </section>
+                )}
 
                 {related.length > 0 && (
                     <section className="grid gap-4">

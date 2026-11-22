@@ -156,6 +156,7 @@ class ApprovalController extends Controller
             'publicBlockers' => $distribution->blockers($record, ignoreApproval: true),
             // People on screen (face counts only), to check consent before publishing.
             'faces' => $visuals->faces($record),
+            'frames' => $visuals->frames($record),
             'history' => $history->for($record),
             'canReview' => request()->user()?->can('review', $record) ?? false,
             'canReopen' => request()->user()?->can('reopen', $record) ?? false,
