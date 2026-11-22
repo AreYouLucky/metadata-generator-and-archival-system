@@ -7,15 +7,17 @@ analyses them with AI, and produces editable metadata (titles, descriptions, tag
 quotes) plus a full archival record with checksums. An admin approves each record, and approved
 videos appear in a public catalogue that anyone can browse by date, event and category.
 
-> **Status:** Phase 4 (approvals, usage and public catalogue) done. Phases 1–3 built users,
+> **Status:** Phase 5 (visual analysis) done. Phases 1–3 built users,
 > chunked uploads, checksums, local GPU transcription, the synced workspace, every platform
 > preset, translations with captions, six export formats and the full archival record (Archive
 > tab, accession numbers, access copies, fixity checks, works, embargoes and the distribution
 > policy). Phase 4 adds the approval workflow (submit, request changes, reject, approve, reopen),
 > an admin overview, usage page with CSV and daily processing limits, admin lists of genres and
 > video types, and the public catalogue (home, browse, project and series pages, watch page)
-> with access logging. The full design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built
-> phase by phase (see [Roadmap](#roadmap)).
+> with access logging. Phase 5 adds shot detection, key frames, frame descriptions, on-screen text
+> (OCR), object labels and face counts, thumbnails, named scenes and on-screen content in the AI
+> metadata. The full design is in [PROJECT_SPEC.md](PROJECT_SPEC.md) and is built phase by phase
+> (see [Roadmap](#roadmap)).
 
 ---
 
@@ -173,8 +175,8 @@ Outside `local`/`testing`, `UserSeeder` creates only the admin and refuses to ru
 | Service         | What it runs                                                                                               | Host port        |
 | --------------- | ---------------------------------------------------------------------------------------------------------- | ---------------- |
 | `redis`         | Laravel queues (db 0), Celery broker (db 1) and results (db 2), Laravel cache (db 3)                       | `127.0.0.1:6379` |
-| `ai-api`        | FastAPI (`/health`, signed `/ping`, `/jobs/process`, `/generate/metadata`)                                 | `127.0.0.1:8001` |
-| `ai-worker`     | Celery: checksums, probing, audio extraction, LLM calls; calls Laravel back at `host.docker.internal:8000` | —                |
+| `ai-api`        | FastAPI (`/health`, signed `/ping`, `/jobs/process`, `/generate/metadata`, `/frames/capture`)              | `127.0.0.1:8001` |
+| `ai-worker`     | Celery: checksums, probing, audio, visual analysis (CPU), LLM calls; calls Laravel back at `host.docker.internal:8000` | — |
 | `ai-worker-gpu` | Celery `gpu` queue: transcription, one job at a time (the 6 GB GPU holds one model)                        | —                |
 
 Uploaded media are stored in `storage/app/media`, which is mounted into the AI containers at
@@ -310,6 +312,41 @@ links to it. Set `ALLOW_PUBLIC_REGISTRATION=false` to hide sign-up, and
 9. Add, rename and reorder entries in **Genres** and **Video types**; ones that records use can't
    be deleted.
 
+## Try Phase 5
+
+After pulling Phase 5:
+
+1. Run `php artisan migrate` (one new column) and `npm run build` (or keep `composer run dev`
+   running).
+2. Rebuild the AI image: `docker compose build` then `docker compose up -d`. It now installs
+   PySceneDetect, OpenCV, EasyOCR, Ultralytics and the CPU build of torch (about 1 GB more to
+   download; `--build-arg VISION=false` builds without them, and the visual stages then fail with
+   a clear message). The first OCR and object detection run downloads their models (about 100 MB)
+   into the `whispermodels` volume.
+
+Then:
+
+1. On **Import media**, leave **Visual analysis** on (with on-screen text and objects) and upload
+   a slide-based video, e.g. a recorded presentation. The progress strip shows the new stages
+   (Scenes, Key frames, Frame descriptions, On-screen text, Objects); they run alongside
+   transcription.
+2. Open the **Visuals** tab: the thumbnail picked after analysis, the key frames (a scissors mark
+   where a shot starts, a star on the thumbnail, a face icon where faces were counted), and the
+   shots. Click a frame: the player jumps there and its description, text on screen, objects and
+   face count are shown. **Use as thumbnail** makes it the record's thumbnail.
+3. Pause anywhere and click **Use current frame** (or press **T**): the frame is taken from the
+   master at full quality. **Upload** takes a JPG, PNG or WebP instead.
+4. Under **Shots and scenes**, click a shot, then another, and **Make a scene**: name it. Named
+   scenes appear on the timeline's **Scenes** track (shots are the strips underneath), in
+   **Archive → Structure** with timecode in and out, and in the JSON export
+   (`structure.segments`, `visual.thumbnail`, `visual.frames`).
+5. The AI metadata mentions what was on screen (slide titles, names shown in lower thirds). A
+   video with no speech at all is now described from its frames.
+6. Once approved, the catalogue card and the watch page's poster use the thumbnail.
+7. Click **Export** in the header (it opens the Export panel; click it again or ✕ to close).
+   Under **Audio**, click **Prepare** for MP3 or WAV: the file is made from the master in the
+   background (a toast says when it's ready), then **Download**. The next download reuses it.
+
 ## Roadmap
 
 | Phase                              | Delivers                                                                                                                    |
@@ -319,7 +356,7 @@ links to it. Set `ALLOW_PUBLIC_REGISTRATION=false` to hide sign-up, and
 | 2 — More AI output                 | All presets, title options, quotes, translations, SRT/VTT/TXT/CSV/Markdown export, captions, shortcuts                      |
 | 3 — Archival metadata              | Descriptive, rights, provenance and structural records; proxies, versions, fixity checks, embargoes                         |
 | 4 — Approvals and public catalogue | Approval workflow, usage dashboard and limits, categories and events, public browse and watch pages                         |
-| 5 — Visual analysis                | Shots with timecode, key frames, frame descriptions, OCR, object labels                                                     |
+| 5 — Visual analysis (built)        | Shots with timecode, key frames, frame descriptions, OCR, object labels, thumbnails, named scenes                            |
 | 6 — Workflow                       | Batch upload and ZIP download, URL import, speaker labels, AssemblyAI transcription                                         |
 | 7 — Advanced                       | Clips, chat with the video, public API, YouTube publishing                                                                  |
 

@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import type { VisualAnalysisValues } from '@/components/encoder/visual-analysis-options';
 import { isAxiosError } from 'axios';
 import { http } from '@/lib/utilities';
 import { store as storeRecord } from '@/routes/records';
@@ -23,7 +24,7 @@ export type UploadRecordInput = {
     expectedMd5: string;
     expectedSha256: string;
     onProgress: (fraction: number) => void;
-};
+} & VisualAnalysisValues;
 
 type UploadSession = { id: string; received: number };
 
@@ -94,6 +95,9 @@ export function useUploadRecord() {
                     custom_prompt: input.customPrompt || null,
                     expected_md5: input.expectedMd5 || null,
                     expected_sha256: input.expectedSha256 || null,
+                    visual_analysis: input.visualAnalysis,
+                    ocr: input.ocr,
+                    object_detection: input.objectDetection,
                 },
             );
 

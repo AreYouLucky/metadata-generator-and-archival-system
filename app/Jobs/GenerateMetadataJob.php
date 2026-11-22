@@ -48,13 +48,7 @@ class GenerateMetadataJob implements ShouldBeUnique, ShouldQueue
     {
         $transcript = $this->record->originalTranscript()->first();
 
-        if ($transcript === null) {
-            $recorder->progress($this->record, PipelineStage::GenerateMetadata, StageStatus::Failed, message: 'There is no transcript to generate metadata from.');
-
-            return;
-        }
-
-        $segments = $transcript->segments()->get(['start', 'end', 'text'])
+        $segments = $transcript === null ? [] : $transcript->segments()->get(['start', 'end', 'text'])
             ->map(fn (RecordSegment $segment): array => [
                 'start' => $segment->start,
                 'end' => $segment->end,
@@ -64,8 +58,11 @@ class GenerateMetadataJob implements ShouldBeUnique, ShouldQueue
             ->values()
             ->all();
 
-        if ($segments === []) {
-            $recorder->progress($this->record, PipelineStage::GenerateMetadata, StageStatus::Failed, message: 'The transcript is empty.');
+        $visual = self::visualContext($this->record);
+
+        if ($segments === [] && $visual === []) {
+            $message = $transcript === null ? 'There is no transcript to generate metadata from.' : 'The transcript is empty.';
+            $recorder->progress($this->record, PipelineStage::GenerateMetadata, StageStatus::Failed, message: $message);
 
             return;
         }
@@ -82,6 +79,7 @@ class GenerateMetadataJob implements ShouldBeUnique, ShouldQueue
                 'title_count' => PipelineOptions::TITLE_COUNT,
                 'duration' => $duration !== null ? (float) $duration : null,
                 'fresh' => true,
+                'visual_context' => $visual,
             ]);
         } catch (RequestException $exception) {
             // The AI service explains provider failures in `detail`; don't retry those.
@@ -98,6 +96,35 @@ class GenerateMetadataJob implements ShouldBeUnique, ShouldQueue
             'preset' => $this->options->preset->value,
             'custom_prompt' => $this->options->customPrompt,
         ]);
+    }
+
+    /**
+     * What the analysed frames show (description and on-screen text), sent
+     * with the transcript when the record had visual analysis. A frame that
+     * shows the same as the one before (a slide held on screen) is left out.
+     *
+     * @return list<array{time_sec: float, description: string|null, ocr_text: string|null}>
+     */
+    public static function visualContext(Record $record): array
+    {
+        $context = [];
+        $previous = null;
+
+        $frames = $record->frames()
+            ->where(fn ($query) => $query->whereNotNull('description')->orWhereNotNull('ocr_text'))
+            ->get(['id', 'time_sec', 'description', 'ocr_text']);
+
+        foreach ($frames as $frame) {
+            $shows = [$frame->description, $frame->ocr_text];
+
+            if ($shows !== $previous) {
+                $context[] = ['time_sec' => $frame->time_sec, 'description' => $frame->description, 'ocr_text' => $frame->ocr_text];
+            }
+
+            $previous = $shows;
+        }
+
+        return $context;
     }
 
     public function failed(?Throwable $exception): void

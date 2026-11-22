@@ -40,11 +40,11 @@ export default function AttachmentList({
         toast.error(getErrorMessage(error, 'That did not work.'));
 
     return (
-        <div className="grid gap-2">
+        <div className="grid grid-cols-1 gap-2">
             {attachments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No attachments.</p>
             ) : (
-                <ul className="grid gap-1.5">
+                <ul className="grid grid-cols-1 gap-1.5">
                     {attachments.map((attachment) => (
                         <li
                             key={attachment.id}
@@ -55,10 +55,10 @@ export default function AttachmentList({
                                 aria-hidden
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="truncate">
+                                <p className="wrap-anywhere">
                                     {attachment.original_filename}
                                 </p>
-                                <p className="text-xs text-neutral-500">
+                                <p className="text-xs wrap-anywhere text-neutral-500">
                                     {formatEnumLabel(attachment.kind)} ·{' '}
                                     {formatBytes(attachment.file_size)}
                                     {attachment.description &&
@@ -113,13 +113,13 @@ export default function AttachmentList({
                         type="file"
                         aria-label="Attachment"
                         accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.csv,.xml,.json,.srt,.vtt,.doc,.docx,.xls,.xlsx,.odt,.ods"
-                        className="text-xs file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-foreground"
+                        className="w-full min-w-0 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-foreground"
                         onChange={(event) =>
                             setFile(event.target.files?.[0] ?? null)
                         }
                     />
-                    <div className="flex gap-2">
-                        <div className="w-40">
+                    <div className="flex flex-wrap gap-2">
+                        <div className="w-40 max-w-full">
                             <ArchiveSelect
                                 id={`attachment-kind-${defaultKind}`}
                                 value={kind}
@@ -137,7 +137,7 @@ export default function AttachmentList({
                             onChange={(event) =>
                                 setDescription(event.target.value)
                             }
-                            className="min-w-0 flex-1"
+                            className="min-w-32 flex-1"
                         />
                         <Button
                             size="icon"
@@ -166,7 +166,7 @@ export default function AttachmentList({
                             <Upload aria-hidden />
                         </Button>
                     </div>
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-xs wrap-anywhere text-neutral-500">
                         PDF, images, documents, subtitles or sidecars, up to{' '}
                         {maxMb} MB. Stored privately.
                     </p>

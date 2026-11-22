@@ -6,6 +6,7 @@
  */
 
 use App\Enums\PipelineStage;
+use App\Http\Controllers\Internal\AudioExportCallbackController;
 use App\Http\Controllers\Internal\PingController;
 use App\Http\Controllers\Internal\RecordFileFixityController;
 use App\Http\Controllers\Internal\RecordFileResultController;
@@ -29,6 +30,9 @@ Route::post('records/{record}/translations/{transcript}/progress', [TranslationC
 Route::post('records/{record}/translations/{transcript}/result', [TranslationCallbackController::class, 'result'])
     ->scopeBindings()
     ->name('records.translations.result');
+
+// Audio exports (MP3 or WAV of the master's audio).
+Route::post('records/{record}/audio-export', AudioExportCallbackController::class)->name('records.audio-export');
 
 // Added files (mezzanine, access copy) and fixity checks (Phase 3).
 Route::post('record-files/{recordFile}/results/{stage}', RecordFileResultController::class)

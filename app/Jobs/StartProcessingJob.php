@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\FileRole;
 use App\Enums\PipelineStage;
+use App\Enums\ProcessingStatus;
 use App\Enums\StageStatus;
 use App\Models\Record;
 use App\Services\AiService\AiServiceClient;
@@ -25,6 +26,11 @@ class StartProcessingJob implements ShouldQueue
 
     public int $tries = 5;
 
+    /**
+     * A record deleted while the job waited needs no processing.
+     */
+    public bool $deleteWhenMissingModels = true;
+
     public function __construct(
         public Record $record,
         public PipelineOptions $options,
@@ -42,10 +48,15 @@ class StartProcessingJob implements ShouldQueue
 
     public function handle(AiServiceClient $client): void
     {
+        // Cancelled while this job waited in the queue.
+        if ($this->isCancelled()) {
+            return;
+        }
+
         $file = $this->record->files()->where('role', FileRole::Master)->firstOrFail();
 
         try {
-            $client->process([
+            $jobId = $client->process([
                 'record_id' => $this->record->id,
                 'record_file_id' => $file->id,
                 'video_path' => $file->storage_location,
@@ -54,6 +65,7 @@ class StartProcessingJob implements ShouldQueue
                     'custom_prompt' => $this->options->customPrompt,
                     'title_count' => PipelineOptions::TITLE_COUNT,
                     'max_duration_seconds' => config('archive.max_video_minutes') * 60,
+                    ...$this->options->visualFlags(),
                 ],
             ]);
         } catch (RequestException $exception) {
@@ -67,7 +79,20 @@ class StartProcessingJob implements ShouldQueue
             throw $exception;
         }
 
-        Log::info('Processing started', ['record_id' => $this->record->id]);
+        // Kept so "Cancel" can stop the run. A cancel that landed while the
+        // request was in flight found no job id, so it is passed on here.
+        $stored = Record::query()
+            ->whereKey($this->record->id)
+            ->where('processing_status', '!=', ProcessingStatus::Cancelled)
+            ->update(['processing_job_id' => $jobId]);
+
+        if ($stored === 0) {
+            CancelProcessingJob::dispatch($this->record->id, $jobId);
+
+            return;
+        }
+
+        Log::info('Processing started', ['record_id' => $this->record->id, 'job_id' => $jobId]);
     }
 
     /**
@@ -76,6 +101,10 @@ class StartProcessingJob implements ShouldQueue
      */
     public function failed(?Throwable $exception): void
     {
+        if ($this->isCancelled()) {
+            return;
+        }
+
         $recorder = app(PipelineRecorder::class);
 
         $message = $exception instanceof RequestException && self::wasRejected($exception)
@@ -87,6 +116,11 @@ class StartProcessingJob implements ShouldQueue
         }
 
         Log::warning('Processing could not start', ['record_id' => $this->record->id, 'error' => $exception?->getMessage()]);
+    }
+
+    private function isCancelled(): bool
+    {
+        return Record::withTrashed()->whereKey($this->record->id)->where('processing_status', ProcessingStatus::Cancelled)->exists();
     }
 
     private static function wasRejected(RequestException $exception): bool

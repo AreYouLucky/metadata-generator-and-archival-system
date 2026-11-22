@@ -3,9 +3,10 @@ wire, like the rest of that block: `contentFlags`, `sensitiveTopics`)."""
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.common import PresetRules, TranscriptSegment, Usage
+from app.schemas.visual import VisualFrame
 
 Tone = Literal[
     "informative",
@@ -147,12 +148,22 @@ class AiMetadata(BaseModel):
 
 class GenerateMetadataRequest(BaseModel):
     record_id: str
-    transcript: list[TranscriptSegment] = Field(min_length=1)
+    transcript: list[TranscriptSegment] = []
     language: str | None = None
     preset: PresetRules
     custom_prompt: str | None = Field(default=None, max_length=2000)
     title_count: int = Field(default=3, ge=1, le=10)
     duration: float | None = Field(default=None, ge=0)
+    # Frame descriptions and on-screen text (Phase 5), when the record has them.
+    visual_context: list[VisualFrame] = Field(default=[], max_length=200)
+
+    @model_validator(mode="after")
+    def _has_content(self) -> "GenerateMetadataRequest":
+        if not self.transcript and not any(
+            frame.description or frame.ocr_text for frame in self.visual_context
+        ):
+            raise ValueError("Send a transcript or on-screen content to describe.")
+        return self
 
 
 class GenerateMetadataResult(BaseModel):

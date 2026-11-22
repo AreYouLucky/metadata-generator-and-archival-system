@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use Carbon\CarbonImmutable as Carbon;
+use Database\Factories\RecordFrameFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -25,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['time_sec', 'path', 'is_scene_start', 'description', 'ocr_text', 'objects', 'face_count'])]
 class RecordFrame extends Model
 {
+    /** @use HasFactory<RecordFrameFactory> */
+    use HasFactory;
+
     /**
      * Defaults mirrored from the migration so new models see them before a refresh.
      *
@@ -47,6 +52,15 @@ class RecordFrame extends Model
             'objects' => 'array',
             'face_count' => 'integer',
         ];
+    }
+
+    /**
+     * How the AI service names a frame: its time, to the millisecond (the
+     * column's precision).
+     */
+    public static function timeKey(float $seconds): string
+    {
+        return number_format($seconds, 3, '.', '');
     }
 
     /**

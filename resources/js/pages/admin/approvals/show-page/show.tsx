@@ -15,10 +15,15 @@ import type {
     Translation,
     WorkspaceTranscript,
 } from '@/types/records';
-import type { ApprovalRecord, ReviewHistoryItem } from '@/types/reviews';
+import type {
+    ApprovalRecord,
+    FaceSummary,
+    ReviewHistoryItem,
+} from '@/types/reviews';
 import RecordSummary from './partials/record-summary';
 import ReviewArchive from './partials/review-archive';
 import ReviewDecisionForm from './partials/review-decision-form';
+import ReviewFaces from './partials/review-faces';
 import ReviewMetadata from './partials/review-metadata';
 import ReviewTabBar from './partials/review-tab-bar';
 import type { ReviewTab } from './partials/review-tab-bar';
@@ -35,6 +40,8 @@ type Props = {
     archive: Archive;
     /** What would still keep the record off the public site once approved. */
     publicBlockers: string[];
+    /** People on screen (face counts only); null when never counted. */
+    faces: FaceSummary | null;
     history: ReviewHistoryItem[];
     canReview: boolean;
     canReopen: boolean;
@@ -55,6 +62,7 @@ export default function ApprovalShow({
     translations,
     archive,
     publicBlockers,
+    faces,
     history,
     canReview,
     canReopen,
@@ -218,6 +226,8 @@ export default function ApprovalShow({
                             </Button>
                         </div>
                     </section>
+
+                    {faces && <ReviewFaces faces={faces} onSeek={seek} />}
 
                     <section className="grid gap-3 rounded-xl border p-4">
                         <h2 className="text-sm font-medium">Review history</h2>

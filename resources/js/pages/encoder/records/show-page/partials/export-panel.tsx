@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
-import { Download, Settings2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Download, Settings2, X } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import EditorPanel from '@/components/encoder/editor-panel';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,14 +14,18 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { useExportAudio } from '@/hooks/use-audio-export';
 import { exportQuery, useExportPreview } from '@/hooks/use-export-preview';
 import type { ExportChoice } from '@/hooks/use-export-preview';
-import { languageName } from '@/lib/utilities';
+import { getErrorMessage, languageName } from '@/lib/utilities';
 import { exportMethod } from '@/routes/records';
 import { index as exportSchemasIndex } from '@/routes/export-schemas';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { ExportSchema } from '@/types/export-schemas';
+import AudioExportRow from './audio-export-row';
 import type {
+    AudioExport,
+    AudioExportFormat,
     ExportFormatName,
     ExportFormatOption,
     Translation,
@@ -29,13 +33,14 @@ import type {
 
 type Props = {
     recordId: string;
-    heading: ReactNode;
     formats: ExportFormatOption[];
     schemas: ExportSchema[];
     originalLanguage: string | null;
     translations: Translation[];
     /** Changes when saved metadata or transcript lines change. */
     version: string;
+    /** The record's audio as MP3 or WAV. */
+    audioExports: AudioExport[];
 };
 
 /** Long transcripts make big exports; the preview shows the start. */
@@ -44,19 +49,40 @@ const FULL_DOCUMENT = 'full';
 const ORIGINAL = 'original';
 
 /**
- * Pick a format, a custom schema (JSON) or a language (subtitles and text),
- * see a live preview, then download. Downloads are logged; previews aren't.
+ * Opened from the header's Export button (not a tab). Pick a format, a
+ * custom schema (JSON) or a language (subtitles and text), see a live
+ * preview, then download; or download the audio as MP3 or WAV. Downloads are
+ * logged; previews aren't.
  */
 export default function ExportPanel({
     recordId,
-    heading,
     formats,
     schemas,
     originalLanguage,
     translations,
     version,
+    audioExports,
 }: Props) {
     const open = useWorkspaceStore((state) => state.inspectorTab === 'export');
+    const setInspectorTab = useWorkspaceStore((state) => state.setInspectorTab);
+    const exportAudio = useExportAudio(recordId);
+    const [preparing, setPreparing] = useState<AudioExportFormat | null>(null);
+
+    const prepareAudio = (audioFormat: AudioExportFormat) => {
+        setPreparing(audioFormat);
+        exportAudio.mutate(audioFormat, {
+            onSuccess: ({ status }) =>
+                status === 'processing' &&
+                toast.success(
+                    'Preparing the audio. It can be downloaded here when it is ready.',
+                ),
+            onError: (error) =>
+                toast.error(
+                    getErrorMessage(error, 'The audio could not be prepared.'),
+                ),
+            onSettled: () => setPreparing(null),
+        });
+    };
     const [choice, setChoice] = useState<ExportChoice>({
         format: 'json',
         schema: schemas.find((schema) => schema.is_default)?.id ?? null,
@@ -73,7 +99,25 @@ export default function ExportPanel({
         setChoice((current) => ({ ...current, ...changes }));
 
     return (
-        <EditorPanel title="Export" heading={heading}>
+        <EditorPanel
+            title="Export"
+            icon={<Download className="size-3.5" aria-hidden />}
+            actions={
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    onClick={() =>
+                        setInspectorTab(
+                            useWorkspaceStore.getState().previousTab,
+                        )
+                    }
+                    aria-label="Close export"
+                >
+                    <X aria-hidden />
+                </Button>
+            }
+        >
             <div className="@container flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
                 <div className="grid gap-3 @md:grid-cols-2">
                     <div className="grid gap-1.5">
@@ -246,6 +290,25 @@ export default function ExportPanel({
                         </a>
                     </Button>
                 </div>
+
+                <section
+                    aria-labelledby="export-audio"
+                    className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4"
+                >
+                    <h3 id="export-audio" className="text-sm font-medium">
+                        Audio
+                    </h3>
+                    <ul className="grid grid-cols-1 gap-1.5">
+                        {audioExports.map((audio) => (
+                            <AudioExportRow
+                                key={audio.format}
+                                audio={audio}
+                                pending={preparing === audio.format}
+                                onPrepare={() => prepareAudio(audio.format)}
+                            />
+                        ))}
+                    </ul>
+                </section>
             </div>
         </EditorPanel>
     );

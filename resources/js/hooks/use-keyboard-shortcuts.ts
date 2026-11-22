@@ -15,8 +15,7 @@ const JUMP_SECONDS = 5;
 export const TRANSCRIPT_SEARCH_ID = 'transcript-search';
 
 /**
- * The workspace keys (PROJECT_SPEC §9), shown in the shortcuts dialog. "T"
- * (set the current frame as thumbnail) arrives with visual analysis.
+ * The workspace keys (PROJECT_SPEC §9), shown in the shortcuts dialog.
  */
 export const SHORTCUTS: { keys: string[]; action: string }[] = [
     { keys: ['Space', 'K'], action: 'Play / pause' },
@@ -26,6 +25,7 @@ export const SHORTCUTS: { keys: string[]; action: string }[] = [
     { keys: ['Shift', 'C'], action: 'Copy the current line with its time' },
     { keys: ['/'], action: 'Search the transcript' },
     { keys: ['E'], action: 'Edit the current line' },
+    { keys: ['T'], action: 'Use the current frame as the thumbnail' },
     { keys: ['?'], action: 'Show these shortcuts' },
 ];
 
@@ -33,6 +33,8 @@ type Options = {
     segments: TranscriptSegment[];
     speakers: Speaker[];
     canEdit: boolean;
+    /** Make the frame the player shows the record's thumbnail. */
+    onSetThumbnail: () => void;
 };
 
 /**
@@ -96,7 +98,7 @@ export function useKeyboardShortcuts(options: Options) {
 
             const store = useWorkspaceStore.getState();
             const { player, seek } = store;
-            const { segments, canEdit } = latest.current;
+            const { segments, canEdit, onSetThumbnail } = latest.current;
 
             if (event.key === '?') {
                 event.preventDefault();
@@ -170,6 +172,14 @@ export function useKeyboardShortcuts(options: Options) {
                 case 'C':
                     event.preventDefault();
                     copyCurrent(event.shiftKey);
+                    break;
+                case 't':
+                case 'T':
+                    if (canEdit && player) {
+                        event.preventDefault();
+                        onSetThumbnail();
+                    }
+
                     break;
                 case 'e':
                 case 'E': {

@@ -1,4 +1,4 @@
-"""The work of each Phase 1 stage. Pure functions over the pipeline context, so they can be
+"""The work of each stage. Pure functions over the pipeline context, so they can be
 tested without Celery or Laravel; app.pipeline.tasks wires them into the chain."""
 
 import json
@@ -9,10 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from app.config import get_settings
-from app.pipeline import audio, checksum, probe, proxy
+from app.pipeline import audio, checksum, frames, objects, ocr, probe, proxy, scenes
 from app.providers.transcription import get_transcription_provider
 from app.schemas.pipeline import PipelineContext
+from app.schemas.visual import FrameInfo
 from app.services.metadata import MetadataGenerator
+from app.services.vision import FrameDescriber
 from app.storage import relative, resolve, work_dir
 
 Progress = Callable[[int], None]
@@ -116,10 +118,127 @@ def run_proxy(context: PipelineContext, on_progress: Progress) -> dict[str, Any]
     }
 
 
+def run_scenes(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
+    settings = get_settings()
+    shots = scenes.detect(
+        resolve(context.request.video_path), context.duration, settings.scene_threshold, on_progress
+    )
+    context.shots = scenes.cap(shots, settings.max_shots)
+    return {"shots": [shot.model_dump() for shot in context.shots]}
+
+
+def run_frames(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
+    """Key frames in `records/{id}/frames/` (replaced on a re-run), which frames repeat
+    the one before, and a suggested default thumbnail."""
+    settings = get_settings()
+    planned = frames.plan(
+        context.duration, context.shots, settings.frame_interval_sec, settings.max_frames
+    )
+    taken = frames.extract_all(
+        resolve(context.request.video_path),
+        resolve(f"records/{context.request.record_id}/frames"),
+        planned,
+        settings.frame_max_height,
+        on_progress,
+    )
+    looks = [frames.look(path) for _, path in taken]
+    on_progress(90)
+    repeats = frames.duplicates(looks)
+    context.frames = [
+        FrameInfo(
+            time_sec=frame.time_sec,
+            path=relative(path),
+            is_scene_start=frame.is_scene_start,
+            duplicate_of=repeats[index],
+        )
+        for index, (frame, path) in enumerate(taken)
+    ]
+    return {
+        "frames": [
+            {"time_sec": frame.time_sec, "path": frame.path, "is_scene_start": frame.is_scene_start}
+            for frame in context.frames
+        ],
+        "thumbnail_index": frames.suggested_thumbnail(
+            looks, [frame.time_sec for frame in context.frames], repeats
+        ),
+    }
+
+
+def _distinct(context: PipelineContext) -> dict[int, Path]:
+    """Frames that don't repeat an earlier one, by index: the only ones analysed."""
+    return {
+        index: resolve(frame.path)
+        for index, frame in enumerate(context.frames)
+        if frame.duplicate_of is None
+    }
+
+
+def _source(context: PipelineContext, index: int) -> int:
+    """The frame whose results this frame shares (itself unless it is a repeat)."""
+    repeat_of = context.frames[index].duplicate_of
+    return index if repeat_of is None else repeat_of
+
+
+def run_vision(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
+    if not context.frames:
+        raise SkipStage("No frames were taken, so there is nothing to describe.")
+    on_progress(5)
+    descriptions, usage = FrameDescriber().describe(_distinct(context))
+    for index, frame in enumerate(context.frames):
+        frame.description = descriptions.get(_source(context, index))
+    return {
+        "model": get_settings().vision_model,
+        "frames": [
+            {"time_sec": frame.time_sec, "description": frame.description}
+            for frame in context.frames
+        ],
+        "usage": [item.model_dump() for item in usage],
+    }
+
+
+def run_ocr(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
+    if not context.frames:
+        raise SkipStage("No frames were taken, so there is no text to read.")
+    distinct = _distinct(context)
+    texts: dict[int, str] = {}
+    for done, (index, path) in enumerate(distinct.items(), start=1):
+        texts[index] = ocr.read(path)
+        on_progress(int(done * 95 / len(distinct)))
+    for index, frame in enumerate(context.frames):
+        frame.ocr_text = texts.get(_source(context, index)) or None
+    return {
+        "frames": [{"time_sec": frame.time_sec, "text": frame.ocr_text} for frame in context.frames]
+    }
+
+
+def run_objects(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
+    if not context.frames:
+        raise SkipStage("No frames were taken, so there is nothing to detect.")
+    distinct = _distinct(context)
+    on_progress(5)
+    found = dict(zip(distinct, objects.detect(list(distinct.values())), strict=True))
+    results = []
+    for index, frame in enumerate(context.frames):
+        labels, faces = found[_source(context, index)]
+        results.append(
+            {
+                "time_sec": frame.time_sec,
+                "objects": [item.model_dump() for item in labels],
+                "face_count": faces,
+            }
+        )
+    return {"frames": results}
+
+
 def run_generate_metadata(context: PipelineContext, on_progress: Progress) -> dict[str, Any]:
-    if not context.segments:
-        raise SkipStage("Nothing was said in the video, so there is nothing to describe.")
+    """From the transcript, the frames' on-screen content, or both (a slideshow with
+    music has no transcript but can still be described)."""
     options = context.request.options
+    visual = context.visual_frames() if options.visual_analysis else []
+    if not context.segments and not visual:
+        if "transcribe" in context.failed or "transcribe" in context.skipped:
+            raise SkipStage("Skipped because the transcribe step did not finish.")
+        raise SkipStage("Nothing was said or shown in the video, so there is nothing to describe.")
     on_progress(10)
     result = MetadataGenerator().generate(
         context.segments,
@@ -128,6 +247,7 @@ def run_generate_metadata(context: PipelineContext, on_progress: Progress) -> di
         custom_prompt=options.custom_prompt,
         title_count=options.title_count,
         duration=context.duration,
+        visual=visual,
     )
     return {
         "preset": options.preset.name,

@@ -10,6 +10,7 @@ use App\Enums\DispositionAction;
 use App\Enums\FileRole;
 use App\Enums\PermissionStatus;
 use App\Enums\ReleaseConsent;
+use App\Enums\SceneKind;
 use App\Enums\SecurityClassification;
 use App\Enums\SourceCarrier;
 use App\Enums\SubjectType;
@@ -19,6 +20,7 @@ use App\Models\Record;
 use App\Models\RecordAttachment;
 use App\Models\RecordFile;
 use App\Models\RecordKeyword;
+use App\Models\RecordScene;
 use App\Models\RecordSubject;
 use App\Models\RecordTechnicalMetadata;
 use App\Models\User;
@@ -153,6 +155,15 @@ class ArchivePresenter
                 'is_original' => $transcript->is_original,
                 'status' => $transcript->status->value,
             ])->values()->all(),
+            // Shot/scene segments (Phase 5): the shots themselves are in the Visuals tab.
+            'segments' => [
+                'shot_count' => $record->scenes()->where('kind', SceneKind::Shot)->count(),
+                'scenes' => array_values($record->scenes()
+                    ->where('kind', SceneKind::Scene)
+                    ->get(['id', 'record_id', 'start', 'end', 'tc_in', 'tc_out', 'label', 'description'])
+                    ->map(fn (RecordScene $scene): array => VisualsPresenter::scene($scene))
+                    ->all()),
+            ],
             'fixity' => $this->fixity($record),
             'audit' => $this->audit($record),
             'suggestions' => $this->containerSuggestions($record),

@@ -62,6 +62,32 @@ class Settings(BaseSettings):
     translation_batch_lines: int = Field(default=60, ge=1, le=200)
     translation_batch_chars: int = Field(default=6000, ge=500, le=20000)
 
+    # Visual analysis (Phase 5). Frames: scene starts plus one every FRAME_INTERVAL_SEC,
+    # at most MAX_FRAMES (the interval grows for long videos), at most this tall.
+    frame_interval_sec: float = Field(default=10.0, ge=1, le=600)
+    max_frames: int = Field(default=60, ge=1, le=200)
+    frame_max_height: int = Field(default=720, ge=240, le=2160)
+    # PySceneDetect ContentDetector threshold (its default); lower finds more cuts.
+    scene_threshold: float = Field(default=27.0, gt=0, le=255)
+    max_shots: int = Field(default=2000, ge=1, le=5000)
+    # Frame descriptions: the cheap model, small low-detail images, several per call.
+    vision_model: str = "gpt-6-luna"
+    vision_reasoning_effort: ReasoningEffort = "none"
+    vision_batch_frames: int = Field(default=8, ge=1, le=20)
+    vision_image_size: int = Field(default=512, ge=128, le=2048)
+    vision_detail: Literal["low", "high", "auto"] = "low"
+    vision_max_output_tokens: int = 2000
+    # EasyOCR language codes (comma-separated); "tl" is Tagalog/Filipino.
+    ocr_languages: str = "en,tl"
+    ocr_min_confidence: float = Field(default=0.25, ge=0, le=1)
+    # Ultralytics YOLO weights, downloaded into models_dir on first use.
+    object_model: str = "yolo11n.pt"
+    object_min_confidence: float = Field(default=0.35, ge=0, le=1)
+    # Where OCR and object-detection models are kept (a volume in Docker).
+    models_dir: str = "/srv/models"
+    # On-screen content sent with the transcript to the metadata model, at most.
+    visual_context_max_chars: int = Field(default=6000, ge=500, le=30000)
+
     openai_api_key: SecretStr = Field(default=SecretStr(""))
     openai_timeout_seconds: float = 180.0
 

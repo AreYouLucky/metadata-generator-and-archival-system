@@ -81,7 +81,8 @@ x-ai: &ai
         - ./ai-service/app:/srv/app
         - ./ai-service/tests:/srv/tests
         - ./storage/app/media:/data/storage
-        # Downloaded Whisper models (large-v3-turbo is ~1.6 GB): kept across rebuilds.
+        # Downloaded models, kept across rebuilds: Whisper (large-v3-turbo is ~1.6 GB),
+        # EasyOCR (~100 MB) and the YOLO weights (~6 MB).
         - whispermodels:/srv/models
     depends_on:
         redis:
@@ -119,7 +120,7 @@ services:
             timeout: 5s
             retries: 10
 
-    # Probing, checksums, audio extraction and LLM calls.
+    # Probing, checksums, audio extraction, visual analysis (CPU) and LLM calls.
     ai-worker:
         <<: *ai
         command: celery -A app.worker worker -Q celery -n default@%h --loglevel=info --concurrency=2

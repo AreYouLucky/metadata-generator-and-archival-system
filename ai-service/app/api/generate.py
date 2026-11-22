@@ -53,6 +53,7 @@ def generate_metadata(body: FreshGenerateMetadataRequest) -> GenerateMetadataRes
             title_count=body.title_count,
             duration=body.duration,
             fresh=body.fresh,
+            visual=body.visual_context,
         ),
     )
 

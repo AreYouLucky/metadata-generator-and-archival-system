@@ -59,6 +59,24 @@ class RecordPolicy
         return $this->update($user, $record);
     }
 
+    /**
+     * Stopping the pipeline: whoever may edit the record (and so re-run it).
+     */
+    public function cancel(User $user, Record $record): bool
+    {
+        return $this->update($user, $record);
+    }
+
+    /**
+     * A soft delete (kept for the audit log): the record's encoder while it is
+     * a draft or has changes requested, admins always. Submitted and approved
+     * records go through review first, so an encoder can't pull them.
+     */
+    public function delete(User $user, Record $record): bool
+    {
+        return $this->update($user, $record);
+    }
+
     public function export(User $user, Record $record): bool
     {
         return $this->view($user, $record);

@@ -4,30 +4,58 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.common import PresetRules, TranscriptSegment
+from app.schemas.common import ULID_PATTERN, PresetRules, TranscriptSegment
+from app.schemas.visual import FrameInfo, Shot, VisualFrame
+
+__all__ = ["ULID_PATTERN"]
 
 StageName = Literal[
-    "checksum", "probe", "extract_audio", "transcribe", "generate_metadata", "proxy"
+    "checksum",
+    "probe",
+    "extract_audio",
+    "transcribe",
+    "scenes",
+    "frames",
+    "vision",
+    "ocr",
+    "objects",
+    "generate_metadata",
+    "proxy",
 ]
 
 # Stages in run order. Checksums come first: nothing else touches the file before.
-# The access copy comes last, so a long transcode never delays the transcript.
+# After probing, the audio branch (extract_audio, transcribe) and the visual branch
+# (scenes ... objects) run side by side; metadata waits for both. The access copy
+# comes last, so a long transcode never delays the transcript.
 STAGES: tuple[StageName, ...] = (
     "checksum",
     "probe",
     "extract_audio",
     "transcribe",
+    "scenes",
+    "frames",
+    "vision",
+    "ocr",
+    "objects",
     "generate_metadata",
     "proxy",
 )
 
-# A stage is skipped when any stage it depends on failed or was skipped.
+VISUAL_STAGES: tuple[StageName, ...] = ("scenes", "frames", "vision", "ocr", "objects")
+
+# A stage is skipped when any stage it depends on failed or was skipped. Metadata
+# checks its own inputs: it can be written from the transcript, the frames, or both.
 DEPENDS_ON: dict[StageName, tuple[StageName, ...]] = {
     "checksum": (),
     "probe": (),
     "extract_audio": ("probe",),
     "transcribe": ("extract_audio",),
-    "generate_metadata": ("transcribe",),
+    "scenes": ("probe",),
+    "frames": ("probe", "scenes"),
+    "vision": ("frames",),
+    "ocr": ("frames",),
+    "objects": ("frames",),
+    "generate_metadata": (),
     "proxy": ("probe",),
 }
 
@@ -37,11 +65,10 @@ class JobOptions(BaseModel):
     custom_prompt: str | None = Field(default=None, max_length=2000)
     title_count: int = Field(default=3, ge=1, le=10)
     max_duration_seconds: float | None = Field(default=None, gt=0)
-
-
-# Crockford base32 ULID in either case: Laravel's HasUlids stores them lowercase.
-# Kept as sent, because the IDs are echoed back on the callbacks.
-ULID_PATTERN = r"^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+    # Chosen on upload (PROJECT_SPEC §6). Off unless Laravel asks for them.
+    visual_analysis: bool = False
+    ocr: bool = False
+    object_detection: bool = False
 
 
 class ProcessRequest(BaseModel):
@@ -56,6 +83,8 @@ class PipelineContext(BaseModel):
     """Handed from stage to stage through the Celery chain (JSON-serialised)."""
 
     request: ProcessRequest
+    # The job id Laravel stores; POST /jobs/{job_id}/cancel flags it (pipeline.cancellation).
+    run_id: str | None = None
     failed: list[StageName] = []
     skipped: list[StageName] = []
     duration: float | None = None
@@ -66,6 +95,8 @@ class PipelineContext(BaseModel):
     audio_path: str | None = None
     language: str | None = None
     segments: list[TranscriptSegment] = []
+    shots: list[Shot] = []
+    frames: list[FrameInfo] = []
 
     def blocked_by(self, stage: StageName) -> StageName | None:
         """The first dependency that failed or was skipped, if any."""
@@ -73,3 +104,44 @@ class PipelineContext(BaseModel):
             if dependency in self.failed or dependency in self.skipped:
                 return dependency
         return None
+
+    def disabled_reason(self, stage: StageName) -> str | None:
+        """Why a stage is switched off for this video, if it is (upload options)."""
+        options = self.request.options
+        if stage in VISUAL_STAGES and not options.visual_analysis:
+            return "Visual analysis was turned off for this video."
+        if stage == "ocr" and not options.ocr:
+            return "On-screen text recognition was turned off for this video."
+        if stage == "objects" and not options.object_detection:
+            return "Object detection was turned off for this video."
+        return None
+
+    def visual_frames(self) -> list[VisualFrame]:
+        """Frames with something to say, for the metadata model (duplicates left out)."""
+        return [
+            VisualFrame(
+                time_sec=frame.time_sec, description=frame.description, ocr_text=frame.ocr_text
+            )
+            for frame in self.frames
+            if frame.duplicate_of is None and (frame.description or frame.ocr_text)
+        ]
+
+    @classmethod
+    def join(cls, branches: list["PipelineContext"]) -> "PipelineContext":
+        """Merge the audio and visual branches, which ran side by side from one context.
+
+        Each branch only fills its own fields, so a field that differs from the shared
+        starting point comes from the branch that set it."""
+        merged = branches[0].model_copy(deep=True)
+        for branch in branches[1:]:
+            for stage in branch.failed:
+                if stage not in merged.failed:
+                    merged.failed.append(stage)
+            for stage in branch.skipped:
+                if stage not in merged.skipped:
+                    merged.skipped.append(stage)
+            for name in ("audio_path", "language", "segments", "shots", "frames"):
+                value = getattr(branch, name)
+                if value:
+                    setattr(merged, name, value)
+        return merged

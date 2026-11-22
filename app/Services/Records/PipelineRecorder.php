@@ -18,6 +18,7 @@ use App\Events\RecordProgressUpdated;
 use App\Events\RecordStageCompleted;
 use App\Models\Record;
 use App\Models\RecordFile;
+use App\Models\RecordFrame;
 use App\Models\RecordMetadata;
 use App\Models\RecordStage;
 use App\Models\RecordTechnicalMetadata;
@@ -35,6 +36,11 @@ use Illuminate\Support\Str;
 class PipelineRecorder
 {
     private const int SEGMENT_INSERT_BATCH = 500;
+
+    public function __construct(
+        private SceneStore $scenes,
+        private RecordThumbnails $thumbnails,
+    ) {}
 
     public function progress(Record $record, PipelineStage $stage, StageStatus $status, int $progress = 0, ?string $message = null): RecordStage
     {
@@ -286,6 +292,99 @@ class PipelineRecorder
     }
 
     /**
+     * Detected shots replace the earlier ones (scenes made by encoders stay).
+     *
+     * @param  list<array{start: float, end: float}>  $shots
+     */
+    public function storeShots(Record $record, array $shots): void
+    {
+        $this->scenes->replaceShots($record, $shots);
+        $this->complete($record, PipelineStage::Scenes);
+    }
+
+    /**
+     * Key frames replace the earlier ones (their analysis follows in the next
+     * stages). A record without a thumbnail gets the suggested frame as its
+     * default; one chosen by an encoder is kept, as it is a separate copy.
+     *
+     * @param  array{frames: list<array{time_sec: float, path: string, is_scene_start: bool}>, thumbnail_index: int|null}  $result
+     */
+    public function storeFrames(Record $record, array $result): void
+    {
+        $now = now();
+        $rows = array_map(fn (array $frame): array => [
+            'record_id' => $record->id,
+            'time_sec' => $frame['time_sec'],
+            'path' => $frame['path'],
+            'is_scene_start' => $frame['is_scene_start'],
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $result['frames']);
+
+        DB::transaction(function () use ($record, $rows): void {
+            RecordFrame::query()->where('record_id', $record->id)->delete();
+            RecordFrame::query()->insert($rows);
+        });
+
+        $suggested = $result['frames'][$result['thumbnail_index'] ?? -1] ?? null;
+
+        if ($record->refresh()->thumbnail_path === null && $suggested !== null) {
+            $frame = $record->frames()->where('path', $suggested['path'])->first();
+
+            if ($frame !== null) {
+                rescue(fn () => $this->thumbnails->useFrame($record, $frame, null));
+            }
+        }
+
+        $this->complete($record, PipelineStage::Frames);
+    }
+
+    /**
+     * Descriptions (`vision`), on-screen text (`ocr`) or objects and face
+     * counts (`objects`) for the frames, matched by time, in one statement.
+     *
+     * @param  array{updates: array<string, array<string, mixed>>, usage: list<array{kind: string, quantity: float, estimated_cost: float|null}>}  $analysis
+     */
+    public function storeFrameAnalysis(Record $record, PipelineStage $stage, array $analysis): void
+    {
+        $columns = match ($stage) {
+            PipelineStage::Vision => ['description'],
+            PipelineStage::Ocr => ['ocr_text'],
+            default => ['objects', 'face_count'],
+        };
+
+        $rows = [];
+
+        foreach ($record->frames()->get(['id', 'record_id', 'time_sec', 'path']) as $frame) {
+            $values = $analysis['updates'][RecordFrame::timeKey($frame->time_sec)] ?? null;
+
+            if ($values === null) {
+                continue;
+            }
+
+            if (array_key_exists('objects', $values)) {
+                $values['objects'] = json_encode($values['objects'], JSON_THROW_ON_ERROR);
+            }
+
+            $rows[] = ['id' => $frame->id, 'record_id' => $frame->record_id, 'time_sec' => $frame->time_sec, 'path' => $frame->path, ...$values];
+        }
+
+        DB::transaction(function () use ($record, $rows, $columns, $analysis): void {
+            if ($rows !== []) {
+                RecordFrame::query()->upsert($rows, ['id'], $columns);
+            }
+
+            $this->recordUsage($record, $analysis['usage']);
+        });
+
+        if ($stage === PipelineStage::Objects) {
+            $this->thumbnails->preferFrameWithFaces($record);
+        }
+
+        $this->complete($record, $stage);
+    }
+
+    /**
      * AI subjects and keywords become unconfirmed archive entries (source
      * `ai`) unless the record already has them; only an encoder confirms them.
      *
@@ -344,10 +443,15 @@ class PipelineRecorder
     /**
      * Put every active stage back to pending before the pipeline runs again.
      * The record returns to `queued`; earlier results are replaced as the
-     * stages complete (metadata keeps its history).
+     * stages complete (metadata keeps its history). Records from before a
+     * phase added stages get rows for them first.
      */
     public function resetStages(Record $record): void
     {
+        $existing = $record->stages()->pluck('stage')->map(fn (PipelineStage $stage): string => $stage->value)->all();
+        $missing = array_filter(PipelineStage::active(), fn (PipelineStage $stage): bool => ! in_array($stage->value, $existing, true));
+        $record->stages()->createMany(array_map(fn (PipelineStage $stage): array => ['stage' => $stage], array_values($missing)));
+
         $record->stages()
             ->whereIn('stage', PipelineStage::active())
             ->update([
@@ -362,7 +466,8 @@ class PipelineRecorder
     }
 
     /**
-     * queued -> processing -> ready | failed, derived from the active stages.
+     * queued -> processing -> ready | failed, derived from the active stages;
+     * `cancelled` once an encoder stopped the run (ProcessingCanceller).
      */
     public function refreshStatus(Record $record): void
     {
@@ -371,19 +476,21 @@ class PipelineRecorder
 
         $terminal = $stages->every(fn (RecordStage $stage): bool => in_array(
             $stage->status,
-            [StageStatus::Done, StageStatus::Failed, StageStatus::Skipped],
+            [StageStatus::Done, StageStatus::Failed, StageStatus::Skipped, StageStatus::Cancelled],
             true,
         ));
+        $cancelled = $stages->contains(fn (RecordStage $stage): bool => $stage->status === StageStatus::Cancelled);
         $failed = $stages->first(fn (RecordStage $stage): bool => $stage->status === StageStatus::Failed);
         $started = $stages->contains(fn (RecordStage $stage): bool => $stage->status !== StageStatus::Pending);
 
         $record->processing_status = match (true) {
+            $cancelled => ProcessingStatus::Cancelled,
             $terminal && $failed !== null => ProcessingStatus::Failed,
             $terminal => ProcessingStatus::Ready,
             $started => ProcessingStatus::Processing,
             default => ProcessingStatus::Queued,
         };
-        $record->processing_error = $failed !== null
+        $record->processing_error = $failed !== null && ! $cancelled
             ? "{$failed->stage->label()}: ".($failed->message ?? 'failed')
             : null;
         $record->save();

@@ -9,6 +9,7 @@ type Props = {
 const ORDER: InspectorTab[] = [
     'metadata',
     'archive',
+    'visuals',
     'chapters',
     'credits',
     'translations',

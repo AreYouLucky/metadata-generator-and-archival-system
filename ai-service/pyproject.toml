@@ -1,6 +1,6 @@
 [project]
 name = "mgas-ai-service"
-version = "0.2.0"
+version = "0.3.0"
 description = "Media and AI worker for the Metadata Generator and Archival System"
 requires-python = ">=3.12"
 # Media/AI libraries are added in the phase that uses them. Phase 1: probing
@@ -22,6 +22,17 @@ dependencies = [
 # Local transcription on the NVIDIA GPU (the default provider, see DECISIONS.md).
 # The NVIDIA wheels provide cuBLAS + cuDNN 9 for CUDA 12, as faster-whisper's README asks.
 local = ["faster-whisper>=1.1", "nvidia-cublas-cu12", "nvidia-cudnn-cu12==9.*"]
+# Visual analysis (Phase 5): scenes, frames, OCR, objects. EasyOCR and Ultralytics need
+# torch; the Dockerfile installs its CPU build first (DECISIONS.md, Phase 5).
+# Ultralytics is AGPL-3.0: check its licence before commercial use.
+vision = [
+    "scenedetect>=0.7",
+    "opencv-python-headless>=4.10,<5", # 5.x moved the bundled face detector out
+    "easyocr>=1.7.2",
+    "ultralytics>=8.3",
+    "pillow>=11",
+    "numpy>=2",
+]
 dev = ["pytest>=8.3,<9", "ruff>=0.8", "mypy>=1.13"]
 
 [build-system]
@@ -56,10 +67,25 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["celery.*", "pymediainfo.*", "faster_whisper.*"]
+module = [
+    "celery.*",
+    "pymediainfo.*",
+    "faster_whisper.*",
+    "scenedetect.*",
+    "cv2.*",
+    "easyocr.*",
+    "ultralytics.*",
+    # Typed, but absent from images built with VISION=false.
+    "PIL.*",
+]
 ignore_missing_imports = true
 
 # Celery's @task decorator is untyped.
 [[tool.mypy.overrides]]
-module = ["app.worker", "app.pipeline.tasks", "app.pipeline.translation", "app.pipeline.files"]
+module = [
+    "app.worker",
+    "app.pipeline.tasks",
+    "app.pipeline.translation",
+    "app.pipeline.files",
+]
 disallow_untyped_decorators = false

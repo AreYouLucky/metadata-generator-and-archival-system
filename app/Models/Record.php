@@ -59,6 +59,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property MetadataSource|null $location_source
  * @property string|null $thumbnail_path
  * @property int|null $thumbnail_frame_id
+ * @property float|null $thumbnail_time_sec
+ * @property bool $thumbnail_is_default
  * @property SecurityClassification $security_classification
  * @property string|null $retention_period
  * @property ArchivalValue|null $archival_value
@@ -66,6 +68,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property DispositionAction|null $disposition_action
  * @property ProcessingStatus $processing_status
  * @property string|null $processing_error
+ * @property string|null $processing_job_id
  * @property ReviewStatus $review_status
  * @property Carbon|null $submitted_at
  * @property int|null $reviewed_by
@@ -110,6 +113,8 @@ class Record extends Model
             'episode_number' => 'integer',
             'latitude' => 'float',
             'longitude' => 'float',
+            'thumbnail_time_sec' => 'float',
+            'thumbnail_is_default' => 'boolean',
             'location_source' => MetadataSource::class,
             'security_classification' => SecurityClassification::class,
             'archival_value' => ArchivalValue::class,

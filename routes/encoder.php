@@ -9,6 +9,8 @@
 use App\Http\Controllers\Encoder\AgencyController;
 use App\Http\Controllers\Encoder\AgencyOptionsController;
 use App\Http\Controllers\Encoder\AttachmentController;
+use App\Http\Controllers\Encoder\AudioExportController;
+use App\Http\Controllers\Encoder\CancelProcessingController;
 use App\Http\Controllers\Encoder\CaptionController;
 use App\Http\Controllers\Encoder\ConfirmSuggestionsController;
 use App\Http\Controllers\Encoder\ContributorController;
@@ -24,15 +26,18 @@ use App\Http\Controllers\Encoder\ProvenanceController;
 use App\Http\Controllers\Encoder\RecordController;
 use App\Http\Controllers\Encoder\RecordExportController;
 use App\Http\Controllers\Encoder\RecordFileController;
+use App\Http\Controllers\Encoder\RecordFrameImageController;
 use App\Http\Controllers\Encoder\RecordMediaController;
 use App\Http\Controllers\Encoder\RecordWaveformController;
 use App\Http\Controllers\Encoder\RetryProcessingController;
 use App\Http\Controllers\Encoder\ReviewController;
 use App\Http\Controllers\Encoder\RightsController;
+use App\Http\Controllers\Encoder\SceneController;
 use App\Http\Controllers\Encoder\SegmentController;
 use App\Http\Controllers\Encoder\SpeakerController;
 use App\Http\Controllers\Encoder\SubjectController;
 use App\Http\Controllers\Encoder\SubmitRecordController;
+use App\Http\Controllers\Encoder\ThumbnailController;
 use App\Http\Controllers\Encoder\TitleController;
 use App\Http\Controllers\Encoder\TranslationController;
 use App\Http\Controllers\Encoder\UploadController;
@@ -54,10 +59,15 @@ Route::middleware(['auth', 'verified', 'role:encoder,admin', 'catalogue.refresh'
 
     Route::get('records/{record}', [RecordController::class, 'show'])->name('records.show');
     Route::patch('records/{record}', [RecordController::class, 'update'])->middleware('throttle:60,1')->name('records.update');
+    Route::delete('records/{record}', [RecordController::class, 'destroy'])->middleware('throttle:30,1')->name('records.destroy');
     Route::get('records/{record}/media', RecordMediaController::class)->name('records.media');
     Route::get('records/{record}/waveform', RecordWaveformController::class)->name('records.waveform');
     Route::get('records/{record}/export', RecordExportController::class)->name('records.export');
+    // Audio as MP3 or WAV, made from the master in the background, then downloaded.
+    Route::post('records/{record}/audio-export', [AudioExportController::class, 'store'])->middleware('throttle:10,1')->name('records.audio-export.store');
+    Route::get('records/{record}/audio-export/{format}', [AudioExportController::class, 'show'])->name('records.audio-export.show');
     Route::post('records/{record}/retry', RetryProcessingController::class)->middleware('throttle:ai')->name('records.retry');
+    Route::post('records/{record}/cancel', CancelProcessingController::class)->middleware('throttle:30,1')->name('records.cancel');
     Route::post('records/{record}/submit', SubmitRecordController::class)->middleware('throttle:30,1')->name('records.submit');
 
     Route::patch('records/{record}/transcript/speaker', [SegmentController::class, 'assignSpeaker'])->name('records.transcript.speaker');
@@ -86,6 +96,14 @@ Route::middleware(['auth', 'verified', 'role:encoder,admin', 'catalogue.refresh'
     Route::post('records/{record}/attachments', [AttachmentController::class, 'store'])->middleware('throttle:30,1')->name('records.attachments.store');
     Route::get('records/{record}/attachments/{attachment}', [AttachmentController::class, 'show'])->scopeBindings()->name('records.attachments.show');
     Route::delete('records/{record}/attachments/{attachment}', [AttachmentController::class, 'destroy'])->scopeBindings()->name('records.attachments.destroy');
+
+    // Visual analysis (Phase 5). A thumbnail at a time runs ffmpeg on the AI service.
+    Route::post('records/{record}/thumbnail', [ThumbnailController::class, 'store'])->middleware('throttle:20,1')->name('records.thumbnail.store');
+    Route::get('records/{record}/thumbnail', [ThumbnailController::class, 'show'])->name('records.thumbnail');
+    Route::get('records/{record}/frames/{frame}/image', RecordFrameImageController::class)->scopeBindings()->name('records.frames.image');
+    Route::post('records/{record}/scenes', [SceneController::class, 'store'])->middleware('throttle:60,1')->name('records.scenes.store');
+    Route::patch('records/{record}/scenes/{scene}', [SceneController::class, 'update'])->middleware('throttle:60,1')->scopeBindings()->name('records.scenes.update');
+    Route::delete('records/{record}/scenes/{scene}', [SceneController::class, 'destroy'])->middleware('throttle:60,1')->scopeBindings()->name('records.scenes.destroy');
 
     Route::post('records/{record}/files', [RecordFileController::class, 'store'])->middleware('throttle:ai')->name('records.files.store');
     Route::post('records/{record}/fixity', FixityController::class)->middleware('throttle:6,1')->name('records.fixity');

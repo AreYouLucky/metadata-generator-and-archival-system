@@ -5,8 +5,9 @@ import { toast } from 'sonner';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useLoadMetadataDraft } from '@/hooks/use-metadata-draft';
 import { useRecordChannel } from '@/hooks/use-record-channel';
+import { useSetThumbnail } from '@/hooks/use-visuals';
 import { translationLinesKey } from '@/hooks/use-translations';
-import { languageName } from '@/lib/utilities';
+import { getErrorMessage, languageName } from '@/lib/utilities';
 import { useMetadataDraftStore } from '@/stores/metadata-draft-store';
 import { index as projectsIndex, show as showProject } from '@/routes/projects';
 import { show } from '@/routes/records';
@@ -16,6 +17,7 @@ import type { ExportSchema } from '@/types/export-schemas';
 import type { WorkspaceReview } from '@/types/reviews';
 import type {
     ActiveMetadata,
+    AudioExport,
     Contributor,
     ContributorRoleOption,
     ExportFormatOption,
@@ -33,6 +35,7 @@ import type {
     WorkspaceRecord,
     WorkspaceTranscript,
 } from '@/types/records';
+import type { Visuals } from '@/types/visuals';
 import ChaptersPanel from './partials/chapters-panel';
 import ArchivePanel from './partials/archive-panel';
 import CreditsPanel from './partials/credits-panel';
@@ -44,6 +47,7 @@ import PreviewMonitor from './partials/preview-monitor';
 import Timeline from './partials/timeline';
 import TranscriptPanel from './partials/transcript-panel';
 import TranslationsPanel from './partials/translations-panel';
+import VisualsPanel from './partials/visuals-panel';
 import WorkspaceHeaderActions from './partials/workspace-header-actions';
 
 type Props = {
@@ -64,6 +68,8 @@ type Props = {
     archive: Archive;
     archiveOptions: ArchiveOptions;
     review: WorkspaceReview;
+    visuals: Visuals;
+    audioExports: AudioExport[];
 };
 
 type SavedSegment = Pick<TranscriptSegment, 'id'> & Partial<TranscriptSegment>;
@@ -93,6 +99,8 @@ export default function ShowRecord(props: Props) {
         archive,
         archiveOptions,
         review,
+        visuals,
+        audioExports,
     } = props;
     const [stages, setStages] = useState(props.stages);
     const [processingStatus, setProcessingStatus] = useState(
@@ -232,7 +240,34 @@ export default function ShowRecord(props: Props) {
     }, []);
 
     useRecordChannel(record.id, { onProgress, onTranslation, onTitles });
-    useKeyboardShortcuts({ segments, speakers, canEdit: record.can_edit });
+    // T: the frame the player shows becomes the thumbnail.
+    const setThumbnail = useSetThumbnail(record.id);
+    const thumbnailFromPlayer = () => {
+        const player = useWorkspaceStore.getState().player;
+
+        if (player) {
+            setThumbnail.mutate(
+                { timeSec: player.currentTime },
+                {
+                    onSuccess: () =>
+                        toast.success('Thumbnail set to this frame.'),
+                    onError: (error) =>
+                        toast.error(
+                            getErrorMessage(
+                                error,
+                                'The thumbnail could not be set.',
+                            ),
+                        ),
+                },
+            );
+        }
+    };
+    useKeyboardShortcuts({
+        segments,
+        speakers,
+        canEdit: record.can_edit,
+        onSetThumbnail: thumbnailFromPlayer,
+    });
 
     const finishedTranslations = useMemo(
         () => translations.filter((item) => item.status === 'done'),
@@ -276,6 +311,7 @@ export default function ShowRecord(props: Props) {
                 archive.subjects.filter((item) => !item.is_confirmed).length +
                 archive.keywords.filter((item) => !item.is_confirmed).length
             }
+            frameCount={visuals.frames.length}
         />
     );
 
@@ -360,6 +396,15 @@ export default function ShowRecord(props: Props) {
                                         canEdit={record.can_edit}
                                     />
                                 ),
+                                visuals: (
+                                    <VisualsPanel
+                                        recordId={record.id}
+                                        heading={tabBar}
+                                        visuals={visuals}
+                                        stages={stages}
+                                        canEdit={record.can_edit}
+                                    />
+                                ),
                                 chapters: (
                                     <ChaptersPanel
                                         recordId={record.id}
@@ -395,7 +440,7 @@ export default function ShowRecord(props: Props) {
                                 export: (
                                     <ExportPanel
                                         recordId={record.id}
-                                        heading={tabBar}
+                                        audioExports={audioExports}
                                         formats={exportFormats}
                                         schemas={exportSchemas}
                                         originalLanguage={
@@ -415,6 +460,8 @@ export default function ShowRecord(props: Props) {
                     media={media}
                     segments={segments}
                     metadata={metadata}
+                    shots={visuals.shots}
+                    scenes={visuals.scenes}
                     canEdit={record.can_edit}
                     generating={generating}
                     onSegmentSaved={onSegmentSaved}

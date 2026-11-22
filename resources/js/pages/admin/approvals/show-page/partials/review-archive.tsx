@@ -293,6 +293,21 @@ export default function ReviewArchive({ archive, record }: Props) {
                             )
                             .join('\n'),
                     ],
+                    [
+                        'Shots',
+                        archive.segments.shot_count > 0
+                            ? String(archive.segments.shot_count)
+                            : null,
+                    ],
+                    [
+                        'Scenes',
+                        archive.segments.scenes
+                            .map(
+                                (scene) =>
+                                    `${scene.label} (${scene.tc_in} – ${scene.tc_out})`,
+                            )
+                            .join('\n'),
+                    ],
                 ]}
             />
 

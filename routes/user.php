@@ -40,5 +40,6 @@ Route::middleware($requiresLogin ? ['auth', 'throttle:catalogue-media'] : ['thro
     ->name('catalogue.')
     ->group(function () {
         Route::get('watch/{record}/media', [CatalogueMediaController::class, 'stream'])->name('media');
+        Route::get('watch/{record}/thumbnail', [CatalogueMediaController::class, 'thumbnail'])->name('thumbnail');
         Route::get('browse/projects/{project}/thumbnail', [CatalogueMediaController::class, 'projectThumbnail'])->name('projects.thumbnail');
     });

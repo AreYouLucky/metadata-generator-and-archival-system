@@ -9,6 +9,7 @@ use App\Models\Record;
 use App\Models\RecordAttachment;
 use App\Models\RecordContributor;
 use App\Models\RecordFile;
+use App\Models\RecordFrame;
 use App\Models\RecordKeyword;
 use App\Models\RecordScene;
 use App\Models\RecordSegment;
@@ -29,7 +30,7 @@ class JsonExporter implements Exporter
 {
     public const string SCHEMA_VERSION = '1.0';
 
-    public const string GENERATOR_VERSION = '0.3.0';
+    public const string GENERATOR_VERSION = '0.4.0';
 
     /**
      * The whole document, or only a custom schema's fields when `fields` is set.
@@ -86,6 +87,7 @@ class JsonExporter implements Exporter
             'transcripts.segments.speaker:id,label',
             'speakers',
             'scenes',
+            'frames',
             'activeMetadata',
         ]);
 
@@ -141,9 +143,32 @@ class JsonExporter implements Exporter
                 ->mapWithKeys(fn (RecordTranscript $transcript): array => [$transcript->language => $this->segments($transcript, withSpeakers: false)])
                 ->all() ?: new stdClass,
             'ai' => $this->ai($record),
-            'visual' => ['thumbnail' => null, 'frames' => []],
+            'visual' => $this->visual($record),
             'clips' => [],
             'publishing' => ['youtube' => ['videoId' => null, 'publishedAt' => null]],
+        ];
+    }
+
+    /**
+     * The thumbnail (its path on the media disk and, for a frame, where it
+     * was taken) and every key frame's analysis. Face counts only.
+     *
+     * @return array{thumbnail: array{timeSec: float|null, path: string}|null, frames: list<array{timeSec: float, description: string|null, ocrText: string|null, objects: list<array{label: string, confidence: float}>, faceCount: int|null}>}
+     */
+    private function visual(Record $record): array
+    {
+        return [
+            'thumbnail' => $record->thumbnail_path === null ? null : [
+                'timeSec' => $record->thumbnail_time_sec,
+                'path' => $record->thumbnail_path,
+            ],
+            'frames' => array_values($record->frames->map(fn (RecordFrame $frame): array => [
+                'timeSec' => $frame->time_sec,
+                'description' => $frame->description,
+                'ocrText' => $frame->ocr_text,
+                'objects' => array_values($frame->objects ?? []),
+                'faceCount' => $frame->face_count,
+            ])->all()),
         ];
     }
 

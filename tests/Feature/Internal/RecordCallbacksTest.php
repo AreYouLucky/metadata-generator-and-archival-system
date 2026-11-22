@@ -13,6 +13,7 @@ use App\Models\Record;
 use App\Models\RecordFile;
 use App\Models\RecordStage;
 use App\Services\InternalSignature;
+use App\Services\Records\PipelineRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Testing\TestResponse;
@@ -262,6 +263,29 @@ class RecordCallbacksTest extends TestCase
     /**
      * @param  array<string, mixed>  $fileAttributes
      */
+    public function test_callbacks_for_a_cancelled_record_are_acknowledged_but_ignored(): void
+    {
+        $record = $this->recordWithStages();
+        $record->stages()->update(['status' => StageStatus::Cancelled]);
+        app(PipelineRecorder::class)->refreshStatus($record);
+
+        $this->postSigned("/internal/records/{$record->id}/progress", [
+            'stage' => 'transcribe',
+            'status' => 'running',
+            'progress' => 40,
+            'message' => null,
+        ])->assertOk()->assertJson(['ignored' => 'cancelled']);
+        $this->postSigned("/internal/records/{$record->id}/results/checksum", [
+            'md5' => str_repeat('a', 32),
+            'sha256' => str_repeat('b', 64),
+            'file_size' => 1024,
+        ])->assertOk()->assertJson(['ignored' => 'cancelled']);
+
+        $this->assertSame([StageStatus::Cancelled], $record->stages()->get()->pluck('status')->unique()->values()->all());
+        $this->assertSame(ProcessingStatus::Cancelled, $record->refresh()->processing_status);
+        $this->assertSame(ChecksumStatus::Pending, $record->files()->sole()->checksum_status);
+    }
+
     private function recordWithStages(array $fileAttributes = []): Record
     {
         $record = Record::factory()->create();

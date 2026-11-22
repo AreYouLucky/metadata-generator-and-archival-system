@@ -11,6 +11,9 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import VisualAnalysisOptions, {
+    DEFAULT_VISUAL_ANALYSIS,
+} from '@/components/encoder/visual-analysis-options';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -31,8 +34,8 @@ type Props = {
 };
 
 /**
- * Re-runs every stage of a failed record. The upload's platform choice isn't
- * stored, so it is asked for again here.
+ * Re-runs every stage of a failed or cancelled record. The upload's choices (platform,
+ * visual analysis) aren't stored, so they are asked for again here.
  */
 export default function RetryProcessingDialog({
     recordId,
@@ -42,11 +45,12 @@ export default function RetryProcessingDialog({
     const [open, setOpen] = useState(false);
     const [preset, setPreset] = useState<PresetName>(initialPreset);
     const [prompt, setPrompt] = useState('');
+    const [visual, setVisual] = useState(DEFAULT_VISUAL_ANALYSIS);
     const retry = useRetryProcessing(recordId);
 
     const submit = () =>
         retry.mutate(
-            { preset, customPrompt: prompt },
+            { preset, customPrompt: prompt, ...visual },
             {
                 onSuccess: () => {
                     setOpen(false);
@@ -111,6 +115,11 @@ export default function RetryProcessingDialog({
                             onChange={(event) => setPrompt(event.target.value)}
                         />
                     </div>
+                    <VisualAnalysisOptions
+                        idPrefix="retry"
+                        values={visual}
+                        onChange={setVisual}
+                    />
                 </div>
                 <DialogFooter>
                     <Button onClick={submit} disabled={retry.isPending}>

@@ -11,10 +11,46 @@ final readonly class PipelineOptions
 {
     public const int TITLE_COUNT = 3;
 
+    /**
+     * The visual flags are chosen on upload (and again on retry): frames,
+     * scenes and descriptions; on-screen text; objects and face counts.
+     * OCR and objects only run with visual analysis.
+     */
     public function __construct(
         public Preset $preset = Preset::Generic,
         public ?string $customPrompt = null,
+        public bool $visualAnalysis = false,
+        public bool $ocr = false,
+        public bool $objectDetection = false,
     ) {}
+
+    /**
+     * The flags as the AI service's JobOptions expects them.
+     *
+     * @return array{visual_analysis: bool, ocr: bool, object_detection: bool}
+     */
+    public function visualFlags(): array
+    {
+        return [
+            'visual_analysis' => $this->visualAnalysis,
+            'ocr' => $this->visualAnalysis && $this->ocr,
+            'object_detection' => $this->visualAnalysis && $this->objectDetection,
+        ];
+    }
+
+    /**
+     * Validation rules for the flags (upload and retry).
+     *
+     * @return array<string, array<int, string>>
+     */
+    public static function visualRules(): array
+    {
+        return [
+            'visual_analysis' => ['sometimes', 'boolean'],
+            'ocr' => ['sometimes', 'boolean'],
+            'object_detection' => ['sometimes', 'boolean'],
+        ];
+    }
 
     /**
      * The preset's limits from config/presets.php, in the shape the AI service expects.

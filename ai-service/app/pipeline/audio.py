@@ -76,6 +76,67 @@ def extract(
     return target
 
 
+# Audio exports for download (not the transcription copy above): MP3 at 192 kbps stereo,
+# or uncompressed 16-bit WAV keeping the master's channels and sample rate.
+EXPORT_CODECS: dict[str, list[str]] = {
+    "mp3": ["-c:a", "libmp3lame", "-b:a", "192k", "-ac", "2"],
+    "wav": ["-c:a", "pcm_s16le"],
+}
+
+
+def export(
+    source: Path,
+    target: Path,
+    audio_format: str,
+    duration: float | None = None,
+    on_progress: Callable[[int], None] | None = None,
+) -> Path:
+    """The master's first audio track as a file to download. Written next to the target
+    first, so a failed or interrupted export never replaces a finished one."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    partial = target.with_name(f".{target.stem}.part{target.suffix}")
+    command = [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(source),
+        "-map",
+        "0:a:0",
+        "-vn",
+        *EXPORT_CODECS[audio_format],
+        "-progress",
+        "pipe:1",
+        str(partial),
+    ]
+    process = subprocess.Popen(  # noqa: S603 - fixed argv, paths confined to storage
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    assert process.stdout is not None
+    for line in process.stdout:
+        match = _TIME_PATTERN.search(line)
+        if match and duration and on_progress:
+            on_progress(min(99, int(int(match.group(1)) / 1_000_000 * 100 / duration)))
+    try:
+        _, stderr = process.communicate(timeout=EXTRACT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as error:
+        process.kill()
+        partial.unlink(missing_ok=True)
+        raise AudioError("Exporting the audio timed out.") from error
+
+    if process.returncode != 0:
+        partial.unlink(missing_ok=True)
+        message = stderr.decode(errors="replace").strip()
+        if "matches no streams" in message:
+            raise AudioError("The video has no audio track.")
+        raise AudioError(f"ffmpeg could not export the audio: {message[:500] or 'unknown error'}")
+    partial.replace(target)
+    return target
+
+
 def waveform_peaks(audio: Path) -> list[int]:
     """Peak level (0-100) per 100 ms, so the browser can draw the waveform without
     downloading or decoding the media. An hour is 36,000 small integers."""

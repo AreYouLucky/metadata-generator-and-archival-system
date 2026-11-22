@@ -91,3 +91,18 @@ export type ApprovalRecord = {
         embargo_until: string | null;
     } | null;
 };
+
+/**
+ * People on screen in a record under review (face counts only; nobody is
+ * identified), so the reviewer can check consent before approving. Null
+ * when faces were never counted.
+ */
+export type FaceSummary = {
+    /** Key frames whose faces were counted. */
+    counted_frames: number;
+    frames_with_faces: number;
+    /** The first frames with faces, in time order. */
+    frames: { id: number; time_sec: number; face_count: number; url: string }[];
+    /** Whether signed release forms are on file (`available` | `not_available`). */
+    release_consent: string;
+};

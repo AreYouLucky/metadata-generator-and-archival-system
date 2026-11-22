@@ -7,6 +7,7 @@ use App\Enums\Preset;
 use App\Enums\StageStatus;
 use App\Jobs\GenerateMetadataJob;
 use App\Models\Record;
+use App\Models\RecordFrame;
 use App\Models\RecordMetadata;
 use App\Models\RecordTranscript;
 use App\Models\User;
@@ -61,6 +62,19 @@ class MetadataControllerTest extends TestCase
             ->assertUnprocessable();
 
         Queue::assertNotPushed(GenerateMetadataJob::class);
+    }
+
+    public function test_a_record_with_analysed_frames_but_no_transcript_can_be_regenerated(): void
+    {
+        Queue::fake([GenerateMetadataJob::class]);
+        $record = Record::factory()->create();
+        RecordFrame::factory()->for($record)->create(['ocr_text' => 'Rice targets 2026']);
+
+        $this->actingAs($record->creator)
+            ->postJson(route('records.metadata.store', $record), ['preset' => 'generic'])
+            ->assertAccepted();
+
+        Queue::assertPushed(GenerateMetadataJob::class);
     }
 
     public function test_an_encoder_cannot_regenerate_another_encoders_record(): void

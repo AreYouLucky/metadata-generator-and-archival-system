@@ -44,6 +44,11 @@ const STAGE_ICONS: Record<
         className: 'text-muted-foreground',
         label: 'Skipped',
     },
+    cancelled: {
+        icon: XCircle,
+        className: 'text-muted-foreground',
+        label: 'Cancelled',
+    },
 };
 
 const STATUS: Record<
@@ -104,6 +109,10 @@ export default function ProcessingStatusMenu({
     const problems = stages.filter(
         (stage) => stage.status === 'failed' || stage.status === 'skipped',
     );
+    const stopped = processingStatus === 'cancelled';
+    const cancelledBy = stopped
+        ? stages.find((stage) => stage.status === 'cancelled')?.message
+        : null;
 
     return (
         <DropdownMenu>
@@ -132,7 +141,7 @@ export default function ProcessingStatusMenu({
                             </span>
                         </>
                     )}
-                    {!working && problems.length > 0 && (
+                    {!working && !stopped && problems.length > 0 && (
                         <span className="text-xs text-muted-foreground">
                             {problems.length}{' '}
                             {problems.length === 1 ? 'issue' : 'issues'}
@@ -143,6 +152,11 @@ export default function ProcessingStatusMenu({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
                 <DropdownMenuLabel>Processing</DropdownMenuLabel>
+                {cancelledBy && (
+                    <p className="px-2 pb-1.5 text-xs text-muted-foreground">
+                        {cancelledBy} Finished steps keep their results.
+                    </p>
+                )}
                 <DropdownMenuSeparator />
                 <ol className="grid gap-1 p-1">
                     {stages.map((stage) => {

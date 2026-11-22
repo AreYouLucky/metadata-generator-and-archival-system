@@ -4,7 +4,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-UsageKind = Literal["transcription_minutes", "llm_input_tokens", "llm_output_tokens"]
+# Crockford base32 ULID in either case: Laravel's HasUlids stores them lowercase.
+# Kept as sent, because the IDs are echoed back on the callbacks.
+ULID_PATTERN = r"^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+
+UsageKind = Literal[
+    "transcription_minutes", "llm_input_tokens", "llm_output_tokens", "vision_frames"
+]
 
 
 class TranscriptSegment(BaseModel):

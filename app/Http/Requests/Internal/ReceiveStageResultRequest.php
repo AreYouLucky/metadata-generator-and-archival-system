@@ -6,6 +6,8 @@ use App\Enums\PipelineStage;
 use App\Enums\ScanType;
 use App\Enums\SubjectType;
 use App\Enums\UsageKind;
+use App\Models\Record;
+use App\Models\RecordFrame;
 use App\Services\Records\PipelineOptions;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,6 +24,13 @@ class ReceiveStageResultRequest extends FormRequest
      * Title options a generation may hold (three generated, plus "Generate more").
      */
     public const int MAX_TITLES = 12;
+
+    /**
+     * Bounds for the visual stages (the AI service caps them lower).
+     */
+    public const int MAX_SHOTS = 5000;
+
+    public const int MAX_FRAMES = 200;
 
     public function authorize(): bool
     {
@@ -69,8 +78,131 @@ class ReceiveStageResultRequest extends FormRequest
                 ...self::metadataRules('metadata.'),
                 ...$this->usageRules(),
             ],
+            PipelineStage::Scenes => [
+                'shots' => ['present', 'array', 'max:'.self::MAX_SHOTS],
+                'shots.*.start' => ['required', 'numeric', 'min:0'],
+                'shots.*.end' => ['required', 'numeric', 'min:0'],
+            ],
+            PipelineStage::Frames => [
+                'frames' => ['present', 'array', 'max:'.self::MAX_FRAMES],
+                'frames.*.time_sec' => ['required', 'numeric', 'min:0'],
+                // Only inside this record's frames folder.
+                'frames.*.path' => ['required', 'string', 'max:255', 'regex:'.$this->framePathPattern()],
+                'frames.*.is_scene_start' => ['required', 'boolean'],
+                'thumbnail_index' => ['nullable', 'integer', 'min:0'],
+            ],
+            PipelineStage::Vision => [
+                'model' => ['required', 'string', 'max:255'],
+                ...$this->frameRules(),
+                'frames.*.description' => ['nullable', 'string', 'max:1000'],
+                ...$this->usageRules(),
+            ],
+            PipelineStage::Ocr => [
+                ...$this->frameRules(),
+                'frames.*.text' => ['nullable', 'string', 'max:5000'],
+            ],
+            PipelineStage::Objects => [
+                ...$this->frameRules(),
+                'frames.*.objects' => ['present', 'array', 'max:20'],
+                'frames.*.objects.*.label' => ['required', 'string', 'max:64'],
+                'frames.*.objects.*.confidence' => ['required', 'numeric', 'between:0,1'],
+                'frames.*.face_count' => ['nullable', 'integer', 'between:0,1000'],
+            ],
             default => [],
         };
+    }
+
+    /**
+     * Shots from the `scenes` stage (end never before start).
+     *
+     * @return list<array{start: float, end: float}>
+     */
+    public function shotsResult(): array
+    {
+        /** @var array<int, array{start: float|int|string, end: float|int|string}> $shots */
+        $shots = $this->validated('shots');
+
+        return array_values(array_map(fn (array $shot): array => [
+            'start' => (float) $shot['start'],
+            'end' => max((float) $shot['start'], (float) $shot['end']),
+        ], $shots));
+    }
+
+    /**
+     * Frames from the `frames` stage and the suggested default thumbnail.
+     *
+     * @return array{frames: list<array{time_sec: float, path: string, is_scene_start: bool}>, thumbnail_index: int|null}
+     */
+    public function framesResult(): array
+    {
+        /** @var array<int, array{time_sec: float|int|string, path: string, is_scene_start: bool|int|string}> $frames */
+        $frames = $this->validated('frames');
+        $thumbnail = $this->validated('thumbnail_index');
+
+        return [
+            'frames' => array_values(array_map(fn (array $frame): array => [
+                'time_sec' => (float) $frame['time_sec'],
+                'path' => $frame['path'],
+                'is_scene_start' => (bool) $frame['is_scene_start'],
+            ], $frames)),
+            'thumbnail_index' => $thumbnail === null ? null : (int) $thumbnail,
+        ];
+    }
+
+    /**
+     * Per-frame results of `vision`, `ocr` or `objects`, as the columns they
+     * fill, keyed by the frame's time (how the AI service names a frame).
+     *
+     * @return array{updates: array<string, array<string, mixed>>, usage: list<array{kind: string, quantity: float, estimated_cost: float|null}>}
+     */
+    public function frameAnalysis(): array
+    {
+        /** @var array<int, array<string, mixed>> $frames */
+        $frames = $this->validated('frames');
+        $updates = [];
+
+        foreach ($frames as $frame) {
+            $key = RecordFrame::timeKey((float) $frame['time_sec']);
+            $updates[$key] = match ($this->stage()) {
+                PipelineStage::Vision => ['description' => self::text($frame['description'] ?? null)],
+                PipelineStage::Ocr => ['ocr_text' => self::text($frame['text'] ?? null)],
+                default => [
+                    'objects' => array_values(array_map(fn (array $object): array => [
+                        'label' => (string) $object['label'],
+                        'confidence' => round((float) $object['confidence'], 3),
+                    ], (array) ($frame['objects'] ?? []))),
+                    'face_count' => isset($frame['face_count']) ? (int) $frame['face_count'] : null,
+                ],
+            };
+        }
+
+        return ['updates' => $updates, 'usage' => $this->usage()];
+    }
+
+    private static function text(mixed $value): ?string
+    {
+        $text = is_string($value) ? trim($value) : '';
+
+        return $text === '' ? null : $text;
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function frameRules(): array
+    {
+        return [
+            'frames' => ['present', 'array', 'max:'.self::MAX_FRAMES],
+            'frames.*.time_sec' => ['required', 'numeric', 'min:0'],
+        ];
+    }
+
+    private function framePathPattern(): string
+    {
+        $record = $this->route('record');
+        $id = $record instanceof Record ? preg_quote($record->id, '/') : 'none';
+
+        return '/^records\/'.$id.'\/frames\/[A-Za-z0-9_-]{1,64}\.jpg$/';
     }
 
     /**
@@ -276,7 +408,7 @@ class ReceiveStageResultRequest extends FormRequest
     {
         return [
             'usage' => ['present', 'array', 'max:20'],
-            'usage.*.kind' => ['required', Rule::in([UsageKind::TranscriptionMinutes->value, UsageKind::LlmInputTokens->value, UsageKind::LlmOutputTokens->value])],
+            'usage.*.kind' => ['required', Rule::in([UsageKind::TranscriptionMinutes->value, UsageKind::LlmInputTokens->value, UsageKind::LlmOutputTokens->value, UsageKind::VisionFrames->value])],
             'usage.*.quantity' => ['required', 'numeric', 'min:0'],
             'usage.*.estimated_cost' => ['nullable', 'numeric', 'min:0'],
         ];

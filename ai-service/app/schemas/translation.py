@@ -5,7 +5,7 @@ line onto each translated one, so the model never sees (or can break) a timestam
 
 from pydantic import BaseModel, Field
 
-from app.schemas.pipeline import ULID_PATTERN
+from app.schemas.common import ULID_PATTERN
 
 LANGUAGE_PATTERN = r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
 

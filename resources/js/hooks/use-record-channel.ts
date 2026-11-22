@@ -3,6 +3,7 @@ import { useEcho } from '@laravel/echo-react';
 import type {
     PipelineStageName,
     RecordArchiveUpdatedEvent,
+    RecordAudioExportUpdatedEvent,
     RecordProgressEvent,
     RecordStageCompletedEvent,
     RecordTitlesGeneratedEvent,
@@ -18,6 +19,11 @@ const RELOAD_AFTER: Record<PipelineStageName, string[]> = {
     probe: ['media'],
     extract_audio: ['media'],
     transcribe: ['transcript', 'translations'],
+    scenes: ['visuals', 'archive'],
+    frames: ['visuals'],
+    vision: ['visuals'],
+    ocr: ['visuals'],
+    objects: ['visuals'],
     generate_metadata: ['metadata', 'metadataHistory', 'archive'],
     proxy: ['media', 'archive'],
 };
@@ -87,6 +93,25 @@ export function useRecordChannel(
 
             store.setDescriptiveSuggestion(event.fields);
             store.setInspectorTab('archive');
+        },
+        [recordId],
+    );
+
+    // An audio export (MP3 or WAV) finished or failed.
+    useEcho<RecordAudioExportUpdatedEvent>(
+        channel,
+        '.record.audio-export-updated',
+        (event) => {
+            router.reload({ only: ['audioExports'] });
+            const name = event.format.toUpperCase();
+
+            if (event.status === 'ready') {
+                toast.success(`The ${name} audio is ready to download.`);
+            } else {
+                toast.error(
+                    event.error ?? `The ${name} audio could not be made.`,
+                );
+            }
         },
         [recordId],
     );

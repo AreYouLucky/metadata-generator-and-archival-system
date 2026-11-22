@@ -302,6 +302,7 @@ class Catalogue
                     'license' => $record->rights?->license,
                     'license_url' => $record->rights?->license_url,
                     'usage_restrictions' => $record->rights?->usage_restrictions,
+                    'thumbnail' => self::thumbnailUrl($record),
                 ],
                 'transcript' => [
                     'language' => $transcript['language'],
@@ -322,6 +323,19 @@ class Catalogue
     }
 
     /**
+     * The record's own thumbnail (Phase 5), else its project's cover. The
+     * version parameter changes with the image, so browsers can cache it.
+     */
+    public static function thumbnailUrl(Record $record): ?string
+    {
+        if ($record->thumbnail_path !== null) {
+            return route('catalogue.thumbnail', ['record' => $record->id, 'v' => substr(md5($record->thumbnail_path), 0, 8)]);
+        }
+
+        return $record->project?->thumbnail_path ? route('catalogue.projects.thumbnail', $record->project_id) : null;
+    }
+
+    /**
      * Public records with the catalogue date, newest first.
      *
      * @return Builder<Record>
@@ -329,7 +343,7 @@ class Catalogue
     public function records(): Builder
     {
         return $this->publicBase()
-            ->select(['records.id', 'records.title', 'records.project_id', 'records.project_series_id', 'records.genre_id', 'records.video_type_id', 'records.agency_id', 'records.date_recorded', 'records.published_at'])
+            ->select(['records.id', 'records.title', 'records.project_id', 'records.project_series_id', 'records.genre_id', 'records.video_type_id', 'records.agency_id', 'records.date_recorded', 'records.published_at', 'records.thumbnail_path'])
             ->selectRaw(self::dateExpression().' as catalogue_date')
             ->orderByRaw(self::dateExpression().' desc')
             ->orderByDesc('records.id');
@@ -485,7 +499,7 @@ class Catalogue
             'video_type' => $record->videoType?->name,
             'agency' => $record->agency?->acronym ?: $record->agency?->name,
             'duration' => $record->masterFile?->technicalMetadata?->duration,
-            'thumbnail' => $record->project?->thumbnail_path ? route('catalogue.projects.thumbnail', $record->project_id) : null,
+            'thumbnail' => self::thumbnailUrl($record),
         ])->all());
     }
 
