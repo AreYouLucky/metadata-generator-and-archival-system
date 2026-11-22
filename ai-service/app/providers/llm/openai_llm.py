@@ -9,13 +9,19 @@ from typing import Any
 
 import openai
 from openai import OpenAI
-from openai.types.responses import EasyInputMessageParam, ResponseInputParam
+from openai.types.responses import (
+    EasyInputMessageParam,
+    ResponseInputImageParam,
+    ResponseInputMessageContentListParam,
+    ResponseInputParam,
+    ResponseInputTextParam,
+)
 from openai.types.shared_params import Reasoning
 from pydantic import ValidationError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import ReasoningEffort, Settings, get_settings
-from app.providers.llm.base import LlmError, LlmUsage, T
+from app.providers.llm.base import ImageInput, LlmError, LlmUsage, T
 
 _TRANSIENT = (
     openai.APIConnectionError,
@@ -42,12 +48,17 @@ class OpenAILlmProvider:
         schema: type[T],
         reasoning_effort: ReasoningEffort,
         max_output_tokens: int,
+        images: list[ImageInput] | None = None,
     ) -> tuple[T, LlmUsage]:
         usage = LlmUsage(model=model)
         conversation: ResponseInputParam = [
             EasyInputMessageParam(role="system", content=instructions),
-            *(EasyInputMessageParam(role="user", content=message) for message in messages),
+            *(EasyInputMessageParam(role="user", content=message) for message in messages[:-1]),
         ]
+        if messages:
+            conversation.append(
+                EasyInputMessageParam(role="user", content=_content(messages[-1], images or []))
+            )
 
         # Structured Outputs guarantees the schema, but a refusal or a cut-off answer
         # can still fail: retry once, telling the model what went wrong.
@@ -91,6 +102,20 @@ class OpenAILlmProvider:
             reasoning=Reasoning(effort=reasoning_effort),
             max_output_tokens=max_output_tokens,
         )
+
+
+def _content(text: str, images: list[ImageInput]) -> str | ResponseInputMessageContentListParam:
+    """Plain text, or the text followed by the images (Responses API `input_image`)."""
+    if not images:
+        return text
+    parts: ResponseInputMessageContentListParam = [
+        ResponseInputTextParam(type="input_text", text=text)
+    ]
+    parts.extend(
+        ResponseInputImageParam(type="input_image", image_url=image.data_url, detail=image.detail)
+        for image in images
+    )
+    return parts
 
 
 def _parsed(response: Any, schema: type[T]) -> T:

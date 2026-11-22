@@ -117,3 +117,45 @@ def test_a_stage_with_nothing_to_do_is_skipped_not_failed(reported: list[tuple[s
     assert reported[-1][2] == "skipped"
     assert out["skipped"] == ["generate_metadata"]
     assert out["failed"] == []
+
+
+def test_a_stage_of_a_cancelled_run_neither_runs_nor_reports(
+    reported: list[tuple[str, ...]],
+) -> None:
+    from app.pipeline import cancellation
+
+    cancellation.cancel("cancelled-run")
+
+    def must_not_run(ctx: PipelineContext, progress: Any) -> dict[str, Any]:
+        raise AssertionError("ran")
+
+    tasks.run_stage("probe", context(run_id="cancelled-run"), must_not_run)
+
+    assert reported == []
+
+
+def test_a_run_cancelled_while_a_stage_works_drops_the_result(
+    reported: list[tuple[str, ...]],
+) -> None:
+    from app.pipeline import cancellation
+
+    def cancelled_midway(ctx: PipelineContext, progress: Any) -> dict[str, Any]:
+        cancellation.cancel("midway-run")
+        return {"duration": 3.0}
+
+    tasks.run_stage("probe", context(run_id="midway-run"), cancelled_midway)
+
+    assert reported == [("progress", "probe", "running", "")]
+
+
+def test_progress_stops_a_long_stage_once_its_run_is_cancelled() -> None:
+    from app.pipeline import cancellation
+
+    ticks: list[int] = []
+    progress = cancellation.CancellableProgress("long-run", ticks.append, interval=0)
+    progress(10)
+    cancellation.cancel("long-run")
+
+    with pytest.raises(cancellation.PipelineCancelled):
+        progress(20)
+    assert ticks == [10]

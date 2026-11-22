@@ -46,6 +46,7 @@ class StoreRecordRequest extends FormRequest
             'custom_prompt' => ['nullable', 'string', 'max:2000'],
             'expected_md5' => ['nullable', 'string', 'regex:/^[A-Fa-f0-9]{32}$/'],
             'expected_sha256' => ['nullable', 'string', 'regex:/^[A-Fa-f0-9]{64}$/'],
+            ...PipelineOptions::visualRules(),
         ];
     }
 
@@ -68,6 +69,12 @@ class StoreRecordRequest extends FormRequest
     {
         $prompt = trim((string) $this->validated('custom_prompt'));
 
-        return new PipelineOptions(Preset::from($this->validated('preset')), $prompt !== '' ? $prompt : null);
+        return new PipelineOptions(
+            Preset::from($this->validated('preset')),
+            $prompt !== '' ? $prompt : null,
+            visualAnalysis: (bool) $this->validated('visual_analysis', false),
+            ocr: (bool) $this->validated('ocr', false),
+            objectDetection: (bool) $this->validated('object_detection', false),
+        );
     }
 }

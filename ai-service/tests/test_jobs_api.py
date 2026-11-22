@@ -68,3 +68,29 @@ def test_an_unsigned_request_is_refused(client: TestClient) -> None:
     response = client.post("/jobs/process", content=body("records/a.mp4"))
 
     assert response.status_code == 401
+
+
+def cancel(client: TestClient, path_id: str, body_id: str) -> object:
+    payload = json.dumps({"job_id": body_id}).encode()
+    return client.post(
+        f"/jobs/{path_id}/cancel",
+        content=payload,
+        headers={"Content-Type": "application/json", **signed_headers(SECRET, payload)},
+    )
+
+
+def test_a_signed_cancel_flags_the_run(client: TestClient) -> None:
+    from app.pipeline import cancellation
+
+    response = cancel(client, "a1b2c3", "a1b2c3")
+
+    assert response.status_code == 200  # type: ignore[attr-defined]
+    assert cancellation.is_cancelled("a1b2c3")
+    assert not cancellation.is_cancelled("another-run")
+
+
+def test_a_cancel_whose_body_names_another_job_is_refused(client: TestClient) -> None:
+    from app.pipeline import cancellation
+
+    assert cancel(client, "run-one", "run-two").status_code == 422  # type: ignore[attr-defined]
+    assert not cancellation.is_cancelled("run-one")

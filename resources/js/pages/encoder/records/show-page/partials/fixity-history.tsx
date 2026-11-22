@@ -23,8 +23,8 @@ export default function FixityHistory({ recordId, entries }: Props) {
     const run = useRunFixity(recordId);
 
     return (
-        <section className="grid gap-2 border-t border-white/10 pt-4">
-            <div className="flex items-center justify-between">
+        <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-medium">Fixity checks</h3>
                 <Button
                     size="sm"
@@ -52,9 +52,12 @@ export default function FixityHistory({ recordId, entries }: Props) {
                     regularly.
                 </p>
             ) : (
-                <ul className="grid gap-1 text-xs">
+                <ul className="grid grid-cols-1 gap-1 text-xs">
                     {entries.map((entry) => (
-                        <li key={entry.id} className="flex items-center gap-2">
+                        <li
+                            key={entry.id}
+                            className="flex flex-wrap items-center gap-x-2 gap-y-0.5"
+                        >
                             {entry.matched ? (
                                 <CircleCheck
                                     className="size-3.5 shrink-0 text-emerald-400"

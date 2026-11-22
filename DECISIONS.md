@@ -3,6 +3,105 @@
 Choices made while building, and any deviation from [PROJECT_SPEC.md](PROJECT_SPEC.md). Newest
 phase first.
 
+## Phase 5 — Visual analysis (built)
+
+### Pipeline
+
+- **The audio and visual stages run side by side.** After `probe`, a Celery group runs
+  `extract_audio → transcribe` (GPU queue) next to `scenes → frames → vision → ocr → objects`
+  (CPU worker); a `join` task merges both contexts, then `generate_metadata` and `proxy` run as
+  before. Visual analysis therefore adds little to the time until metadata. Celery turns the
+  group into a chord, which uses the existing Redis result backend.
+- **Upload options** `visual_analysis`, `ocr` and `object_detection` (on by default) are on the
+  Import page and, as the options still aren't stored on the record, in the Retry dialog. OCR and
+  objects only run with visual analysis. A switched-off stage is reported as `skipped` with the
+  reason. Records from before Phase 5 have no visual stages; a retry adds the rows (there is no
+  way yet to run only the visual stages on a finished record, see "Later").
+- **Metadata no longer depends on the transcript alone.** It is written from the transcript, the
+  frames' on-screen content, or both, so a slideshow with music is still described.
+- **Frames:** every shot's start (0.5 s into the shot, past dissolves) plus one every
+  `FRAME_INTERVAL_SEC` (10) that isn't within half an interval of a shot start; at most
+  `MAX_FRAMES` (60). For long videos the interval grows to fit; with more shots than frames, the
+  shot starts are spread evenly. JPEGs at most 720 px tall, square pixels (anamorphic SD masters),
+  deinterlaced when flagged, in `records/{id}/frames/` (replaced on a re-run; not temporary files,
+  as the workspace shows them).
+- **Repeated frames aren't paid for twice.** Each frame is compared with the one before (160×90
+  greyscale; a duplicate when under 0.2% of the cells changed by more than 24 levels, which a new
+  line of text on a slide exceeds). OCR, objects and descriptions run on distinct frames only and
+  are copied to repeats.
+- **Shots:** PySceneDetect `ContentDetector` (threshold 27, its default; 15-frame minimum), at
+  most `MAX_SHOTS` (2,000; the rest merge into the last). Timecode in and out are computed by
+  Laravel (`App\Support\Timecode`, the same arithmetic as the frontend's `formatTimecode`) from
+  the master's frame rate and start timecode. A re-run replaces the shots but keeps the scenes
+  encoders made.
+
+### Models and cost
+
+- **OCR and object detection run on the CPU** with torch's CPU build (about 200 MB instead of
+  several GB of CUDA libraries); the 6 GB GPU stays with Whisper. On the dev machine OCR takes
+  about 2 s per distinct frame and YOLO 0.1 s. `VISION=false` builds the image without them.
+- **OCR:** EasyOCR, English and Tagalog (`OCR_LANGUAGES=en,tl`). Words below 0.25 confidence or
+  with fewer than two letters or digits are dropped (0.4 dropped a slightly misread title); the
+  rest are joined into reading-order lines. The metadata prompt says on-screen text may be
+  misspelt and to prefer the transcript's spelling.
+- **Objects:** Ultralytics YOLO11n (AGPL-3.0, as the spec warns), labels with their highest
+  confidence, at most 10 per frame. Ultralytics' analytics (`sync`) are switched off and it may
+  not install packages at run time (`YOLO_AUTOINSTALL=false`).
+- **Faces are counted with OpenCV's bundled frontal-face detector**, never recognised.
+  **OpenCV is pinned below 5**: 5.x moved that detector out of the main package (only YuNet,
+  which needs a separate model download, remains).
+- **Descriptions:** `VISION_MODEL` (`gpt-6-luna`), 512 px low-detail JPEGs, 8 frames per
+  structured call, each description cached by the image's hash for 30 days. Two frames cost about
+  700 input tokens (checked against the API). Usage is written as tokens (which carry the cost)
+  plus `vision_frames` (no cost of its own, so nothing is counted twice). The prompt forbids
+  naming or describing people from their faces; names come only from on-screen text.
+- **On-screen content in metadata:** one line per distinct frame (`[m:ss] description On screen:
+  "text"`), text shown twice listed once, at most `VISUAL_CONTEXT_MAX_CHARS` (6,000; lines are
+  shortened evenly so the end of the video is kept). It is part of the cache key only when
+  present, so transcript-only caches stay valid. Regenerating sends the stored frames' content.
+
+### Thumbnails and scenes
+
+- **Every thumbnail is a copy** under `records/{id}/thumbnail/` (`thumbnail_path`), with
+  `thumbnail_frame_id` and the new `thumbnail_time_sec` saying where it came from. A re-run that
+  replaces the frames therefore never loses a chosen thumbnail. After the frames stage a record
+  without one gets a default: the first distinct frame after the first second that isn't near
+  black or white and has some contrast (often the title card), else the one with most contrast.
+- **"Use current frame"** (button or **T**) calls the AI service's `/frames/capture` inside the
+  request: one frame from the master at full quality (up to 1080 px), about a second, so it isn't
+  queued (like the admin ping). Limited to 20 a minute. Uploaded images follow the project cover
+  rules (JPG/PNG/WebP, 5 MB).
+- **Scenes** are named groups of shots (`POST|PATCH|DELETE /records/{record}/scenes`, not in the
+  spec's route list): select a run of shots in the Visuals tab and name it. Shots can't be edited.
+- The **catalogue** card and the watch page's poster use the record's thumbnail (served on
+  `/watch/{record}/thumbnail` behind `distribute`), falling back to the project cover.
+- **Archive → Structure** and the review page list the shot count and the named scenes; the shots
+  themselves are on the Visuals tab and the timeline's new Scenes track.
+- The JSON export fills `visual.thumbnail` and `visual.frames`; the generator version is 0.4.0.
+
+### Workspace changes (owner's requests)
+
+- **Export is no longer an inspector tab.** The header's Export button opens the Export panel in
+  the inspector (with its own title and a close button) and closes it again; closing returns to
+  the tab that was open. The tab strip stays one row: it scrolls sideways with snap, with arrows
+  on the side where tabs are hidden, and keeps the open tab in view.
+- **Audio export (MP3 or WAV)**, in the Export panel. Not in the spec. MP3 is 192 kbps stereo;
+  WAV is 16-bit PCM with the master's channels and sample rate. The file is made from the
+  master's first audio track by the AI service in the background (`POST /jobs/export-audio`,
+  callback `/internal/records/{record}/audio-export`, the path checked against the record), so a
+  long video doesn't hold a request open; the panel hears about it over Reverb. It is kept at
+  `records/{id}/exports/audio.{mp3|wav}` and reused (the master never changes); while one is being
+  made, or after a failure, the state is in the cache (one start at a time per format, a failure
+  can be retried). It isn't an archival file, so it isn't in `record_files`. Needs export rights
+  (view) and a probed master with an audio track; limited to 10 starts a minute. Each download is
+  logged as `exported` ("Format: mp3 (audio)").
+
+### Later
+
+- Run only the visual stages on a record processed before Phase 5 (today: re-upload, or retry
+  after a failure). Phase 6 adds retrying single stages.
+- Browser-side "Copy text" (tesseract.js) stays: it reads any paused frame, not only key frames.
+
 ## Phase 4 — Approvals, usage and public catalogue (built)
 
 ### Approval workflow
@@ -383,6 +482,22 @@ phase first.
   throttled progress ticks are best effort.
 - **Platform limits live only in `config/presets.php`.** Laravel sends them with every
   generation; Python has no copy. Phase 1 enables `generic` and `youtube`.
+- **Cancel was pulled forward from Phase 6** (owner's request). `POST /records/{record}/cancel`
+  (who may edit, while `queued` or `processing`) marks unfinished stages `cancelled` (a new stage
+  status) and the record `cancelled`. Results already stored stay, and Retry now also accepts a
+  cancelled record. `/jobs/process` returns a run id (not a Celery task id), which is kept in
+  `records.processing_job_id`. `CancelProcessingJob` sends it to `POST /jobs/{job_id}/cancel`, with
+  the id repeated in the body because only the body is signed. The AI service keeps a Redis flag
+  per run (7 days). Each stage checks it before it runs, every few seconds while it reports
+  progress, and before it reports its result, so a running stage stops at its next progress tick.
+  A retry gets a new run id, so an old flag can't stop it. Laravel also ignores progress and
+  results for a cancelled record (answering 200 so the service doesn't retry). A cancel that lands
+  while `StartProcessingJob` is still talking to the service is passed on once the job id comes
+  back.
+- **Deleting a record is a soft delete** (`records.deleted_at`, pulled forward from Phase 6):
+  `DELETE /records/{record}`, for the encoder while the record is a draft or has changes
+  requested, and for admins always. Processing still running is cancelled first, and the
+  deletion is logged as `deleted`. Files stay on disk until the cleanup job (§14) purges them.
 
 ### Uploads and media
 

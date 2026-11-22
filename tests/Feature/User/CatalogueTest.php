@@ -249,6 +249,31 @@ class CatalogueTest extends TestCase
         $this->get(route('catalogue.browse'))->assertInertia(fn (Assert $page) => $page->where('records.data.0.title', 'New title'));
     }
 
+    public function test_a_public_records_thumbnail_is_shown_on_its_card_and_served(): void
+    {
+        Storage::fake('media');
+        $record = $this->publicRecord();
+        $record->thumbnail_path = "records/{$record->id}/thumbnail/abc.jpg";
+        $record->save();
+        Storage::disk('media')->put($record->thumbnail_path, 'image');
+
+        $this->get(route('catalogue.browse'))->assertInertia(fn (Assert $page) => $page
+            ->where('records.data.0.thumbnail', Catalogue::thumbnailUrl($record)));
+        $this->assertStringStartsWith(route('catalogue.thumbnail', $record), (string) Catalogue::thumbnailUrl($record));
+        $this->get(route('catalogue.thumbnail', $record))->assertOk();
+    }
+
+    public function test_the_thumbnail_of_a_record_that_may_not_be_distributed_is_not_found(): void
+    {
+        Storage::fake('media');
+        $record = Record::factory()->create();
+        $record->thumbnail_path = "records/{$record->id}/thumbnail/abc.jpg";
+        $record->save();
+        Storage::disk('media')->put($record->thumbnail_path, 'image');
+
+        $this->get(route('catalogue.thumbnail', $record))->assertNotFound();
+    }
+
     public function test_the_home_page_lists_the_latest_records(): void
     {
         $this->publicRecord(['title' => 'Published']);

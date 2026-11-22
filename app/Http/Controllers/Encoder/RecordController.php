@@ -11,6 +11,7 @@ use App\Enums\Preset;
 use App\Enums\SecurityClassification;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Encoder\CreateRecordRequest;
+use App\Http\Requests\Encoder\DestroyRecordRequest;
 use App\Http\Requests\Encoder\IndexRecordsRequest;
 use App\Http\Requests\Encoder\StoreRecordRequest;
 use App\Http\Requests\Encoder\StoreTranslationRequest;
@@ -24,14 +25,19 @@ use App\Models\RecordStage;
 use App\Models\User;
 use App\Models\VideoAuditLog;
 use App\Services\Records\ArchivePresenter;
+use App\Services\Records\AudioExports;
+use App\Services\Records\AuditTrail;
 use App\Services\Records\PipelineOptions;
+use App\Services\Records\ProcessingCanceller;
 use App\Services\Records\RecordContent;
 use App\Services\Records\RecordIngestService;
 use App\Services\Records\ReviewHistory;
+use App\Services\Records\VisualsPresenter;
 use App\Services\Usage\ProcessingLimit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -192,6 +198,9 @@ class RecordController extends Controller
                 'embargo_until' => $record->rights?->isEmbargoed() ? $record->rights->embargo_until?->toDateString() : null,
                 'created_at' => $record->created_at?->toIso8601String(),
                 'can_edit' => $user?->can('update', $record) ?? false,
+                // Permission only: the page shows Cancel while its live status is queued or processing.
+                'can_cancel' => $user?->can('cancel', $record) ?? false,
+                'can_delete' => $user?->can('delete', $record) ?? false,
             ],
             'media' => fn (): array => $this->media($record),
             'stages' => fn (): array => $this->stages($record),
@@ -221,6 +230,7 @@ class RecordController extends Controller
                 array_values(StoreTranslationRequest::languages()),
             ),
             'exportFormats' => ExportFormat::options(),
+            'audioExports' => fn (): array => app(AudioExports::class)->present($record),
             'exportSchemas' => fn (): array => $user instanceof User ? ExportSchemaController::list($user) : [],
             // Approval workflow (Phase 4): notes from reviews and what this user may do next.
             'review' => fn (): array => [
@@ -231,6 +241,8 @@ class RecordController extends Controller
                 'can_view_access_log' => $user?->can('viewAccessLog', $record) ?? false,
                 'is_public' => Gate::forUser(null)->allows('distribute', $record),
             ],
+            // Visual analysis (Phase 5): frames, shots, scenes and the thumbnail.
+            'visuals' => fn (): array => app(VisualsPresenter::class)->present($record),
             'archive' => fn (): array => app(ArchivePresenter::class)->present($record),
             'archiveOptions' => fn (): array => $user instanceof User ? app(ArchivePresenter::class)->options($user) : [],
         ]);
@@ -267,6 +279,26 @@ class RecordController extends Controller
         }
 
         return response()->json(['archive' => $archive->present($record->refresh())]);
+    }
+
+    /**
+     * Soft delete: the record leaves every list and the public site, but its
+     * row, files and audit log stay (PROJECT_SPEC §8; files are purged later
+     * by the cleanup job). Processing still running is cancelled first.
+     */
+    public function destroy(DestroyRecordRequest $request, Record $record, ProcessingCanceller $canceller, AuditTrail $audit): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $canceller->cancel($record, $user);
+
+        DB::transaction(function () use ($record, $user, $audit): void {
+            $audit->log($record, AuditAction::Deleted, $user, 'Record deleted.');
+            $record->delete();
+        });
+
+        return response()->json(['deleted' => true]);
     }
 
     /**

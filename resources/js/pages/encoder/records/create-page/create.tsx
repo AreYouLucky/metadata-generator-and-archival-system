@@ -1,4 +1,5 @@
 import { Head, router } from '@inertiajs/react';
+import { DEFAULT_VISUAL_ANALYSIS } from '@/components/encoder/visual-analysis-options';
 import { Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -54,6 +55,7 @@ export default function CreateRecord({
         customPrompt: '',
         expectedMd5: '',
         expectedSha256: '',
+        ...DEFAULT_VISUAL_ANALYSIS,
     });
     const startedAt = useRef(0);
     const video = useLocalVideo(file);

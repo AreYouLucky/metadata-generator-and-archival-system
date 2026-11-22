@@ -4,7 +4,10 @@ namespace Tests\Feature\Encoder;
 
 use App\Enums\AuditAction;
 use App\Enums\Preset;
+use App\Models\Record;
 use App\Models\RecordFile;
+use App\Models\RecordFrame;
+use App\Models\RecordScene;
 use App\Models\RecordSegment;
 use App\Models\RecordTranscript;
 use App\Models\User;
@@ -54,6 +57,30 @@ class RecordExportControllerTest extends TestCase
         $this->assertSame('youtube', $json['ai']['preset']);
         $this->assertSame('Opening', $json['ai']['selectedTitle']);
         $this->assertDatabaseHas('video_audit_logs', ['record_id' => $record->id, 'action' => AuditAction::Exported->value]);
+    }
+
+    public function test_the_json_export_has_the_thumbnail_frames_and_shot_segments(): void
+    {
+        $record = Record::factory()->create();
+        $frame = RecordFrame::factory()->analysed()->for($record)->create(['time_sec' => 12.3]);
+        $record->thumbnail_path = "records/{$record->id}/thumbnail/abc.jpg";
+        $record->thumbnail_frame_id = $frame->id;
+        $record->thumbnail_time_sec = 12.3;
+        $record->save();
+        RecordScene::factory()->for($record)->create(['start' => 0, 'end' => 18.4, 'tc_in' => '01:00:00:00', 'tc_out' => '01:00:18:10']);
+
+        $response = $this->actingAs($record->creator)->get(route('records.export', [$record, 'format' => 'json']))->assertOk();
+
+        $json = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(['timeSec' => 12.3, 'path' => "records/{$record->id}/thumbnail/abc.jpg"], $json['visual']['thumbnail']);
+        $this->assertSame([[
+            'timeSec' => 12.3,
+            'description' => 'A speaker at a podium in front of a banner.',
+            'ocrText' => 'Regional S&T Fair 2026',
+            'objects' => [['label' => 'person', 'confidence' => 0.91]],
+            'faceCount' => 1,
+        ]], $json['visual']['frames']);
+        $this->assertSame([['kind' => 'shot', 'start' => 0.0, 'end' => 18.4, 'tcIn' => '01:00:00:00', 'tcOut' => '01:00:18:10', 'label' => null]], $json['structure']['segments']);
     }
 
     public function test_another_encoder_cannot_export_the_record(): void

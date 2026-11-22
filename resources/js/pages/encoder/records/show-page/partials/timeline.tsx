@@ -19,10 +19,12 @@ import type {
     TranscriptSegment,
     WorkspaceMedia,
 } from '@/types/records';
+import type { Scene, Shot } from '@/types/visuals';
 import TimelineChapterControls from './timeline-chapter-controls';
 import TimelineChaptersTrack from './timeline-chapters-track';
 import TimelinePlayhead from './timeline-playhead';
 import TimelineRuler from './timeline-ruler';
+import TimelineScenesTrack from './timeline-scenes-track';
 import TimelineTranscriptTrack from './timeline-transcript-track';
 import TimelineWaveformTrack from './timeline-waveform-track';
 import TimelineZoom from './timeline-zoom';
@@ -34,7 +36,8 @@ const MAX_PIXELS_PER_SECOND = 200;
 const TRACKS = [
     { key: 'chapters', label: 'Chapters', height: 'h-9 shrink-0' },
     { key: 'transcript', label: 'Transcript', height: 'h-12 shrink-0' },
-    { key: 'audio', label: 'Audio', height: 'min-h-16 flex-1' },
+    { key: 'scenes', label: 'Scenes', height: 'h-8 shrink-0' },
+    { key: 'audio', label: 'Audio', height: 'min-h-12 flex-1' },
 ] as const;
 
 type Props = {
@@ -43,6 +46,9 @@ type Props = {
     segments: TranscriptSegment[];
     /** The active generation; its chapters are edited through the shared draft. */
     metadata: ActiveMetadata | null;
+    /** Detected shots and named scenes (visual analysis). */
+    shots: Shot[];
+    scenes: Scene[];
     canEdit: boolean;
     generating: boolean;
     /** A line's timing changed on the transcript track. */
@@ -55,7 +61,7 @@ export type TimelineViewport = { left: number; width: number };
 
 /**
  * Editor timeline: time ruler (click or drag to scrub), chapters,
- * transcript and audio waveform tracks, and a playhead that follows playback.
+ * transcript, scenes (shots and named scenes) and audio waveform tracks, and a playhead that follows playback.
  * Only the visible part of each track is rendered. Encoders add chapters at
  * the playhead (or by double-clicking the chapters track) and drag them, and
  * drag or trim transcript lines to fix their timing.
@@ -65,6 +71,8 @@ export default function Timeline({
     media,
     segments,
     metadata,
+    shots,
+    scenes,
     canEdit,
     generating,
     onSegmentSaved,
@@ -190,7 +198,7 @@ export default function Timeline({
     return (
         <section
             aria-label="Timeline"
-            className="flex min-h-56 shrink-0 flex-col border-t border-white/10 bg-neutral-900 xl:h-[calc((100svh-1rem)*0.3)] xl:min-h-52"
+            className="flex min-h-60 shrink-0 flex-col border-t border-white/10 bg-neutral-900 xl:h-[calc((100svh-1rem)*0.3)] xl:min-h-60"
         >
             <header className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -279,7 +287,18 @@ export default function Timeline({
                             />
                         </div>
                         <div
-                            className="min-h-16 flex-1 border-b border-white/5"
+                            className="h-8 shrink-0 border-b border-white/5"
+                            onPointerDown={seekToPointer}
+                        >
+                            <TimelineScenesTrack
+                                shots={shots}
+                                scenes={scenes}
+                                pixelsPerSecond={pixelsPerSecond}
+                                range={range}
+                            />
+                        </div>
+                        <div
+                            className="min-h-12 flex-1 border-b border-white/5"
                             onPointerDown={seekToPointer}
                         >
                             <TimelineWaveformTrack

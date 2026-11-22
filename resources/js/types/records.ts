@@ -18,13 +18,24 @@ export type ReviewStatus =
     | 'rejected'
     | 'changes_requested';
 
-export type StageStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+export type StageStatus =
+    | 'pending'
+    | 'running'
+    | 'done'
+    | 'failed'
+    | 'skipped'
+    | 'cancelled';
 
 export type PipelineStageName =
     | 'checksum'
     | 'probe'
     | 'extract_audio'
     | 'transcribe'
+    | 'scenes'
+    | 'frames'
+    | 'vision'
+    | 'ocr'
+    | 'objects'
     | 'generate_metadata'
     | 'proxy';
 
@@ -88,6 +99,9 @@ export type WorkspaceRecord = {
     embargo_until: string | null;
     created_at: string | null;
     can_edit: boolean;
+    /** May stop the pipeline (shown while queued or processing). */
+    can_cancel: boolean;
+    can_delete: boolean;
 };
 
 export type WorkspaceMedia = {
@@ -276,4 +290,22 @@ export type RecordTitlesGeneratedEvent = {
 export type RecordStageCompletedEvent = {
     stage: PipelineStageName;
     processing_status: ProcessingStatus;
+};
+
+export type AudioExportFormat = 'mp3' | 'wav';
+
+/** The record's audio as a file to download (AudioExports::present). */
+export type AudioExport = {
+    format: AudioExportFormat;
+    label: string;
+    status: 'none' | 'processing' | 'ready' | 'failed';
+    file_size: number | null;
+    error: string | null;
+    download_url: string | null;
+};
+
+export type RecordAudioExportUpdatedEvent = {
+    format: AudioExportFormat;
+    status: 'ready' | 'failed';
+    error: string | null;
 };

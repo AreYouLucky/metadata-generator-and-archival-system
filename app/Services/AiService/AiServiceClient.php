@@ -77,6 +77,18 @@ class AiServiceClient
     }
 
     /**
+     * Stop a pipeline run (the id `process()` returned). The id is repeated in
+     * the body because only the body is signed. Idempotent.
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function cancel(string $jobId): void
+    {
+        $this->send('POST', '/jobs/'.rawurlencode($jobId).'/cancel', ['job_id' => $jobId])->throw();
+    }
+
+    /**
      * Generate AI metadata synchronously (used by GenerateMetadataJob for regenerations).
      *
      * @param  array<string, mixed>  $payload
@@ -119,6 +131,35 @@ class AiServiceClient
     {
         /** @var array{model?: string, fields?: array<string, mixed>, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>} */
         return $this->send('POST', '/generate/descriptive', $payload, timeoutSeconds: 120)->throw()->json();
+    }
+
+    /**
+     * One frame of the master saved as the record's thumbnail ("use current
+     * frame"). Synchronous: a single frame takes about a second. Returns the
+     * stored path (relative to the media root).
+     *
+     * @param  array{record_id: string, video_path: string, time_sec: float, output_path: string}  $payload
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function captureFrame(array $payload): string
+    {
+        return (string) $this->send('POST', '/frames/capture', $payload, timeoutSeconds: 30)->throw()->json('path');
+    }
+
+    /**
+     * Export the master's audio as MP3 or WAV in the background. Returns the
+     * job id; the result arrives on /internal/records/{record}/audio-export.
+     *
+     * @param  array{record_id: string, video_path: string, format: string, output_path: string, duration: float|null}  $payload
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function exportAudio(array $payload): string
+    {
+        return (string) $this->send('POST', '/jobs/export-audio', $payload)->throw()->json('job_id');
     }
 
     /**

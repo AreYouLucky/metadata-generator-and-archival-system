@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { formatEnumLabel, languageName } from '@/lib/utilities';
+import { formatEnumLabel, formatNumber, languageName } from '@/lib/utilities';
 import { show } from '@/routes/records';
 import type { Archive, ArchiveOptions } from '@/types/archive';
 import AttachmentList from './attachment-list';
@@ -23,17 +23,19 @@ export default function ArchiveStructure({
     canEdit,
 }: Props) {
     return (
-        <div className="grid gap-5">
-            <section className="grid gap-2">
+        <div className="grid grid-cols-1 gap-5">
+            <section className="grid grid-cols-1 gap-2">
                 <h3 className="text-sm font-medium">Files</h3>
-                <ul className="grid gap-1 text-sm">
+                <ul className="grid grid-cols-1 gap-1 text-sm">
                     {archive.files.map((file) => (
                         <li
                             key={file.id}
                             className="flex justify-between gap-2"
                         >
-                            <span>{formatEnumLabel(file.role)}</span>
-                            <span className="truncate text-neutral-500">
+                            <span className="shrink-0">
+                                {formatEnumLabel(file.role)}
+                            </span>
+                            <span className="min-w-0 text-right wrap-anywhere text-neutral-500">
                                 {file.original_filename}
                             </span>
                         </li>
@@ -41,7 +43,7 @@ export default function ArchiveStructure({
                 </ul>
             </section>
 
-            <section className="grid gap-2 border-t border-white/10 pt-4">
+            <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
                 <h3 className="text-sm font-medium">Work (reels and parts)</h3>
                 <WorkPicker
                     recordId={recordId}
@@ -50,7 +52,7 @@ export default function ArchiveStructure({
                     canEdit={canEdit}
                 />
                 {archive.work && archive.work.parts.length > 1 && (
-                    <ol className="grid gap-1 text-sm">
+                    <ol className="grid grid-cols-1 gap-1 text-sm">
                         {archive.work.parts.map((part) => (
                             <li key={part.id}>
                                 <Link
@@ -72,7 +74,7 @@ export default function ArchiveStructure({
                 )}
             </section>
 
-            <section className="grid gap-2 border-t border-white/10 pt-4">
+            <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
                 <h3 className="text-sm font-medium">Attachments</h3>
                 <AttachmentList
                     recordId={recordId}
@@ -84,16 +86,16 @@ export default function ArchiveStructure({
                 />
             </section>
 
-            <section className="grid gap-2 border-t border-white/10 pt-4">
+            <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
                 <h3 className="text-sm font-medium">Transcripts</h3>
-                <ul className="grid gap-1 text-sm">
+                <ul className="grid grid-cols-1 gap-1 text-sm">
                     {archive.transcripts.map((transcript) => (
                         <li
                             key={transcript.language}
-                            className="flex justify-between"
+                            className="flex flex-wrap justify-between gap-x-2"
                         >
                             <span>{languageName(transcript.language)}</span>
-                            <span className="text-neutral-500">
+                            <span className="text-right text-neutral-500">
                                 {transcript.is_original
                                     ? 'Original'
                                     : `Translation · ${formatEnumLabel(transcript.status)}`}
@@ -103,11 +105,31 @@ export default function ArchiveStructure({
                 </ul>
             </section>
 
-            <section className="grid gap-2 border-t border-white/10 pt-4">
-                <h3 className="text-sm font-medium">Shot segments</h3>
+            <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
+                <h3 className="text-sm font-medium">Shot and scene segments</h3>
                 <p className="text-sm text-muted-foreground">
-                    Shots with timecode in and out come with visual analysis.
+                    {archive.segments.shot_count > 0
+                        ? `${formatNumber(archive.segments.shot_count)} shots detected, with timecode in and out.`
+                        : 'No shots yet: they come from visual analysis.'}{' '}
+                    Group them into named scenes in the Visuals tab.
                 </p>
+                {archive.segments.scenes.length > 0 && (
+                    <ul className="grid grid-cols-1 gap-1 text-sm">
+                        {archive.segments.scenes.map((scene) => (
+                            <li
+                                key={scene.id}
+                                className="flex justify-between gap-2"
+                            >
+                                <span className="min-w-0 wrap-anywhere">
+                                    {scene.label}
+                                </span>
+                                <span className="shrink-0 font-mono text-xs text-neutral-500 tabular-nums">
+                                    {scene.tc_in} – {scene.tc_out}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </section>
         </div>
     );

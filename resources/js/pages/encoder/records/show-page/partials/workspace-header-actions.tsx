@@ -12,6 +12,8 @@ import type {
     WorkspaceRecord,
 } from '@/types/records';
 import type { WorkspaceReview } from '@/types/reviews';
+import CancelProcessingDialog from './cancel-processing-dialog';
+import DeleteRecordDialog from './delete-record-dialog';
 import ProcessingStatusMenu from './processing-status-menu';
 import RetryProcessingDialog from './retry-processing-dialog';
 import ReviewStatusDialog from './review-status-dialog';
@@ -30,10 +32,11 @@ type Props = {
 
 /**
  * The workspace's controls in the app header, beside the breadcrumbs (which
- * already name the project, series and record): processing status, retry
- * after a failure, review status (notes, history, admin actions), "Submit
- * for approval", keyboard shortcuts and Export (which opens the inspector's
- * Export tab).
+ * already name the project, series and record): processing status, cancel
+ * while it runs, retry after a failure or cancel, review status (notes,
+ * history, admin actions), "Submit for approval", keyboard shortcuts, Export
+ * (which opens the Export panel in the inspector, and closes it again) and
+ * Delete.
  */
 export default function WorkspaceHeaderActions({
     record,
@@ -45,6 +48,11 @@ export default function WorkspaceHeaderActions({
     pendingSuggestions,
 }: Props) {
     const setInspectorTab = useWorkspaceStore((state) => state.setInspectorTab);
+    const exportOpen = useWorkspaceStore(
+        (state) => state.inspectorTab === 'export',
+    );
+    const working =
+        processingStatus === 'queued' || processingStatus === 'processing';
 
     return (
         <HeaderActions>
@@ -54,13 +62,18 @@ export default function WorkspaceHeaderActions({
                     processingStatus={processingStatus}
                 />
             )}
-            {processingStatus === 'failed' && record.can_edit && (
-                <RetryProcessingDialog
-                    recordId={record.id}
-                    presets={presets}
-                    initialPreset={initialPreset}
-                />
+            {working && record.can_cancel && (
+                <CancelProcessingDialog recordId={record.id} />
             )}
+            {(processingStatus === 'failed' ||
+                processingStatus === 'cancelled') &&
+                record.can_edit && (
+                    <RetryProcessingDialog
+                        recordId={record.id}
+                        presets={presets}
+                        initialPreset={initialPreset}
+                    />
+                )}
             {record.accession_number && (
                 <span className="hidden font-mono text-xs text-muted-foreground lg:inline">
                     {record.accession_number}
@@ -94,12 +107,26 @@ export default function WorkspaceHeaderActions({
             <ShortcutsDialog />
             <Button
                 size="sm"
-                variant="outline"
-                onClick={() => setInspectorTab('export')}
+                variant={exportOpen ? 'secondary' : 'outline'}
+                aria-pressed={exportOpen}
+                onClick={() =>
+                    setInspectorTab(
+                        exportOpen
+                            ? useWorkspaceStore.getState().previousTab
+                            : 'export',
+                    )
+                }
             >
                 <Download aria-hidden />
                 <span className="hidden sm:inline">Export</span>
             </Button>
+            {record.can_delete && (
+                <DeleteRecordDialog
+                    recordId={record.id}
+                    title={record.title}
+                    processing={working}
+                />
+            )}
         </HeaderActions>
     );
 }

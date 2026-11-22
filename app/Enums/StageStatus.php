@@ -12,4 +12,6 @@ enum StageStatus: string
     case Done = 'done';
     case Failed = 'failed';
     case Skipped = 'skipped';
+    // Stopped by an encoder before it finished (POST /records/{record}/cancel).
+    case Cancelled = 'cancelled';
 }

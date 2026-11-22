@@ -40,6 +40,7 @@ from app.schemas.metadata import (
     TitleOptions,
     TranscriptCore,
 )
+from app.schemas.visual import VisualFrame
 from app.services.cache import Cache, get_cache
 
 _templates = Environment(
@@ -58,6 +59,7 @@ MAX_SENSITIVE_TOPICS = 5
 MAX_SUBJECTS = 12
 # v2: quotes, tone and content flags (Phase 2); v3: subject and location suggestions.
 CACHE_VERSION = "v3"
+ON_SCREEN_HEADING = "On-screen content (frame descriptions and text read from the video):\n"
 
 
 def render(template: str, **context: object) -> str:
@@ -91,6 +93,31 @@ def compact_transcript(segments: list[TranscriptSegment], block_seconds: float) 
     return blocks
 
 
+def compact_visual(frames: list[VisualFrame], max_chars: int) -> str:
+    """One line per frame with something to say: "[m:ss] description On screen: "text"".
+
+    Text already shown on an earlier frame is left out (a slide shown twice). When the
+    lines are over `max_chars`, every line is shortened by the same amount, so the end
+    of the video is still covered."""
+    lines: list[str] = []
+    seen: set[str] = set()
+    for frame in sorted(frames, key=lambda item: item.time_sec):
+        parts: list[str] = []
+        if description := " ".join((frame.description or "").split()):
+            parts.append(description)
+        text = " ".join((frame.ocr_text or "").split())
+        if text and text.lower() not in seen:
+            seen.add(text.lower())
+            parts.append(f'On screen: "{text}"')
+        if parts:
+            lines.append(f"[{format_time(frame.time_sec)}] " + " ".join(parts))
+
+    if sum(len(line) + 1 for line in lines) > max_chars:
+        per_line = max(40, max_chars // len(lines) - 1)
+        lines = [line if len(line) <= per_line else line[: per_line - 1] + "…" for line in lines]
+    return "\n".join(lines)[:max_chars]
+
+
 def estimate_tokens(text: str) -> int:
     """Rough and deliberately high: Filipino tokenises worse than English (~3 chars/token)."""
     return math.ceil(len(text) / 3)
@@ -117,14 +144,21 @@ class MetadataGenerator:
         title_count: int = 3,
         duration: float | None = None,
         fresh: bool = False,
+        visual: list[VisualFrame] | None = None,
     ) -> GenerateMetadataResult:
         model = self.settings.llm_model
         blocks = compact_transcript(segments, self.settings.llm_block_seconds)
         transcript_text = "\n".join(blocks)
+        visual_text = compact_visual(visual or [], self.settings.visual_context_max_chars)
         duration = duration or (segments[-1].end if segments else None)
         custom_prompt = (custom_prompt or "").strip() or None
 
-        transcript_hash = _hash(CACHE_VERSION, model, language or "", transcript_text)
+        # On-screen content is part of what was read, so it is part of the cache key
+        # (only when there is some, so transcript-only caches stay valid).
+        hashed = [CACHE_VERSION, model, language or "", transcript_text]
+        if visual_text:
+            hashed.append(visual_text)
+        transcript_hash = _hash(*hashed)
         result_key = "metadata:result:" + _hash(
             transcript_hash, preset.model_dump_json(), custom_prompt or "", str(title_count)
         )
@@ -162,10 +196,11 @@ class MetadataGenerator:
             if estimate_tokens(transcript_text) > self.settings.llm_max_transcript_tokens:
                 body, map_usages = self._condense(blocks)
                 usages += map_usages
+            on_screen = [ON_SCREEN_HEADING + visual_text] if visual_text else []
             generated, usage = self.llm.complete(
                 model=model,
                 instructions=render("metadata_system.j2"),
-                messages=[f"Transcript:\n{body}", request],
+                messages=[f"Transcript:\n{body or '(nothing is said)'}", *on_screen, request],
                 schema=GeneratedMetadata,
                 reasoning_effort=self.settings.llm_reasoning_effort,
                 max_output_tokens=self.settings.llm_max_output_tokens,

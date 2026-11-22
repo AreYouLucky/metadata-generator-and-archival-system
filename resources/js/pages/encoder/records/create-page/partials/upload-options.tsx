@@ -1,6 +1,8 @@
 import { ChevronDown, Info, SlidersHorizontal } from 'lucide-react';
 import type { ReactNode } from 'react';
 import EditorPanel from '@/components/encoder/editor-panel';
+import VisualAnalysisOptions from '@/components/encoder/visual-analysis-options';
+import type { VisualAnalysisValues } from '@/components/encoder/visual-analysis-options';
 import {
     Collapsible,
     CollapsibleContent,
@@ -24,7 +26,7 @@ export type UploadOptionValues = {
     customPrompt: string;
     expectedMd5: string;
     expectedSha256: string;
-};
+} & VisualAnalysisValues;
 
 type Props = {
     /** The project picker, shown first. */
@@ -107,6 +109,13 @@ export default function UploadOptions({
                     </div>
                 </div>
 
+                <VisualAnalysisOptions
+                    idPrefix="upload"
+                    values={values}
+                    onChange={(visual) => set(visual)}
+                    disabled={disabled}
+                />
+
                 <Collapsible>
                     <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:underline focus-visible:outline-none">
                         <ChevronDown
@@ -157,7 +166,10 @@ export default function UploadOptions({
                     <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                     Audio is transcribed on this organisation's server. The
                     transcript text (not the video) is then sent to OpenAI to
-                    write titles, descriptions and tags.
+                    write titles, descriptions and tags
+                    {values.visualAnalysis
+                        ? ', with small copies of the key frames to describe what is shown.'
+                        : '.'}
                 </p>
             </div>
         </EditorPanel>

@@ -19,6 +19,7 @@ use App\Services\Records\ArchivePresenter;
 use App\Services\Records\RecordContent;
 use App\Services\Records\ReviewHistory;
 use App\Services\Records\ReviewWorkflow;
+use App\Services\Records\VisualsPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
@@ -73,7 +74,7 @@ class ApprovalController extends Controller
      * Works for any record an admin opens, but the decision buttons only
      * appear while it is submitted.
      */
-    public function show(Record $record, ReviewHistory $history, Distribution $distribution, RecordContent $content, ArchivePresenter $archive): Response
+    public function show(Record $record, ReviewHistory $history, Distribution $distribution, RecordContent $content, ArchivePresenter $archive, VisualsPresenter $visuals): Response
     {
         Gate::authorize('view', $record);
 
@@ -153,6 +154,8 @@ class ApprovalController extends Controller
             'archive' => $archive->present($record),
             // What would still keep it off the public site once approved.
             'publicBlockers' => $distribution->blockers($record, ignoreApproval: true),
+            // People on screen (face counts only), to check consent before publishing.
+            'faces' => $visuals->faces($record),
             'history' => $history->for($record),
             'canReview' => request()->user()?->can('review', $record) ?? false,
             'canReopen' => request()->user()?->can('reopen', $record) ?? false,

@@ -23,7 +23,12 @@ class MetadataController extends Controller
      */
     public function store(GenerateMetadataRequest $request, Record $record, PipelineRecorder $recorder): JsonResponse
     {
-        abort_if($record->originalTranscript()->doesntExist(), 422, 'The record has no transcript yet.');
+        // From the transcript, the frames' on-screen content (Phase 5), or both.
+        abort_if(
+            $record->originalTranscript()->doesntExist() && GenerateMetadataJob::visualContext($record) === [],
+            422,
+            'The record has no transcript or analysed frames yet.',
+        );
 
         $running = $record->stages()
             ->where('stage', PipelineStage::GenerateMetadata)

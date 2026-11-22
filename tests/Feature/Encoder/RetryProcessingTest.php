@@ -40,6 +40,39 @@ class RetryProcessingTest extends TestCase
         );
     }
 
+    public function test_a_retry_runs_the_visual_analysis_chosen_again_and_adds_the_new_stages(): void
+    {
+        Queue::fake([StartProcessingJob::class]);
+        $record = $this->failedRecord();
+        // A record from before visual analysis has no rows for those stages.
+        $record->stages()->whereIn('stage', PipelineStage::visual())->delete();
+
+        $this->actingAs($record->creator)
+            ->postJson(route('records.retry', $record), ['preset' => 'generic', 'visual_analysis' => true, 'ocr' => true])
+            ->assertAccepted();
+
+        $this->assertSame(count(PipelineStage::active()), $record->stages()->count());
+        Queue::assertPushed(
+            StartProcessingJob::class,
+            fn (StartProcessingJob $job): bool => $job->options->visualFlags() === ['visual_analysis' => true, 'ocr' => true, 'object_detection' => false],
+        );
+    }
+
+    public function test_a_cancelled_record_can_be_retried(): void
+    {
+        Queue::fake([StartProcessingJob::class]);
+        $record = $this->failedRecord();
+        $record->stages()->update(['status' => StageStatus::Cancelled]);
+        app(PipelineRecorder::class)->refreshStatus($record);
+
+        $this->actingAs($record->creator)
+            ->postJson(route('records.retry', $record), ['preset' => 'generic'])
+            ->assertAccepted();
+
+        $this->assertSame(ProcessingStatus::Queued, $record->refresh()->processing_status);
+        Queue::assertPushed(StartProcessingJob::class);
+    }
+
     public function test_a_record_that_did_not_fail_cannot_be_retried(): void
     {
         Queue::fake([StartProcessingJob::class]);

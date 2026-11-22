@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Enums\SceneKind;
 use Carbon\CarbonImmutable as Carbon;
+use Database\Factories\RecordSceneFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -26,6 +28,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['kind', 'start', 'end', 'tc_in', 'tc_out', 'label', 'description'])]
 class RecordScene extends Model
 {
+    /** @use HasFactory<RecordSceneFactory> */
+    use HasFactory;
+
     /**
      * Defaults mirrored from the migration so new models see them before a refresh.
      *

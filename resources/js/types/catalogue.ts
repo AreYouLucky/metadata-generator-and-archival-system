@@ -95,6 +95,8 @@ export type WatchRecord = {
     license: string | null;
     license_url: string | null;
     usage_restrictions: string | null;
+    /** The record's thumbnail, else its project's cover (the player's poster). */
+    thumbnail: string | null;
 };
 
 export type WatchTranscriptLine = {

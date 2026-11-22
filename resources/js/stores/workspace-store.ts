@@ -4,6 +4,7 @@ import type { DescriptiveSuggestion } from '@/types/archive';
 export type InspectorTab =
     | 'metadata'
     | 'archive'
+    | 'visuals'
     | 'chapters'
     | 'credits'
     | 'translations'
@@ -24,6 +25,8 @@ type WorkspaceState = {
     followPlayback: boolean;
     /** Which inspector tab is showing (the frame-text tool opens Credits). */
     inspectorTab: InspectorTab;
+    /** The tab to go back to when the Export panel (opened from the header) closes. */
+    previousTab: InspectorTab;
     /** Language code of the caption track shown on the player; null = off. */
     captionLanguage: string | null;
     /** Bumped when a transcript line is edited, so caption tracks reload. */
@@ -66,6 +69,7 @@ const initial = {
     activeIndex: -1,
     followPlayback: true,
     inspectorTab: 'metadata' as InspectorTab,
+    previousTab: 'metadata' as InspectorTab,
     captionLanguage: null,
     captionsVersion: 0,
     shortcutsOpen: false,
@@ -99,7 +103,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     },
     setActiveIndex: (activeIndex) => set({ activeIndex }),
     setFollowPlayback: (followPlayback) => set({ followPlayback }),
-    setInspectorTab: (inspectorTab) => set({ inspectorTab }),
+    setInspectorTab: (inspectorTab) =>
+        set((state) => ({
+            inspectorTab,
+            previousTab:
+                state.inspectorTab === 'export'
+                    ? state.previousTab
+                    : state.inspectorTab,
+        })),
     setCaptionLanguage: (captionLanguage) => set({ captionLanguage }),
     bumpCaptions: () =>
         set((state) => ({ captionsVersion: state.captionsVersion + 1 })),

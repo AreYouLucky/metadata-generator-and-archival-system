@@ -7,6 +7,7 @@ use App\Enums\Preset;
 use App\Enums\StageStatus;
 use App\Jobs\GenerateMetadataJob;
 use App\Models\Record;
+use App\Models\RecordFrame;
 use App\Models\RecordSegment;
 use App\Models\RecordTranscript;
 use App\Services\Records\PipelineOptions;
@@ -49,6 +50,27 @@ class GenerateMetadataJobTest extends TestCase
         $this->assertSame(Preset::Youtube, $active->preset);
         $this->assertSame('A title', $active->payload['selectedTitle']);
         $this->assertSame(1, $record->usageRecords()->count());
+    }
+
+    public function test_what_the_frames_show_is_sent_once_per_change_and_alone_when_nothing_was_said(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake(['http://ai-api.test/generate/metadata' => Http::response([
+            'model' => 'gpt-6.2-sol',
+            'metadata' => ['titles' => ['T'], 'description' => 'D', 'summary' => 'S', 'tags' => [], 'keywords' => [], 'hashtags' => [], 'chapters' => []],
+            'usage' => [],
+        ])]);
+        $record = Record::factory()->create();
+        RecordFrame::factory()->for($record)->create(['time_sec' => 0.5, 'ocr_text' => 'Rice targets', 'description' => 'A slide.']);
+        // The same slide held on screen, then a frame with nothing on it.
+        RecordFrame::factory()->for($record)->create(['time_sec' => 10, 'ocr_text' => 'Rice targets', 'description' => 'A slide.']);
+        RecordFrame::factory()->for($record)->create(['time_sec' => 20]);
+
+        GenerateMetadataJob::dispatchSync($record, new PipelineOptions);
+
+        Http::assertSent(fn (Request $request): bool => $request['transcript'] === []
+            && $request['visual_context'] === [['time_sec' => 0.5, 'description' => 'A slide.', 'ocr_text' => 'Rice targets']]);
+        $this->assertSame('T', $record->activeMetadata()->sole()->payload['selectedTitle']);
     }
 
     public function test_a_provider_error_fails_the_stage_with_the_services_explanation(): void

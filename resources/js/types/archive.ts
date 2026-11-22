@@ -3,6 +3,7 @@
  * App\Services\Records\ArchivePresenter.
  */
 import type { LocationValue } from '@/hooks/use-locations';
+import type { Scene } from '@/types/visuals';
 
 export type Option = { value: string; label: string };
 
@@ -183,6 +184,8 @@ export type Archive = {
     part_number: number | null;
     part_label: string | null;
     transcripts: { language: string; is_original: boolean; status: string }[];
+    /** Shot/scene segments (Phase 5); the shots themselves are in Visuals. */
+    segments: { shot_count: number; scenes: Scene[] };
     fixity: FixityEntry[];
     audit: AuditEntry[];
     /** From the master's container tags (hints, not facts). */

@@ -55,6 +55,23 @@ class CatalogueMediaController extends Controller
     }
 
     /**
+     * A public record's thumbnail (frame, captured or uploaded image).
+     */
+    public function thumbnail(Record $record): BinaryFileResponse
+    {
+        abort_unless(Gate::forUser(null)->allows('distribute', $record), 404);
+
+        $disk = Storage::disk('media');
+        abort_unless($record->thumbnail_path !== null && $disk->exists($record->thumbnail_path), 404);
+
+        return response()->file($disk->path($record->thumbnail_path), [
+            // Private: the record can leave the catalogue (reopened, embargoed).
+            'Cache-Control' => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /**
      * A project's cover, only while the project has public records (so
      * internal projects stay invisible).
      */

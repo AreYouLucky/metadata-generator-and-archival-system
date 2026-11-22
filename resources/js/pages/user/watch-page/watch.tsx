@@ -55,6 +55,7 @@ export default function Watch({
                             <video
                                 ref={video}
                                 src={mediaUrl}
+                                poster={record.thumbnail ?? undefined}
                                 controls
                                 controlsList="nodownload"
                                 preload="metadata"

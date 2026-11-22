@@ -7,6 +7,7 @@ use App\Enums\AuditAction;
 use App\Enums\PermissionStatus;
 use App\Enums\ReviewStatus;
 use App\Models\Record;
+use App\Models\RecordFrame;
 use App\Models\RecordRights;
 use App\Models\RecordSegment;
 use App\Models\RecordTranscript;
@@ -61,6 +62,35 @@ class ApprovalControllerTest extends TestCase
                 ->where('record.id', $record->id)
                 ->where('canReview', true)
                 ->where('publicBlockers', ['Its access level is internal, not public.']));
+    }
+
+    public function test_the_review_page_shows_the_frames_with_faces_for_a_consent_check(): void
+    {
+        $record = Record::factory()->submitted()->create();
+        RecordFrame::factory()->for($record)->create(['time_sec' => 2, 'face_count' => 0]);
+        $first = RecordFrame::factory()->for($record)->create(['time_sec' => 5, 'face_count' => 2]);
+        RecordFrame::factory()->for($record)->create(['time_sec' => 9, 'face_count' => 1]);
+        RecordFrame::factory()->for($record)->create(['time_sec' => 12, 'face_count' => null]);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get(route('admin.approvals.show', $record))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('faces.counted_frames', 3)
+                ->where('faces.frames_with_faces', 2)
+                ->where('faces.release_consent', 'not_available')
+                ->where('faces.frames.0.id', $first->id)
+                ->where('faces.frames.0.face_count', 2)
+                ->has('faces.frames', 2));
+    }
+
+    public function test_the_review_page_has_no_face_check_when_faces_were_never_counted(): void
+    {
+        $record = Record::factory()->submitted()->create();
+        RecordFrame::factory()->for($record)->create(['face_count' => null]);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get(route('admin.approvals.show', $record))
+            ->assertInertia(fn (Assert $page) => $page->where('faces', null));
     }
 
     public function test_the_review_page_includes_everything_from_the_workspace(): void
