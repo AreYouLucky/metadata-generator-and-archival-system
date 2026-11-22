@@ -157,7 +157,7 @@ export default function ExportPanel({
                                 </Label>
                                 <Link
                                     href={exportSchemasIndex()}
-                                    className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-foreground"
+                                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                                 >
                                     <Settings2 className="size-3" aria-hidden />
                                     Manage
@@ -257,12 +257,12 @@ export default function ExportPanel({
                     )}
                 </div>
 
-                <div className="flex min-h-48 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/40">
-                    <div className="flex h-8 shrink-0 items-center justify-between border-b border-white/10 px-3 text-[11px] tracking-wider text-neutral-500 uppercase">
+                <div className="flex min-h-48 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card">
+                    <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-[11px] tracking-wider text-muted-foreground uppercase">
                         Preview
                         {preview.isFetching && <Spinner className="size-3" />}
                     </div>
-                    <pre className="min-h-0 flex-1 overflow-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-neutral-300">
+                    <pre className="min-h-0 flex-1 overflow-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground/80">
                         {preview.isError
                             ? 'The preview could not be loaded.'
                             : preview.data === undefined
@@ -293,7 +293,7 @@ export default function ExportPanel({
 
                 <section
                     aria-labelledby="export-audio"
-                    className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4"
+                    className="grid grid-cols-1 gap-2 border-t border-border pt-4"
                 >
                     <h3 id="export-audio" className="text-sm font-medium">
                         Audio

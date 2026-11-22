@@ -257,7 +257,7 @@ class RecordCallbacksTest extends TestCase
         $record = $this->recordWithStages();
 
         $this->postJson("/internal/records/{$record->id}/results/checksum", ['md5' => str_repeat('a', 32)])->assertUnauthorized();
-        $this->postSigned("/internal/records/{$record->id}/results/diarize", [])->assertNotFound();
+        $this->postSigned("/internal/records/{$record->id}/results/embed", [])->assertNotFound();
     }
 
     /**

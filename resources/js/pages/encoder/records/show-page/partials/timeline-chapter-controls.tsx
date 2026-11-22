@@ -30,7 +30,7 @@ export default function TimelineChapterControls({
             <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1.5 px-2 text-xs text-neutral-300"
+                className="h-7 gap-1.5 px-2 text-xs text-foreground/80"
                 disabled={!editable}
                 onClick={onAdd}
                 title={

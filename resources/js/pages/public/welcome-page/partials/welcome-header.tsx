@@ -1,6 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import AppearanceToggle from '@/components/all/appearance-toggle';
-import AppLogoIcon from '@/components/app-logo-icon';
+import BrandLogo from '@/components/all/brand-logo';
 import { Button } from '@/components/ui/button';
 import { dashboard, home, login, register } from '@/routes';
 import { home as catalogue } from '@/routes/catalogue';
@@ -20,12 +19,11 @@ export default function WelcomeHeader({ canRegister }: Props) {
                     href={home()}
                     className="group flex min-w-0 items-center gap-2.5 font-semibold"
                 >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground shadow-md shadow-brand/30 transition-transform duration-300 group-hover:-rotate-6">
-                        <AppLogoIcon className="size-5 fill-current" />
-                    </span>
-                    <span className="truncate text-sm sm:text-base">
-                        {name}
-                    </span>
+                    <BrandLogo
+                        variant="compact"
+                        alt={name}
+                        className="h-8 transition-transform duration-300 group-hover:-translate-y-0.5 sm:h-9"
+                    />
                 </Link>
 
                 <nav
@@ -44,7 +42,6 @@ export default function WelcomeHeader({ canRegister }: Props) {
                 </nav>
 
                 <div className="flex shrink-0 items-center gap-2">
-                    <AppearanceToggle />
                     <Button asChild variant="ghost" size="sm">
                         <Link href={catalogue()}>Catalogue</Link>
                     </Button>

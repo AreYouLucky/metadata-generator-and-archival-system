@@ -203,6 +203,7 @@ def test_the_workflow_runs_the_audio_and_visual_branches_side_by_side() -> None:
     assert [task.task for task in branches[0].tasks] == [
         "pipeline.extract_audio",
         "pipeline.transcribe",
+        "pipeline.diarize",
     ]
     assert [task.task for task in branches[1].tasks] == [
         "pipeline.scenes",

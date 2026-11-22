@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    /*
+    | YouTube publishing (Phase 7): a Google Cloud OAuth client (Web application)
+    | with the YouTube Data API v3 enabled. Add the redirect URI below to the
+    | client's "Authorized redirect URIs".
+    */
+
+    'youtube' => [
+        'client_id' => env('YOUTUBE_CLIENT_ID'),
+        'client_secret' => env('YOUTUBE_CLIENT_SECRET'),
+        // Empty = this app's /settings/youtube/callback.
+        'redirect_uri' => env('YOUTUBE_REDIRECT_URI'),
+    ],
+
 ];

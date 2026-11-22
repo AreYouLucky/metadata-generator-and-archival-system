@@ -6,11 +6,12 @@ import { useMetadataDraftStore } from '@/stores/metadata-draft-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { Chapter } from '@/types/records';
 
+/** Sky and yellow from the owner's palette, dark enough for white titles. */
 const COLOURS = [
-    'bg-blue-700/70 hover:bg-blue-600/80',
-    'bg-violet-700/70 hover:bg-violet-600/80',
-    'bg-sky-700/70 hover:bg-sky-600/80',
-    'bg-amber-700/70 hover:bg-amber-600/80',
+    'bg-sky-700/90 hover:bg-sky-600/90',
+    'bg-yellow-700/90 hover:bg-yellow-600/90',
+    'bg-sky-800/90 hover:bg-sky-700/90',
+    'bg-amber-700/90 hover:bg-amber-600/90',
 ];
 
 /** Pointer travel before a press counts as a drag rather than a click. */

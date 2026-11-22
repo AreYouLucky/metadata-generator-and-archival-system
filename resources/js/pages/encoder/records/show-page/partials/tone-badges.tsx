@@ -33,14 +33,14 @@ export default function ToneBadges({ tone, flags }: Props) {
                     <Badge
                         key={warning}
                         variant="outline"
-                        className="gap-1 border-amber-400/40 text-amber-200"
+                        className="gap-1 border-amber-400/40 text-amber-700"
                     >
                         <AlertTriangle className="size-3" aria-hidden />
                         {warning}
                     </Badge>
                 ))}
                 {flags && warnings.length === 0 && (
-                    <Badge variant="outline" className="text-neutral-400">
+                    <Badge variant="outline" className="text-muted-foreground">
                         No content flags
                     </Badge>
                 )}

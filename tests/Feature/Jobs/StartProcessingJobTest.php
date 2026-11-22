@@ -12,6 +12,7 @@ use App\Models\Record;
 use App\Models\RecordFile;
 use App\Services\AiService\AiServiceClient;
 use App\Services\Records\PipelineOptions;
+use App\Services\Records\PipelineSeed;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -75,7 +76,7 @@ class StartProcessingJobTest extends TestCase
             return Http::response(['job_id' => 'run-1'], 202);
         }]);
 
-        (new StartProcessingJob($file->record, new PipelineOptions))->handle(app(AiServiceClient::class));
+        (new StartProcessingJob($file->record, new PipelineOptions))->handle(app(AiServiceClient::class), app(PipelineSeed::class));
 
         $this->assertNull($file->record->refresh()->processing_job_id);
         Queue::assertPushed(CancelProcessingJob::class, fn (CancelProcessingJob $job): bool => $job->jobId === 'run-1');

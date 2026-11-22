@@ -44,7 +44,7 @@ export default function LocationMap({
             center={point ?? PHILIPPINES}
             zoom={point ? 15 : 5}
             scrollWheelZoom
-            className="isolate z-0 h-64 w-full rounded-md ring-1 ring-white/10"
+            className="isolate z-0 h-64 w-full rounded-md ring-1 ring-border"
             style={{ cursor: disabled ? 'default' : 'crosshair' }}
         >
             <TileLayer url={TILE_URL} attribution={ATTRIBUTION} />
@@ -55,7 +55,7 @@ export default function LocationMap({
                     pathOptions={{
                         color: '#ffffff',
                         weight: 2,
-                        fillColor: '#0284c7',
+                        fillColor: '#0ea5e9',
                         fillOpacity: 1,
                     }}
                 />

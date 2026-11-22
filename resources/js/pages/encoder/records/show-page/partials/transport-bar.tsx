@@ -46,7 +46,7 @@ export default function TransportBar({
     };
 
     return (
-        <div className="flex h-12 shrink-0 items-center gap-1 border-t border-white/10 bg-neutral-900 px-2">
+        <div className="flex h-12 shrink-0 items-center gap-1 border-t border-border bg-card px-2">
             <span className="flex w-36 items-center gap-2">
                 <TimecodeToggle />
                 <span className="font-mono text-xs text-brand tabular-nums">
@@ -86,7 +86,7 @@ export default function TransportBar({
                     <SkipForward aria-hidden />
                 </Button>
             </div>
-            <span className="w-28 text-right font-mono text-xs text-neutral-400 tabular-nums">
+            <span className="w-28 text-right font-mono text-xs text-muted-foreground tabular-nums">
                 {formatTime(duration)}
             </span>
             <CaptionsMenu languages={captionLanguages} />

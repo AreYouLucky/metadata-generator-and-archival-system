@@ -80,14 +80,14 @@ export default function SceneRow({ recordId, scene, label, canEdit }: Props) {
     }
 
     return (
-        <div className="group flex items-center gap-2 rounded-sm px-2 py-1 text-sm hover:bg-white/5">
+        <div className="group flex items-center gap-2 rounded-sm px-2 py-1 text-sm hover:bg-muted/60">
             <button
                 type="button"
                 onClick={() => seek(scene.start)}
                 className="grid min-w-0 flex-1 text-left focus-visible:underline focus-visible:outline-none"
             >
                 <span className="truncate">{scene.label}</span>
-                <span className="font-mono text-[11px] text-neutral-500 tabular-nums">
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
                     {label}
                 </span>
             </button>

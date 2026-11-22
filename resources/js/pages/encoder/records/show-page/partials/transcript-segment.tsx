@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Scissors, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { toast } from 'sonner';
@@ -98,8 +98,32 @@ export default function TranscriptSegment({
         );
     };
 
+    const extendClip = useWorkspaceStore((state) => state.extendClip);
+    const setInspectorTab = useWorkspaceStore((state) => state.setInspectorTab);
+    // Inside the range marked for a clip (re-renders only when that changes).
+    const inClip = useWorkspaceStore(
+        ({ clipMarks }) =>
+            clipMarks.start !== null &&
+            clipMarks.end !== null &&
+            segment.start < clipMarks.end &&
+            segment.end > clipMarks.start,
+    );
+
+    /** Add this line to the clip range (Shift-click, or the scissors). */
+    const addToClip = () => {
+        extendClip(segment.start, segment.end);
+        setInspectorTab('clips');
+    };
+
     const jumpHere = (event: MouseEvent<HTMLDivElement>) => {
         const target = event.target as HTMLElement;
+
+        if (event.shiftKey && !editing && !target.closest(CONTROLS)) {
+            window.getSelection()?.removeAllRanges();
+            addToClip();
+
+            return;
+        }
 
         if (
             editing ||
@@ -115,12 +139,20 @@ export default function TranscriptSegment({
     return (
         <div
             onClick={jumpHere}
+            onMouseDown={(event) => {
+                // Shift-click selects lines for a clip, not text.
+                if (event.shiftKey && !editing) {
+                    event.preventDefault();
+                }
+            }}
             className={cn(
                 'group flex gap-3 border-l-2 px-3 py-2 transition-colors',
                 !editing && 'cursor-pointer',
                 active
                     ? 'border-brand bg-brand-muted/60'
-                    : 'border-transparent hover:bg-muted/40',
+                    : inClip
+                      ? 'border-amber-400/70 bg-amber-400/10'
+                      : 'border-transparent hover:bg-muted/40',
             )}
             aria-current={active ? 'true' : undefined}
         >
@@ -193,6 +225,20 @@ export default function TranscriptSegment({
                 )}
             </div>
 
+            {!editing && (
+                <div className="flex shrink-0 flex-col gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        onClick={addToClip}
+                        aria-label="Add this line to the clip"
+                        title="Add to the clip (or Shift-click the line)"
+                    >
+                        <Scissors aria-hidden />
+                    </Button>
+                </div>
+            )}
             {canEdit && !editing && (
                 <div className="flex shrink-0 flex-col gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
                     <Button
@@ -211,7 +257,7 @@ export default function TranscriptSegment({
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="size-7 text-red-300 hover:text-red-200"
+                        className="size-7 text-red-700 hover:text-red-800"
                         onClick={() => onDelete(segment)}
                         aria-label="Delete line"
                         title="Delete line"

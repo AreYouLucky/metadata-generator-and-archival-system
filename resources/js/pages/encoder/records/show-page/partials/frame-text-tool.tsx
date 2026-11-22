@@ -141,7 +141,7 @@ export default function FrameTextTool({
                             <img
                                 src={result.image}
                                 alt={`Frame at ${formatTimestamp(result.time)}`}
-                                className="w-full rounded-md ring-1 ring-white/10"
+                                className="w-full rounded-md ring-1 ring-border"
                             />
                             {result.lines.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">

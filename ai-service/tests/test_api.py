@@ -41,6 +41,18 @@ def test_health_is_open_and_reports_the_version(client: TestClient) -> None:
     assert "gpu_name" in response.json()
 
 
+def test_health_says_which_providers_hear_the_audio(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TRANSCRIPTION_PROVIDER", "assemblyai")
+    monkeypatch.setenv("DIARIZATION_PROVIDER", "pyannote")
+
+    body = client.get("/health").json()
+
+    assert body["transcription_provider"] == "assemblyai"
+    assert body["diarization_provider"] == "pyannote"
+
+
 def test_a_signed_ping_queues_the_callback_task(client: TestClient, queued: list[str]) -> None:
     response = post_signed(client, "/ping", {"ping_id": PING_ID})
 

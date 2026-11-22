@@ -26,7 +26,7 @@ class ReceiveRecordProgressRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'stage' => ['required', Rule::in(array_map(fn (PipelineStage $stage): string => $stage->value, PipelineStage::active()))],
+            'stage' => ['required', Rule::in(array_map(fn (PipelineStage $stage): string => $stage->value, PipelineStage::tracked()))],
             'status' => ['required', Rule::in([StageStatus::Running->value, StageStatus::Failed->value, StageStatus::Skipped->value])],
             'progress' => ['required', 'integer', 'between:0,100'],
             'message' => ['nullable', 'string', 'max:1000'],

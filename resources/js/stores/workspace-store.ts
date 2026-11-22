@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import type { DescriptiveSuggestion } from '@/types/archive';
 
+export type ClipMarks = {
+    start: number | null;
+    end: number | null;
+    title: string;
+};
+
 export type InspectorTab =
     | 'metadata'
     | 'archive'
@@ -8,7 +14,9 @@ export type InspectorTab =
     | 'chapters'
     | 'credits'
     | 'translations'
-    | 'export';
+    | 'clips'
+    | 'export'
+    | 'publish';
 
 /**
  * Workspace UI state shared by the player, transcript and metadata panels.
@@ -32,6 +40,11 @@ type WorkspaceState = {
     /** Bumped when a transcript line is edited, so caption tracks reload. */
     captionsVersion: number;
     shortcutsOpen: boolean;
+    /**
+     * The range marked for a new clip (I / O at the playhead, Shift-click on
+     * transcript lines, a quote or a chapter), and its suggested title.
+     */
+    clipMarks: ClipMarks;
     /** Every time display: the clock, or SMPTE timecode (TimecodeToggle). */
     timeFormat: 'clock' | 'timecode';
     /** The master's frame rate ("25/1") and start timecode, for timecode. */
@@ -52,6 +65,14 @@ type WorkspaceState = {
     setCaptionLanguage: (language: string | null) => void;
     bumpCaptions: () => void;
     setShortcutsOpen: (open: boolean) => void;
+    setClipIn: (seconds: number) => void;
+    setClipOut: (seconds: number) => void;
+    /** Mark exactly this range (a quote, a chapter). */
+    markClip: (start: number, end: number, title?: string) => void;
+    /** Grow the marked range to take in this one (transcript lines). */
+    extendClip: (start: number, end: number) => void;
+    setClipTitle: (title: string) => void;
+    clearClip: () => void;
     setTimeFormat: (format: 'clock' | 'timecode') => void;
     setTimecodeBase: (frameRate: string | null, start: string | null) => void;
     requestEdit: (segmentId: number | null) => void;
@@ -73,6 +94,7 @@ const initial = {
     captionLanguage: null,
     captionsVersion: 0,
     shortcutsOpen: false,
+    clipMarks: { start: null, end: null, title: '' } as ClipMarks,
     editRequest: null,
     descriptivePending: false,
     descriptiveSuggestion: null as DescriptiveSuggestion | null,
@@ -106,8 +128,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     setInspectorTab: (inspectorTab) =>
         set((state) => ({
             inspectorTab,
+            // Export and Publish open from the header; closing them goes back to the last tab.
             previousTab:
-                state.inspectorTab === 'export'
+                state.inspectorTab === 'export' ||
+                state.inspectorTab === 'publish'
                     ? state.previousTab
                     : state.inspectorTab,
         })),
@@ -115,6 +139,48 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     bumpCaptions: () =>
         set((state) => ({ captionsVersion: state.captionsVersion + 1 })),
     setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+    // An in point after the out point (or the reverse) starts a new range.
+    setClipIn: (start) =>
+        set(({ clipMarks }) => ({
+            clipMarks: {
+                ...clipMarks,
+                start,
+                end:
+                    clipMarks.end !== null && clipMarks.end > start
+                        ? clipMarks.end
+                        : null,
+            },
+        })),
+    setClipOut: (end) =>
+        set(({ clipMarks }) => ({
+            clipMarks: {
+                ...clipMarks,
+                end,
+                start:
+                    clipMarks.start !== null && clipMarks.start < end
+                        ? clipMarks.start
+                        : null,
+            },
+        })),
+    markClip: (start, end, title) =>
+        set(({ clipMarks }) => ({
+            clipMarks: { start, end, title: title ?? clipMarks.title },
+        })),
+    extendClip: (start, end) =>
+        set(({ clipMarks }) => ({
+            clipMarks: {
+                ...clipMarks,
+                start:
+                    clipMarks.start === null
+                        ? start
+                        : Math.min(clipMarks.start, start),
+                end:
+                    clipMarks.end === null ? end : Math.max(clipMarks.end, end),
+            },
+        })),
+    setClipTitle: (title) =>
+        set(({ clipMarks }) => ({ clipMarks: { ...clipMarks, title } })),
+    clearClip: () => set({ clipMarks: { start: null, end: null, title: '' } }),
     setTimeFormat: (timeFormat) => set({ timeFormat }),
     setTimecodeBase: (frameRate, start) =>
         set({ timecodeBase: { frameRate, start } }),

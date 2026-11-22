@@ -2,6 +2,8 @@
 
 namespace App\Exporters;
 
+use App\Enums\AttachmentKind;
+use App\Enums\PublicationStatus;
 use App\Enums\ReviewStatus;
 use App\Enums\TaskStatus;
 use App\Models\FixityCheck;
@@ -38,7 +40,7 @@ class JsonExporter implements Exporter
     public function export(Record $record, ExportOptions $options): string
     {
         $flags = JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION;
-        $document = $this->document($record);
+        $document = $this->document($record, $options->forDistribution);
 
         if ($options->fields !== null) {
             $document = ExportSchemaFields::filter($document, $options->fields);
@@ -58,9 +60,13 @@ class JsonExporter implements Exporter
     }
 
     /**
+     * With `$forDistribution` (an export leaving the archive), release forms
+     * and contracts are left out of the attachments and unconfirmed subjects
+     * and keywords are dropped.
+     *
      * @return array<string, mixed>
      */
-    public function document(Record $record): array
+    public function document(Record $record, bool $forDistribution = false): array
     {
         $record->loadMissing([
             'project:id,title,date,end_date',
@@ -98,7 +104,7 @@ class JsonExporter implements Exporter
             'generatedAt' => now()->utc()->toIso8601ZuluString(),
             'generator' => ['app' => 'metadata-generator-and-archival-system', 'version' => self::GENERATOR_VERSION],
             'record' => $this->recordBlock($record),
-            'descriptive' => $this->descriptive($record),
+            'descriptive' => $this->descriptive($record, $forDistribution),
             'contributors' => $record->contributors->map(fn (RecordContributor $contributor): array => [
                 'role' => $contributor->role->value,
                 'name' => $contributor->name,
@@ -114,12 +120,14 @@ class JsonExporter implements Exporter
             'provenance' => $this->provenance($record),
             'structure' => [
                 'files' => $record->files->map(fn (RecordFile $file): array => ['fileId' => $file->id, 'role' => $file->role->value])->values()->all(),
-                'attachments' => $record->attachments->map(fn (RecordAttachment $attachment): array => [
-                    'id' => $attachment->id,
-                    'kind' => $attachment->kind->value,
-                    'name' => $attachment->original_filename,
-                    'sha256' => $attachment->sha256_checksum,
-                ])->values()->all(),
+                'attachments' => $record->attachments
+                    ->reject(fn (RecordAttachment $attachment): bool => $forDistribution && in_array($attachment->kind, [AttachmentKind::ReleaseForm, AttachmentKind::Contract], true))
+                    ->map(fn (RecordAttachment $attachment): array => [
+                        'id' => $attachment->id,
+                        'kind' => $attachment->kind->value,
+                        'name' => $attachment->original_filename,
+                        'sha256' => $attachment->sha256_checksum,
+                    ])->values()->all(),
                 'transcripts' => $record->transcripts->map(fn (RecordTranscript $transcript): array => [
                     'language' => $transcript->language,
                     'original' => $transcript->is_original,
@@ -145,7 +153,26 @@ class JsonExporter implements Exporter
             'ai' => $this->ai($record),
             'visual' => $this->visual($record),
             'clips' => [],
-            'publishing' => ['youtube' => ['videoId' => null, 'publishedAt' => null]],
+            'publishing' => ['youtube' => $this->youtube($record)],
+        ];
+    }
+
+    /**
+     * The latest video uploaded to YouTube (Phase 7), if any.
+     *
+     * @return array{videoId: string|null, publishedAt: string|null}
+     */
+    private function youtube(Record $record): array
+    {
+        $publication = $record->youtubePublications()
+            ->whereNotNull('video_id')
+            ->whereIn('status', [PublicationStatus::Processing, PublicationStatus::Published])
+            ->latest('id')
+            ->first(['id', 'record_id', 'video_id', 'published_at', 'created_at']);
+
+        return [
+            'videoId' => $publication?->video_id,
+            'publishedAt' => $this->timestamp($publication?->published_at),
         ];
     }
 
@@ -212,7 +239,7 @@ class JsonExporter implements Exporter
     /**
      * @return array<string, mixed>
      */
-    private function descriptive(Record $record): array
+    private function descriptive(Record $record, bool $confirmedOnly): array
     {
         $hasLocation = $record->location !== null || $record->region_id !== null || $record->latitude !== null;
 
@@ -240,13 +267,13 @@ class JsonExporter implements Exporter
                 'longitude' => $record->longitude,
                 'source' => $record->location_source?->value,
             ] : null,
-            'subjects' => $record->subjects->map(fn (RecordSubject $subject): array => [
+            'subjects' => $record->subjects->filter(fn (RecordSubject $subject): bool => ! $confirmedOnly || $subject->is_confirmed)->map(fn (RecordSubject $subject): array => [
                 'subject' => $subject->subject,
                 'type' => $subject->type->value,
                 'source' => $subject->source->value,
                 'confirmed' => $subject->is_confirmed,
             ])->values()->all(),
-            'keywords' => $record->keywords->map(fn (RecordKeyword $keyword): array => [
+            'keywords' => $record->keywords->filter(fn (RecordKeyword $keyword): bool => ! $confirmedOnly || $keyword->is_confirmed)->map(fn (RecordKeyword $keyword): array => [
                 'keyword' => $keyword->keyword,
                 'source' => $keyword->source->value,
                 'confirmed' => $keyword->is_confirmed,

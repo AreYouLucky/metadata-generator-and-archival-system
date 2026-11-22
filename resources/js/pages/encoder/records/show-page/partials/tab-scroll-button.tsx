@@ -23,10 +23,10 @@ export default function TabScrollButton({ direction, onClick }: Props) {
                 direction === 'left' ? 'Show earlier tabs' : 'Show more tabs'
             }
             className={cn(
-                'absolute inset-y-0 z-10 flex w-7 items-center text-neutral-400 hover:text-foreground',
+                'absolute inset-y-0 z-10 flex w-7 items-center text-muted-foreground hover:text-foreground',
                 direction === 'left'
-                    ? 'left-0 justify-start bg-linear-to-r from-neutral-900 from-50% to-transparent'
-                    : 'right-0 justify-end bg-linear-to-l from-neutral-900 from-50% to-transparent',
+                    ? 'left-0 justify-start bg-linear-to-r from-card from-50% to-transparent'
+                    : 'right-0 justify-end bg-linear-to-l from-card from-50% to-transparent',
             )}
         >
             <Icon className="size-4" aria-hidden />

@@ -46,7 +46,7 @@ export function useUpdateSegment(recordId: string) {
                         ...(speakerId === undefined
                             ? {}
                             : { speaker_id: speakerId }),
-                        ...(timing ?? {}),
+                        ...timing,
                     },
                 )
             ).data,

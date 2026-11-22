@@ -6,6 +6,7 @@ import {
     isTypingTarget,
     speakerName,
 } from '@/lib/utilities';
+import { useAskMeStore } from '@/stores/ask-me-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { Speaker, TranscriptSegment } from '@/types/records';
 
@@ -26,6 +27,11 @@ export const SHORTCUTS: { keys: string[]; action: string }[] = [
     { keys: ['/'], action: 'Search the transcript' },
     { keys: ['E'], action: 'Edit the current line' },
     { keys: ['T'], action: 'Use the current frame as the thumbnail' },
+    {
+        keys: ['I', 'O'],
+        action: 'Mark a clip’s in / out point at the playhead',
+    },
+    { keys: ['A'], action: 'Open or close “Ask me” (chat with the video)' },
     { keys: ['?'], action: 'Show these shortcuts' },
 ];
 
@@ -172,6 +178,25 @@ export function useKeyboardShortcuts(options: Options) {
                 case 'C':
                     event.preventDefault();
                     copyCurrent(event.shiftKey);
+                    break;
+                case 'i':
+                case 'I':
+                case 'o':
+                case 'O':
+                    if (player) {
+                        event.preventDefault();
+                        const isIn = event.key.toLowerCase() === 'i';
+                        (isIn ? store.setClipIn : store.setClipOut)(
+                            player.currentTime,
+                        );
+                        store.setInspectorTab('clips');
+                    }
+
+                    break;
+                case 'a':
+                case 'A':
+                    event.preventDefault();
+                    useAskMeStore.getState().toggle();
                     break;
                 case 't':
                 case 'T':

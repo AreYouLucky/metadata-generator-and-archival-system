@@ -5,7 +5,6 @@ import type { ChannelAuthorizationCallback } from 'pusher-js';
 import { authenticate } from '@/actions/Illuminate/Broadcasting/BroadcastController';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import CatalogueLayout from '@/layouts/catalogue-layout';
@@ -87,9 +86,8 @@ void createInertiaApp({
         );
     },
     progress: {
-        color: '#0284c7',
+        color: '#0ea5e9',
     },
 });
 
 // This will set light / dark mode on load...
-initializeTheme();

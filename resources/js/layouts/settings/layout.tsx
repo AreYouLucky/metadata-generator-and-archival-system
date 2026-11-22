@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
+import { index as apiTokens } from '@/routes/api-tokens';
 import { index as exportSchemas } from '@/routes/export-schemas';
+import { index as youtube } from '@/routes/youtube';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
@@ -22,18 +23,23 @@ const sidebarNavItems: NavItem[] = [
         href: editSecurity(),
         icon: null,
     },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
-        icon: null,
-    },
 ];
 
-/** Encoders and admins also keep their export schemas here. */
+/** Encoders and admins also keep their export schemas, API tokens and YouTube channel here. */
 const encoderNavItems: NavItem[] = [
     {
         title: 'Export schemas',
         href: exportSchemas(),
+        icon: null,
+    },
+    {
+        title: 'API tokens',
+        href: apiTokens(),
+        icon: null,
+    },
+    {
+        title: 'YouTube',
+        href: youtube(),
         icon: null,
     },
 ];

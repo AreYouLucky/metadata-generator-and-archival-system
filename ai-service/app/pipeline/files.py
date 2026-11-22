@@ -6,15 +6,17 @@ Callbacks, signed like every other:
     /internal/record-files/{file}/results/failed     {message}
     /internal/record-files/{file}/fixity             {md5, sha256, triggered_by} or {error}
     /internal/records/{record}/audio-export          {format, path, file_size} or {format, error}
+    /internal/records/{record}/clips/{clip}          {path, file_size, md5, sha256, probe}
+                                                     or {error}
 """
 
 import logging
 from typing import Any
 
 from app.callbacks import post_with_retry
-from app.pipeline import audio, checksum, probe
+from app.pipeline import audio, checksum, clips, probe
 from app.pipeline.tasks import user_message
-from app.schemas.files import AudioExportRequest, FixityRequest, IngestFileRequest
+from app.schemas.files import AudioExportRequest, ClipRequest, FixityRequest, IngestFileRequest
 from app.storage import resolve
 from app.worker import celery_app
 
@@ -87,6 +89,36 @@ def run_audio_export(request_data: dict[str, Any]) -> None:
     )
 
 
+def run_clip(request_data: dict[str, Any]) -> None:
+    """Cut, then checksum and probe the clip like any other file (PROJECT_SPEC section 6)."""
+    request = ClipRequest.model_validate(request_data)
+    path = f"/internal/records/{request.record_id}/clips/{request.clip_id}"
+    try:
+        target = clips.cut(
+            resolve(request.video_path),
+            resolve(request.output_path),
+            request.start,
+            request.end,
+            request.max_height,
+        )
+        sums = checksum.compute(target)
+        summary = probe.summarise(probe.run_ffprobe(target), probe.run_mediainfo(target))
+    except Exception as error:  # noqa: BLE001 - reported to Laravel
+        logger.exception("record_id=%s clip %s failed", request.record_id, request.clip_id)
+        post_with_retry(path, {"error": user_message("clip", error)})
+        return
+    post_with_retry(
+        path,
+        {
+            "path": request.output_path,
+            "file_size": sums["file_size"],
+            "md5": sums["md5"],
+            "sha256": sums["sha256"],
+            "probe": summary,
+        },
+    )
+
+
 @celery_app.task(name="files.ingest", soft_time_limit=2 * 60 * 60)
 def ingest_task(request_data: dict[str, Any]) -> None:
     run_ingest(request_data)
@@ -100,6 +132,15 @@ def fixity_task(request_data: dict[str, Any]) -> None:
 @celery_app.task(name="files.export_audio", soft_time_limit=60 * 60)
 def export_audio_task(request_data: dict[str, Any]) -> None:
     run_audio_export(request_data)
+
+
+@celery_app.task(name="files.clip", soft_time_limit=40 * 60)
+def clip_task(request_data: dict[str, Any]) -> None:
+    run_clip(request_data)
+
+
+def start_clip(request: ClipRequest) -> str:
+    return str(clip_task.delay(request.model_dump()).id)
 
 
 def start_ingest(request: IngestFileRequest) -> str:

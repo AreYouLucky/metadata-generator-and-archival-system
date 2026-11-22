@@ -3,6 +3,345 @@
 Choices made while building, and any deviation from [PROJECT_SPEC.md](PROJECT_SPEC.md). Newest
 phase first.
 
+## Phase 7 — Advanced (built)
+
+### Public API
+
+- **Laravel Sanctum, bearer tokens only** (installed with the owner's approval). `sanctum.guard`
+  and `sanctum.stateful` are empty: the app's pages use the web session, the API only tokens.
+  Routes live in `routes/api.php` under `/api/v1` with `auth:sanctum` + `role:encoder,admin`, so a
+  deactivated account's tokens stop working at once.
+- **Abilities narrow a token further** (`records:read`, `records:create`; chosen per token), on top
+  of the owner's own permissions (encoders their own records, admins all). Tokens expire after 30,
+  90 or 365 days or never; 20 per person; `sanctum:prune-expired` runs daily.
+- **`POST /records` takes a multipart `file`** (the spec's "multipart file") up to
+  `API_MAX_UPLOAD_MB` (512), handed to the same chunked-upload store and checked ingest as the
+  Import page (real type check, checksums, accession number), or a `url` to import. `preset`
+  defaults to the first enabled one. Bigger files: import from a web address (resumable uploads
+  through the API are a "Later" item).
+- **Export through the API leaves the archive**, so it requires the distribution policy (spec §8),
+  even for the record's own encoder; the workspace export doesn't. It drops release forms and
+  contracts from the attachment list and unconfirmed subjects and keywords
+  (`ExportOptions::forDistribution`). Each export is logged as `exported`, "via API".
+- **`GET /records/{id}`** also returns `exportable` and `export_blockers` (the distribution
+  reasons), so a client knows why an export is refused.
+- **Rate limits:** `throttle:api` per token (`API_REQUESTS_PER_MINUTE`, 60); creating a record also
+  passes `throttle:ai` and the daily processing limit.
+- **Webhooks** (optional `webhook_url` on create): sent when processing ends as `record.ready` or
+  `record.failed` (the spec says "ready"; a client waiting for it also needs to hear about a
+  failure). Signed like the internal calls: `X-Archive-Signature: sha256=HMAC(secret,
+  timestamp.body)` with `X-Archive-Timestamp`, using a **per-user signing secret** (Settings → API
+  tokens; shown once, stored encrypted; required before a `webhook_url` is accepted). Only
+  https on port 443 to a public host; the job resolves the host again, refuses any private or
+  reserved address, pins the checked address (`CURLOPT_RESOLVE`) and doesn't follow redirects.
+  5xx and 429 are retried with backoff; `records.webhook_sent_at` records delivery.
+
+### YouTube publishing
+
+- **No Google SDK** (owner's choice): OAuth, the resumable upload, `thumbnails.set` and
+  `videos.list` are plain HTTP calls (`app/Services/YouTube`), which `Http::fake()` covers in
+  tests. The spec's `google/apiclient` would have added every Google API for four calls.
+- **One channel per person** (`youtube_accounts.user_id` unique), connected with the OAuth web
+  flow (`access_type=offline`, `prompt=consent`, a one-time `state` in the session). Scopes:
+  `youtube.upload` and `youtube.readonly`; a grant missing either is refused. Tokens are
+  encrypted (model casts) and never reach the browser; disconnecting revokes the grant at Google.
+  Publications keep their history (`youtube_account_id` set to null).
+- **Who may publish:** `RecordPolicy::publish` = may open the record (its encoder or an admin)
+  **and** the distribution policy. Each person publishes to the channel they connected.
+- **The upload runs in short queued steps** (`PublishToYouTubeJob`, about 30 s each, chunks of
+  `YOUTUBE_CHUNK_MB` = 8 MB), not one long job: Horizon kills jobs after 60 s and a long upload
+  would be retried from the start. Each step first asks YouTube how many bytes it has, so an
+  interrupted step resumes; an expired session starts over. **Every step checks the
+  distribution policy again**, so reopening, deleting, classifying or embargoing the record stops
+  an upload in progress. Outages and rate limits are retried with backoff; other refusals (quota,
+  invalid title) fail the publication with YouTube's reason.
+- **What is uploaded:** the master (the best copy); an MXF master, which YouTube doesn't take, is
+  published from its browser copy (proxy or access file).
+- **Statuses:** queued → uploading (with percent) → processing (on YouTube) → published, or
+  failed. After the upload, YouTube's processing is checked every minute (up to an hour), and the
+  panel's **Check status** asks again. `published` means YouTube has processed the video, at the
+  privacy chosen. Rejected, failed or deleted videos are marked failed with YouTube's reason.
+- **Starting values** (`YouTubeDraft`): the record's title; the AI description, then chapter lines
+  only when YouTube would accept them as chapters (first at 00:00, at least three, each ≥ 10 s),
+  then up to 15 hashtags; AI tags cut to YouTube's 500-character budget (tags with spaces count
+  their quotes). `<` and `>` are removed. The encoder edits them in the panel; nothing typed there
+  changes the record. Privacy starts at **private**; "made for kids" must be declared (YouTube
+  requires it); a short fixed list of categories (default 22, `YOUTUBE_DEFAULT_CATEGORY`).
+- **Custom thumbnail:** sent after the upload when chosen (JPEG or PNG ≤ 2 MB). YouTube allows it
+  only on verified channels; a refusal is noted on the publication and the video stays published.
+- **Publishing again** is allowed once earlier publications have finished (the panel asks for
+  confirmation, since it uploads a second copy); never while one is still on its way.
+- **Quota:** an upload costs 1,600 of the default 10,000 daily API units; `throttle:youtube`
+  allows 10 publishes an hour per person.
+- **Audit and export:** a finished upload is logged as the new audit action `published` (with the
+  video id, channel and privacy); the JSON export's `publishing.youtube` holds the latest uploaded
+  video's id and when YouTube finished processing it.
+- **Workspace:** a **Publish** button in the header opens the Publish panel in the inspector, like
+  Export; progress arrives on `records.{id}` as `record.publication-updated`.
+
+### Later
+
+- Resumable (chunked) uploads through the public API for files above `API_MAX_UPLOAD_MB`.
+- Updating a published video's title, description or privacy from the archive.
+- Webhook delivery log per record (today only the last successful delivery time).
+
+## Phase 7 — Advanced: Ask me and clips
+
+### Look: light mode only, owner's palette and logo (owner's request)
+
+- **Light mode only, everywhere** (the workspace and Import page were dark editor screens; now
+  they follow the same light theme). Dark mode is gone: the `dark` class is never set, the
+  appearance setting page, its route, the theme toggles, `use-appearance` and the
+  `HandleAppearance` middleware were removed. The `dark` variant stays defined in `app.css` so the
+  operating system's dark setting can't switch the leftover `dark:` utilities on.
+- **Palette** (`resources/css/app.css`): background mist `#F4F8FA`, text black, primary actions
+  black, secondary sky `#0EA5E9` (the logo's sky, black text on it), tertiary yellow `#FACC15`
+  (new `tertiary` colour). The brand accent (active tabs, links, timestamps, the Ask me button)
+  uses the deeper sky-600 `#0284C7` so it is readable as text; focus rings are sky too, since
+  yellow is too faint on mist. Tailwind's neutral greys are tinted toward the sky (slate-like).
+  Timeline chapters, scenes and transcript blocks use sky and yellow shades dark enough for white
+  titles. The owner first picked teal `#0F3D47` and coral `#F59E78`, then swapped them for sky and
+  yellow.
+- **Logo:** the KeepFrame pack the owner added (`storage/app/public/KeepFrame-logo`) is copied to
+  `public/brand/` (static app assets, not user uploads) and shown by `BrandLogo`: the compact
+  wordmark in the sidebar (the mark when collapsed), catalogue and landing headers and login
+  screens (white on the dark showcase panel), the full lockup with its tagline in the landing
+  footer; favicon and touch icon from its app-icon set. Toasts now sit above the Ask me button.
+
+### Clips
+
+- **Marked like in an editor:** in and out points (I / O at the playhead, typed, or the crosshair
+  buttons), Shift-click on transcript lines (or their scissors button) to grow the range line by
+  line, a key quote's scissors button, or a whole chapter. The marks live in the workspace store
+  and show as an amber band on the timeline and the transcript. This is the spec's "transcript
+  selection, quote, or chapter".
+- **An exact cut, re-encoded** (H.264 CRF 20 / AAC 160 kbps MP4, never taller than
+  `CLIP_MAX_HEIGHT` = 1080, deinterlaced when the master is interlaced, `+faststart`), not a
+  stream copy: a copy can only start at a key frame, seconds away from the marked point, and a
+  ProRes or MXF master would give a clip browsers and social sites can't play. Always cut from the
+  master, the best copy. Length 1 s to 10 minutes; 100 clips per record.
+- **Each clip is checksummed (MD5 + SHA-256) and probed** in the same AI-service task
+  (`POST /clips`, callback `/internal/records/{record}/clips/{clip}`). The checksums and a probe
+  summary are kept on the `clips` row (`md5_checksum`, `sha256_checksum`, `technical`; the spec
+  lists only `path` and `status`). Clips are derivatives, not archival files, so they are not in
+  `record_files` and don't fill the Technical tab or fixity checks. Stored privately at
+  `records/{id}/clips/{clip}.mp4`; downloaded through the policy and logged as `exported`.
+- **Who:** whoever may view the record (the `export` ability), also once it is submitted, like
+  any download. A clip being cut can't be deleted (its file would be orphaned). Ids are integers,
+  always scoped to their record in the URL.
+
+### Function tools (owner's request)
+
+- **The model learns about a record only through function tools**, which live in
+  `app/Http/Controllers/FunctionTools/` (owner's request; they are not controllers, but the owner
+  wanted them there). Each implements `FunctionTool` (name, description, strict JSON schema,
+  Laravel validation rules, `handle(Record, args)`); `FunctionToolbox::TOOLS` lists them:
+  `get_record_overview`, `search_transcript`, `read_transcript`, `get_generated_metadata`,
+  `get_visual_content`, `get_speakers`, `get_archival_details`, `get_technical_details`.
+  A tool reads only the record it is given (already authorised); arguments carry no IDs, so the
+  model can't reach another record. Attachments, storage paths and raw probe output are never
+  returned; faces are counts only. Every result says whether the data was `available`, and why
+  not (e.g. "Visual analysis has not been run"), so the model can say so instead of guessing.
+- **"Answer only from the tools" is enforced in four layers:** (1) the system prompt
+  (`chat_system.j2`) forbids outside knowledge and tells the model to refuse off-topic questions;
+  (2) the first step uses `tool_choice: required`, so nothing is answered before a lookup;
+  (3) Laravel stores an answer as `answered` only when the model says it is grounded **and** a
+  tool actually returned data, otherwise `not_found` (shown as "Not in this record's data");
+  (4) citations are kept only where they fall on a moment a tool returned (±2 s). Tool results
+  are wrapped as data and the prompt says to ignore instructions inside them (transcripts and
+  on-screen text could contain some). Checked live: a general-knowledge question was refused and
+  marked not grounded; a transcript question was answered with the passage's exact times.
+- **The loop runs in Laravel, the model call in the AI service** (it stays database-free, as §7
+  wants). `POST /chat` on the AI service is one step: Laravel sends the question, the tool
+  definitions and this turn's calls and results; the service returns tool calls or the answer
+  (Responses API, strict function tools plus a structured answer, `store=false`; earlier calls are
+  replayed without item ids, so no reasoning items are needed). At most 4 model calls per
+  question, 4 tool calls run per step; the last call must answer. The spec's `/chat` body
+  (`context_chunks`) became this tool-step body.
+- `LLM_CHAT_MODEL=gpt-6.2-sol` (low reasoning): following "use only the tool results" is where a
+  small model slips. A question costs about one to three cents. Usage is billed to the person who
+  asked (not the record's creator), including the embeddings the search made.
+
+### Transcript search
+
+- **No `embed` pipeline stage.** Passages (`transcript_chunks`, ~45 s windows cut at line ends,
+  with speaker names) are built the first time the chat searches a record, and brought up to date
+  on each search: a passage whose text or times changed is replaced and embedded again; the rest
+  keep their vectors. Edited transcripts are therefore always searched as they are now, and
+  records nobody chats about cost nothing. Embeddings: `text-embedding-3-small` at
+  `EMBEDDING_DIMENSIONS` (sent by Laravel, so both sides agree); about $0.0003 per hour of video.
+- **No pgvector:** the host PostgreSQL 19 (Windows) doesn't have the extension. Search is always
+  within one record (a few hundred passages), so vectors are stored as base64 float32 in a text
+  column and compared in PHP (cosine), streamed 100 at a time. A vector index would only matter
+  for searching across records. A passage containing the question's words gets a small bonus
+  (names, places). If embeddings fail (no key, service down) the search falls back to word
+  matching and tells the model it did.
+
+### "Ask me" on every page, approved records only (owner's request)
+
+- **A floating "Ask me" button on every page** (staff pages, the public catalogue and the landing
+  page; A toggles it in the workspace). It is for signed-in accounts of every role; guests are
+  asked to log in (paid AI work for anonymous visitors would be hard to limit). The routes are
+  shared (`routes/all.php`: `GET|POST|DELETE /chat`, `All\ChatController`).
+- **Only approved content, as far as the account may see it** (`ChatScope`): admins ask about every
+  approved record with its internal fields; encoders about their own approved records (internal
+  fields) and everything in the public catalogue (public fields); viewers only the public
+  catalogue (`Distribution::constrain`: unclassified, public rights, no embargo). Drafts, records
+  under review, rejected and deleted records are never read, not even when asked from their
+  workspace page. "Internal" means the account may open the record (`RecordPolicy::view`);
+  otherwise the tools return only what the public watch page shows (no accession number,
+  classification, provenance, technical details, AI working data or face counts).
+- **Tools take a `record_id`**, checked against that scope on every call; an id outside it gets the
+  same "not available" answer as one that doesn't exist, and the prompt forbids guessing about
+  hidden records. A new `search_records` tool finds records by catalogue fields and by words
+  spoken in their transcripts (word matching; meaning-based search stays within one record).
+- **The page is context, not a key:** on a record's page (workspace or watch page) its id is sent
+  as a hint; the server uses it only if the record is in the scope. Cited moments carry their
+  record, its title and a link the server chose (the workspace for staff who may open it, the
+  watch page otherwise, with `?t=` so it opens at that moment); on that record's own page the
+  chip plays it in place.
+- **One conversation per account** (`chat_messages.record_id` became the optional page context).
+  The superseded `RecordPolicy::chat` and per-record routes were removed.
+
+### Conversations
+
+- Questions are answered by `AnswerChatQuestionJob`; one at a time per account (a cache lock),
+  `throttle:chat` allows 6 a minute. Up to 5 model calls per question. The reply is announced on
+  the asker's own private channel (`App.Models.User.{id}`, no content), and the panel re-reads
+  through the authorised GET route; while an answer is pending it also re-reads every 5 s in case
+  the event is missed. The last 8 messages (without failed ones) go with each question so
+  follow-ups make sense; the prompt says they are not a source of facts.
+
+### Later
+
+- Meaning-based search across records (needs pgvector or another vector index); today it is
+  word matching across records, meaning-based within one.
+- Faster cross-record word search on a large archive (a `pg_trgm` index on transcript lines).
+- Streaming answers token by token.
+
+## Phase 6 — Workflow (built)
+
+### Batches
+
+- **The Import page takes several clips.** Drop, paste or browse several files and add web
+  addresses; one clip still makes one record (`POST /records`), several make a batch
+  (`POST /batches`), up to `MAX_BATCH_SIZE`. Files are uploaded one after another in the same
+  resumable chunks; the batch is created once every upload has finished. Project, series,
+  agency, preset, instructions and processing switches apply to every clip; each clip keeps its
+  own working title. Expected checksums are offered for a single uploaded file only.
+- **One bad file stops the whole batch before anything is created.** Every upload's real type is
+  checked first; the uploads that were fine stay claimable for a second try.
+- **Batches use ULID keys** (they appear in URLs, like records; the spec lists them under big
+  integers). The spec's `status`, `total`, `completed`, `failed` and `zip_path` are joined by
+  `zip_status` and `zip_built_at`. The counts follow the records: ready counts as completed,
+  failed or cancelled as failed, deleted records drop out of the total; the batch is `done`
+  once all have finished. They are recounted (one grouped query) only when a record's
+  processing status changes.
+- **The batch page** (`/batches/{batch}`) follows every record's progress live on one private
+  channel, `batches.{id}`: `RecordProgressUpdated` is also broadcast there when the record
+  belongs to a batch (with the record id). The record list shows the batch under the title, and
+  the workspace header has a **Batch** link.
+- **The ZIP is built on request** (`POST /batches/{batch}/zip`, not in the spec's route list)
+  by `BuildBatchZipJob` in the background (one build per batch at a time), then downloaded from
+  `GET /batches/{batch}/download`. Per record a folder `{accession}-{title}` with the JSON and
+  Markdown exports and, when there is a transcript, SRT, VTT, TXT and CSV; optionally the
+  thumbnail; and `manifest.csv` listing every record, whether it is in the ZIP and why not.
+  Each record put in a ZIP is logged as `exported`. A new build replaces the previous file.
+- **Owner's rule for what the ZIP holds (deviates from §8/§11):** the ZIP is the encoder's
+  working export, so drafts are included, but the archive's restrictions apply. A record that
+  is deleted, classified, embargoed, or whose rights aren't public with permission approved is
+  left out: the distribution rule without its approval check
+  (`Distribution::blockers(ignoreApproval: true)`). Records still processing are left out until
+  they finish. Release forms and other attachments are never included. The spec's strict reading
+  (approved records only) would have made a new batch's ZIP empty, which its own "done when"
+  contradicts.
+- `ZipArchive` needs PHP's `zip` extension: it is in the Docker PHP image; on the XAMPP host it
+  was switched on in `php.ini` (owner's approval).
+
+### URL import
+
+- **`POST /records` takes `url` instead of `upload_id`** (and batches take either per item). The
+  record is created at once with a placeholder title ("Import from youtube.com"), the address in
+  the new `records.source_url`, and an extra **`import`** stage ("Download from URL") before the
+  pipeline. `StartImportJob` calls the AI service's `/import-url`, whose result arrives on
+  `/internal/imports/{record}/done`; the file must be in that record's master folder under a
+  ULID name, and gets the same video check as an upload. Then the site's title replaces the
+  placeholder (a title typed by the encoder is kept), where it came from goes into the
+  provenance notes (born digital) and the `uploaded` audit entry, and processing starts.
+- **The processing options are now stored on the record** (`records.pipeline_options`), since an
+  import starts processing only after the download. Every upload stores them too, so the retry
+  dialog now starts from the upload's choices instead of asking again.
+- **Safety:** Laravel accepts only http(s) on the standard ports, without credentials, whose host
+  isn't localhost, a private or reserved IP, or an internal-only name (`PublicMediaUrl`); the AI
+  service resolves the host again and refuses any address that isn't globally routable. Only
+  yt-dlp's site extractors run: the generic extractor (which fetches any page or file, and so
+  any address a site redirects to) is off unless `IMPORT_ALLOW_GENERIC=true`. Playlists and
+  channels are refused (one video at a time, at most one entry downloaded even if one slips
+  through); the upload size and duration limits apply before and during the download. The Import
+  page says to import only videos you have the rights to.
+- **Format:** up to `IMPORT_MAX_HEIGHT` (1080), MP4/AAC preferred, so the master usually plays in
+  browsers without a proxy. The download's progress shows on the `import` stage and it can be
+  cancelled like processing. A failed download fails the record with yt-dlp's reason; the other
+  stages are skipped. **Retry** downloads again.
+- **YouTube needs Deno** (yt-dlp's JavaScript challenges, `yt-dlp[default]` brings yt-dlp-ejs).
+  The AI image copies the `deno` binary from `denoland/deno:bin-2.5.6`.
+
+### Speakers
+
+- **A `diarize` stage after `transcribe`** (switch on the Import page and in the retry dialog,
+  off by default) reports speaker turns `{start, end, speaker}`. Laravel gives each transcript
+  line the speaker who talks longest during it, renumbers the labels S1, S2… in order of first
+  appearance, and keeps the names already given to those labels. Speakers left without a line
+  or a name are removed. Renaming, adding speakers and their colours were already there.
+- **pyannote is the default provider** (`pyannote/speaker-diarization-community-1`, pyannote.audio
+  4.x, the owner prefers local processing). It needs `HF_TOKEN` and the model's terms accepted
+  on Hugging Face. It runs **on the CPU** by default, next to the vision models, using the CPU
+  torch already in the image (checked with a dry run: nothing pulls CUDA builds), so the 6 GB
+  GPU stays with Whisper; `DIARIZATION_DEVICE=cuda` sends the stage to the GPU queue. The audio is
+  decoded by ffmpeg and handed over as a waveform. pyannote's telemetry is switched off.
+- **AssemblyAI** can label speakers instead (`DIARIZATION_PROVIDER=assemblyai`). It has no
+  speaker-only request, so it transcribes again and only the speakers are kept; that is paid
+  for and recorded as transcription minutes. When AssemblyAI is also the transcription
+  provider, the transcription asks for speaker labels in the same request and the diarize stage
+  reuses them at no extra cost.
+
+### AssemblyAI transcription
+
+- `TRANSCRIPTION_PROVIDER=assemblyai`: the extracted audio is uploaded, transcribed with
+  `speech_models` (`assemblyai-stt-3-7`, falling back to `universal-2`; the singular
+  `speech_model` is deprecated) and language detection, polled, and its **sentences** become the
+  transcript lines (AssemblyAI has no segments). No SDK: a few httpx calls with retries. Prices
+  from AssemblyAI's page on 2026-11-22: $0.21/h (stt-3-7), $0.15/h (universal-2), +$0.02/h for
+  speaker labels. Language codes like `en_us` are stored as `en`.
+- **Privacy notice:** `/health` now reports which transcription and diarization providers are
+  configured (names only), Laravel keeps them for ten minutes (`AiProviders`), and the Import
+  page's notice says when the audio is sent to OpenAI or AssemblyAI instead of claiming local
+  transcription.
+
+### Record history
+
+- **Retry one step:** `POST /records/{record}/retry` takes `stage`. A failed or skipped step whose
+  inputs are done runs again with every step that reads its results (e.g. transcribe → speakers
+  → metadata; frames → descriptions, text, objects → metadata), once processing has finished.
+  The rule lives in `ProcessingRetry::refusal()`; the workspace's stage list offers **Retry** (or
+  **Run** for a skipped one) exactly where it allows. Without `stage`, the whole pipeline runs
+  again as before. This also covers running speakers or visual analysis later on a record that
+  was processed without them (the "Later" item of Phase 5).
+- **Partial runs keep the AI service stateless:** the run gets the list of steps and a seed with
+  the stored results those steps read (transcript lines and language, shots, frames with their
+  descriptions and text). Steps not run again restore their output silently: probe is measured
+  again (seconds), the extracted audio is reused from the work folder or extracted again, the
+  rest comes from the seed; repeated frames are found again from the images.
+- **The record list** gets row actions: open, open the batch, stop processing while it runs,
+  retry (opens the workspace, where the options are chosen) and delete (with confirmation).
+  Search and filters were already there.
+
+### Later
+
+- A batch list page (today: the batch link on each record and in the workspace).
+- Choose the number of speakers (pyannote's `num_speakers` / `min_speakers` / `max_speakers`)
+  when it is known.
+
 ## Phase 5 — Visual analysis (built)
 
 ### Pipeline

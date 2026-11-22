@@ -340,7 +340,7 @@ export default function ArchiveDescriptive({
             {containerDate &&
                 containerDate !== values.date_recorded &&
                 canEdit && (
-                    <div className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2.5 text-xs text-amber-100 ring-1 ring-amber-400/20">
+                    <div className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2.5 text-xs text-amber-700 ring-1 ring-amber-400/20">
                         <CalendarClock
                             className="mt-0.5 size-4 shrink-0"
                             aria-hidden

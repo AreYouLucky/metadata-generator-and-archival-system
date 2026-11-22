@@ -1,7 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
-import AppearanceToggle from '@/components/all/appearance-toggle';
-import AppLogoIcon from '@/components/app-logo-icon';
+import BrandLogo from '@/components/all/brand-logo';
 import { home } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
 import AuthShowcase from './partials/auth-showcase';
@@ -28,10 +27,11 @@ export default function AuthSplitLayout({
                         href={home()}
                         className="flex min-w-0 items-center gap-2.5 font-semibold lg:hidden"
                     >
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-brand text-brand-foreground">
-                            <AppLogoIcon className="size-5 fill-current" />
-                        </span>
-                        <span className="truncate text-sm">{name}</span>
+                        <BrandLogo
+                            variant="compact"
+                            alt={name}
+                            className="h-7"
+                        />
                     </Link>
                     <div className="ml-auto flex items-center gap-2">
                         <Link
@@ -41,7 +41,6 @@ export default function AuthSplitLayout({
                             <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
                             Back to home
                         </Link>
-                        <AppearanceToggle />
                     </div>
                 </div>
 

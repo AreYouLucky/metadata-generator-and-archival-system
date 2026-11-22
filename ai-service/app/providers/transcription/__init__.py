@@ -4,6 +4,11 @@ from app.providers.transcription.base import TranscriptionProvider, Transcriptio
 
 def get_transcription_provider(settings: Settings | None = None) -> TranscriptionProvider:
     settings = settings or get_settings()
+    if settings.transcription_provider == "assemblyai":
+        from app.providers.transcription.assemblyai import AssemblyAIProvider
+
+        return AssemblyAIProvider(settings)
+
     if settings.transcription_provider == "openai":
         from app.providers.transcription.openai_whisper import OpenAIWhisperProvider
 

@@ -4,6 +4,9 @@ Each task receives the pipeline context, runs its stage (unless it was switched 
 upload or a dependency failed or was skipped), reports to Laravel, and hands the context
 on. A failing stage never breaks the workflow: independent stages still run, dependent
 ones are reported as `skipped`. Transcription runs on the `gpu` queue (one at a time).
+
+A partial run (a retry of one stage) goes through the same chain: stages it doesn't run
+again restore their outputs silently (stages.restore) and report nothing.
 """
 
 import logging
@@ -14,6 +17,7 @@ import openai
 from celery import chain, group
 
 from app.callbacks import ProgressReporter, report_progress, report_result
+from app.config import get_settings
 from app.pipeline import stages
 from app.pipeline.audio import AudioError
 from app.pipeline.cancellation import (
@@ -22,9 +26,12 @@ from app.pipeline.cancellation import (
     is_cancelled,
     new_run_id,
 )
+from app.pipeline.clips import ClipError
 from app.pipeline.probe import ProbeError
 from app.pipeline.proxy import ProxyError
 from app.pipeline.visual import VisualError
+from app.providers.assemblyai import AssemblyAIError
+from app.providers.diarization import DiarizationError
 from app.providers.llm import LlmError
 from app.providers.transcription.local import ModelNotReadyError
 from app.schemas.pipeline import PipelineContext, ProcessRequest, StageName
@@ -42,11 +49,14 @@ _EXPLAINED = (
     ProbeError,
     ProxyError,
     AudioError,
+    ClipError,
     VisualError,
     LlmError,
     UnsafePathError,
     FileNotFoundError,
     ModelNotReadyError,
+    AssemblyAIError,
+    DiarizationError,
 )
 
 
@@ -72,6 +82,15 @@ def run_stage(
     # Cancelled from Laravel, which already marked the remaining stages: stay silent.
     if is_cancelled(context.run_id):
         log.info("record_id=%s stage=%s not run: pipeline cancelled", record_id, stage)
+        return context.model_dump()
+
+    # A partial run: this stage's results are already stored in Laravel.
+    if not context.request.runs(stage):
+        try:
+            stages.restore(stage, context)
+        except Exception:  # noqa: BLE001 - the stages that needed it are skipped
+            log.exception("record_id=%s stage=%s could not be restored", record_id, stage)
+            context.failed.append(stage)
         return context.model_dump()
 
     if reason := context.disabled_reason(stage):
@@ -136,6 +155,11 @@ def transcribe_task(context: dict[str, Any]) -> dict[str, Any]:
     return run_stage("transcribe", context, stages.run_transcribe)
 
 
+@celery_app.task(name="pipeline.diarize", soft_time_limit=2 * 60 * 60)
+def diarize_task(context: dict[str, Any]) -> dict[str, Any]:
+    return run_stage("diarize", context, stages.run_diarize)
+
+
 @celery_app.task(name="pipeline.scenes", soft_time_limit=2 * 60 * 60)
 def scenes_task(context: dict[str, Any]) -> dict[str, Any]:
     return run_stage("scenes", context, stages.run_scenes)
@@ -181,11 +205,16 @@ def proxy_task(context: dict[str, Any]) -> dict[str, Any]:
 def workflow(request: ProcessRequest, run_id: str | None = None) -> Any:
     """checksum -> probe -> (audio branch | visual branch) -> join -> metadata -> proxy.
 
+    The audio branch is extract_audio -> transcribe -> diarize.
     Transcription waits on the GPU queue while the CPU worker analyses the frames, so
     visual analysis adds little to the time before metadata. A group followed by a task
     in a chain becomes a chord (it needs the Celery result backend)."""
     context = PipelineContext(request=request, run_id=run_id).model_dump()
-    audio_branch = chain(extract_audio_task.s(), transcribe_task.s().set(queue=GPU_QUEUE))
+    audio_branch = chain(
+        extract_audio_task.s(),
+        transcribe_task.s().set(queue=GPU_QUEUE),
+        diarize_task.s().set(queue=diarize_queue()),
+    )
     visual_branch = chain(
         scenes_task.s(), frames_task.s(), vision_task.s(), ocr_task.s(), objects_task.s()
     )
@@ -197,6 +226,14 @@ def workflow(request: ProcessRequest, run_id: str | None = None) -> Any:
         generate_metadata_task.s(),
         proxy_task.s(),
     )
+
+
+def diarize_queue() -> str:
+    """pyannote on the GPU waits its turn with Whisper; otherwise the normal worker."""
+    settings = get_settings()
+    if settings.diarization_provider == "pyannote" and settings.diarization_device == "cuda":
+        return GPU_QUEUE
+    return "celery"
 
 
 def start_pipeline(request: ProcessRequest) -> str:

@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useLoadMetadataDraft } from '@/hooks/use-metadata-draft';
+import { useAskMePage } from '@/hooks/use-ask-me-page';
 import { useRecordChannel } from '@/hooks/use-record-channel';
+import { useStartTime } from '@/hooks/use-start-time';
 import { useSetThumbnail } from '@/hooks/use-visuals';
 import { translationLinesKey } from '@/hooks/use-translations';
 import { getErrorMessage, languageName } from '@/lib/utilities';
@@ -13,7 +15,9 @@ import { index as projectsIndex, show as showProject } from '@/routes/projects';
 import { show } from '@/routes/records';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { Archive, ArchiveOptions } from '@/types/archive';
+import type { Clip, ClipLimits } from '@/types/clips';
 import type { ExportSchema } from '@/types/export-schemas';
+import type { Publication, Publishing } from '@/types/publishing';
 import type { WorkspaceReview } from '@/types/reviews';
 import type {
     ActiveMetadata,
@@ -37,6 +41,7 @@ import type {
 } from '@/types/records';
 import type { Visuals } from '@/types/visuals';
 import ChaptersPanel from './partials/chapters-panel';
+import ClipsPanel from './partials/clips-panel';
 import ArchivePanel from './partials/archive-panel';
 import CreditsPanel from './partials/credits-panel';
 import ExportPanel from './partials/export-panel';
@@ -44,6 +49,7 @@ import InspectorTabBar from './partials/inspector-tab-bar';
 import InspectorTabs from './partials/inspector-tabs';
 import MetadataPanel from './partials/metadata-panel';
 import PreviewMonitor from './partials/preview-monitor';
+import PublishPanel from './partials/publish-panel';
 import Timeline from './partials/timeline';
 import TranscriptPanel from './partials/transcript-panel';
 import TranslationsPanel from './partials/translations-panel';
@@ -70,6 +76,10 @@ type Props = {
     review: WorkspaceReview;
     visuals: Visuals;
     audioExports: AudioExport[];
+    clips: Clip[];
+    clipLimits: ClipLimits;
+    publishing: Publishing | null;
+    publications: Publication[];
 };
 
 type SavedSegment = Pick<TranscriptSegment, 'id'> & Partial<TranscriptSegment>;
@@ -78,9 +88,9 @@ type SavedSegment = Pick<TranscriptSegment, 'id'> & Partial<TranscriptSegment>;
  * The workspace, laid out like a video editor: transcript on the left,
  * preview monitor in the middle and the inspector (metadata and credits) on
  * the right, above a timeline that takes 30% of the height. Status and
- * export sit in the app header beside the breadcrumbs. It stays dark in both
- * themes, like editing software, by scoping the `dark` theme to this
- * subtree. Keyboard shortcuts are listed in the shortcuts dialog ("?").
+ * export sit in the app header beside the breadcrumbs. Light like the rest
+ * of the app (owner's palette, light mode only). Keyboard shortcuts are
+ * listed in the shortcuts dialog ("?").
  */
 export default function ShowRecord(props: Props) {
     const {
@@ -101,6 +111,10 @@ export default function ShowRecord(props: Props) {
         review,
         visuals,
         audioExports,
+        clips,
+        clipLimits,
+        publishing,
+        publications,
     } = props;
     const [stages, setStages] = useState(props.stages);
     const [processingStatus, setProcessingStatus] = useState(
@@ -240,6 +254,9 @@ export default function ShowRecord(props: Props) {
     }, []);
 
     useRecordChannel(record.id, { onProgress, onTranslation, onTitles });
+    // "Ask me": this record is the chat's "this video"; ?t= opens a cited moment.
+    useAskMePage(record.id, useWorkspaceStore.getState().seek);
+    useStartTime(useWorkspaceStore((state) => state.player));
     // T: the frame the player shows becomes the thumbnail.
     const setThumbnail = useSetThumbnail(record.id);
     const thumbnailFromPlayer = () => {
@@ -301,7 +318,6 @@ export default function ShowRecord(props: Props) {
             ['pending', 'running'].includes(stage.status) &&
             ['extract_audio', 'transcribe'].includes(stage.stage),
     );
-    const initialPreset = metadata?.preset ?? presets[0]?.name ?? 'generic';
     const tabBar = (
         <InspectorTabBar
             metadata={metadata}
@@ -312,6 +328,7 @@ export default function ShowRecord(props: Props) {
                 archive.keywords.filter((item) => !item.is_confirmed).length
             }
             frameCount={visuals.frames.length}
+            clipCount={clips.length}
         />
     );
 
@@ -323,7 +340,6 @@ export default function ShowRecord(props: Props) {
                 stages={stages}
                 processingStatus={processingStatus}
                 presets={presets}
-                initialPreset={initialPreset}
                 review={review}
                 pendingSuggestions={
                     archive.subjects.filter((item) => !item.is_confirmed)
@@ -336,12 +352,12 @@ export default function ShowRecord(props: Props) {
                 breadcrumbs plus the panels share the other 70%. */}
             <div
                 data-workspace
-                className="dark flex flex-1 flex-col bg-neutral-950 text-foreground xl:min-h-0 xl:overflow-hidden"
+                className="flex flex-1 flex-col bg-background text-foreground xl:min-h-0 xl:overflow-hidden"
             >
                 {/* One explicit row, so all three panels end on the same line
                     and scroll inside it, however long the transcript is. */}
-                <div className="grid gap-px bg-white/10 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)_minmax(21rem,28rem)] xl:grid-rows-[minmax(0,1fr)]">
-                    <div className="order-2 h-120 min-h-0 overflow-hidden bg-neutral-900 xl:order-0 xl:h-auto">
+                <div className="grid gap-px bg-muted xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)_minmax(21rem,28rem)] xl:grid-rows-[minmax(0,1fr)]">
+                    <div className="order-2 h-120 min-h-0 overflow-hidden bg-card xl:order-0 xl:h-auto">
                         <TranscriptPanel
                             recordId={record.id}
                             transcript={transcript}
@@ -354,7 +370,7 @@ export default function ShowRecord(props: Props) {
                             onSpeakerApplied={onSpeakerApplied}
                         />
                     </div>
-                    <div className="order-1 min-h-0 overflow-hidden bg-neutral-950 xl:order-0">
+                    <div className="order-1 min-h-0 overflow-hidden bg-background xl:order-0">
                         <PreviewMonitor
                             recordId={record.id}
                             media={media}
@@ -364,7 +380,7 @@ export default function ShowRecord(props: Props) {
                             captionLanguages={captionLanguages}
                         />
                     </div>
-                    <div className="order-3 h-144 min-h-0 overflow-hidden bg-neutral-900 xl:order-0 xl:h-auto">
+                    <div className="order-3 h-144 min-h-0 overflow-hidden bg-card xl:order-0 xl:h-auto">
                         <InspectorTabs
                             panels={{
                                 metadata: (
@@ -437,6 +453,16 @@ export default function ShowRecord(props: Props) {
                                         onStarted={upsertTranslation}
                                     />
                                 ),
+                                clips: (
+                                    <ClipsPanel
+                                        recordId={record.id}
+                                        heading={tabBar}
+                                        clips={clips}
+                                        limits={clipLimits}
+                                        metadata={metadata}
+                                        duration={media.duration ?? 0}
+                                    />
+                                ),
                                 export: (
                                     <ExportPanel
                                         recordId={record.id}
@@ -448,6 +474,13 @@ export default function ShowRecord(props: Props) {
                                         }
                                         translations={translations}
                                         version={exportVersion}
+                                    />
+                                ),
+                                publish: (
+                                    <PublishPanel
+                                        recordId={record.id}
+                                        publishing={publishing}
+                                        publications={publications}
                                     />
                                 ),
                             }}

@@ -88,13 +88,26 @@ class ChunkedUploadStore
      */
     public function claim(string $id, User $user): array
     {
+        $finished = $this->inspect($id, $user);
+
+        $this->cache()->forget($this->key($id));
+
+        return $finished;
+    }
+
+    /**
+     * A finished upload's session and part path, without claiming it (a batch
+     * checks every file before it creates any record).
+     *
+     * @return array{session: UploadSession, path: string}
+     */
+    public function inspect(string $id, User $user): array
+    {
         $session = $this->session($id, $user);
 
         if ($session['received'] !== $session['size']) {
             throw new ConflictHttpException('The upload is not finished yet.');
         }
-
-        $this->cache()->forget($this->key($id));
 
         return ['session' => $session, 'path' => $this->partPath($id)];
     }

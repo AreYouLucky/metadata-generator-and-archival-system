@@ -71,10 +71,10 @@ export default function VisualsFrames({
             <div className="flex items-center justify-between gap-2">
                 <h3
                     id="visuals-frames"
-                    className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase"
+                    className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
                 >
                     Key frames{' '}
-                    <span className="text-neutral-500 tabular-nums">
+                    <span className="text-muted-foreground tabular-nums">
                         {shown.length}
                     </span>
                 </h3>
@@ -95,13 +95,13 @@ export default function VisualsFrames({
                             onClick={() => setFacesOnly((value) => !value)}
                             aria-pressed={facesOnly}
                             className={cn(
-                                'flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-neutral-400 ring-1 ring-white/10 transition hover:text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                                facesOnly && 'bg-white/10 text-white',
+                                'flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                facesOnly && 'bg-muted text-foreground',
                             )}
                         >
                             <ScanFace className="size-3" aria-hidden />
                             People on screen
-                            <span className="text-neutral-500 tabular-nums">
+                            <span className="text-muted-foreground tabular-nums">
                                 {withFaces}
                             </span>
                         </button>
@@ -120,7 +120,7 @@ export default function VisualsFrames({
                     />
                 ))}
             </div>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-muted-foreground">
                 Click a frame to see it large with its description, the text on
                 screen, objects and faces counted
                 {canEdit ? ', and to correct them' : ''}.

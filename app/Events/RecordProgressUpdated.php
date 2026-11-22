@@ -27,7 +27,11 @@ class RecordProgressUpdated implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel("records.{$this->record->id}")];
+        return [
+            new PrivateChannel("records.{$this->record->id}"),
+            // The batch page follows every record of its batch on one channel.
+            ...($this->record->batch_id !== null ? [new PrivateChannel("batches.{$this->record->batch_id}")] : []),
+        ];
     }
 
     public function broadcastAs(): string
@@ -36,11 +40,12 @@ class RecordProgressUpdated implements ShouldBroadcastNow
     }
 
     /**
-     * @return array{processing_status: string, stage: array{stage: string, status: string, progress: int, message: string|null}}
+     * @return array{record_id: string, processing_status: string, stage: array{stage: string, status: string, progress: int, message: string|null}}
      */
     public function broadcastWith(): array
     {
         return [
+            'record_id' => $this->record->id,
             'processing_status' => $this->record->processing_status->value,
             'stage' => [
                 'stage' => $this->stage->stage->value,

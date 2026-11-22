@@ -256,7 +256,7 @@ export default function ArchiveRights({
                 />
             )}
 
-            <section className="grid gap-2 border-t border-white/10 pt-4">
+            <section className="grid gap-2 border-t border-border pt-4">
                 <h3 className="text-sm font-medium">Release forms</h3>
                 <AttachmentList
                     recordId={recordId}

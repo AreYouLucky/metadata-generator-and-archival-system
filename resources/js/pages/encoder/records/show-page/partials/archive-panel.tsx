@@ -61,7 +61,7 @@ export default function ArchivePanel({
         <EditorPanel title="Archive" heading={heading}>
             <nav
                 aria-label="Archive sections"
-                className="flex shrink-0 flex-wrap gap-1 border-b border-white/10 px-3 py-2"
+                className="flex shrink-0 flex-wrap gap-1 border-b border-border px-3 py-2"
             >
                 {SECTIONS.map(([value, label]) => (
                     <button
@@ -73,7 +73,7 @@ export default function ArchivePanel({
                             'rounded-full px-2.5 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                             section === value
                                 ? 'bg-brand text-brand-foreground'
-                                : 'text-neutral-400 hover:bg-white/10 hover:text-foreground',
+                                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                         )}
                     >
                         {label}

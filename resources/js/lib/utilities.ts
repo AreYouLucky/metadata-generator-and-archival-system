@@ -51,6 +51,24 @@ export function formatTimestamp(seconds: number): string {
 }
 
 /**
+ * A typed position back to seconds: "1:15" -> 75, "1:02:05.5" -> 3725.5,
+ * "90" -> 90. Null when it isn't a time.
+ */
+export function parseTimestamp(text: string): number | null {
+    const parts = text.trim().split(':');
+
+    if (
+        parts.length > 3 ||
+        parts.some((part) => !/^\d+(\.\d+)?$/.test(part)) ||
+        parts.slice(0, -1).some((part) => part.includes('.'))
+    ) {
+        return null;
+    }
+
+    return parts.reduce((total, part) => total * 60 + Number(part), 0);
+}
+
+/**
  * Editor-style clock with tenths, e.g. 83.46 -> "00:01:23.4".
  */
 export function formatClock(seconds: number): string {
@@ -230,7 +248,7 @@ export function formatDateTime(value: string | null): string {
 
 /** Chip colours for speakers, by position in the record's speaker list. */
 const SPEAKER_COLORS = [
-    'bg-sky-500/15 text-sky-700 ring-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200 dark:ring-sky-400/40',
+    'bg-yellow-400/25 text-yellow-800 ring-yellow-500/50',
     'bg-amber-500/15 text-amber-700 ring-amber-500/40 dark:bg-amber-500/20 dark:text-amber-200 dark:ring-amber-400/40',
     'bg-emerald-500/15 text-emerald-700 ring-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/40',
     'bg-fuchsia-500/15 text-fuchsia-700 ring-fuchsia-500/40 dark:bg-fuchsia-500/20 dark:text-fuchsia-200 dark:ring-fuchsia-400/40',

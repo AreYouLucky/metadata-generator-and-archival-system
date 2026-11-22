@@ -26,7 +26,7 @@ export default function ArchiveField({
                 {label}
             </Label>
             {children}
-            {hint && <p className="text-xs text-neutral-500">{hint}</p>}
+            {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
             <InputError message={error} />
         </div>
     );

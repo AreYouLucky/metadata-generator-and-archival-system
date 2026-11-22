@@ -1,12 +1,14 @@
 import { Link } from '@inertiajs/react';
-import { Film } from 'lucide-react';
+import { Film, Layers } from 'lucide-react';
 import ClassificationBadge from '@/components/all/classification-badge';
 import EmbargoBadge from '@/components/encoder/embargo-badge';
 import ProcessingStatusBadge from '@/components/all/processing-status-badge';
 import ReviewStatusBadge from '@/components/all/review-status-badge';
 import { formatDate, formatTimestamp } from '@/lib/utilities';
+import { show as showBatch } from '@/routes/batches';
 import { show } from '@/routes/records';
 import type { RecordListItem } from '@/types/records';
+import RecordRowActions from './record-row-actions';
 
 export default function RecordsTable({
     records,
@@ -39,6 +41,9 @@ export default function RecordsTable({
                         )}
                         <th scope="col" className="px-4 py-3 font-medium">
                             Added
+                        </th>
+                        <th scope="col" className="px-2 py-3">
+                            <span className="sr-only">Actions</span>
                         </th>
                     </tr>
                 </thead>
@@ -74,6 +79,18 @@ export default function RecordsTable({
                                         )}
                                     </span>
                                 </Link>
+                                {record.batch && (
+                                    <Link
+                                        href={showBatch(record.batch.id)}
+                                        className="mt-1 ml-12 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                    >
+                                        <Layers
+                                            className="size-3"
+                                            aria-hidden
+                                        />
+                                        {record.batch.name}
+                                    </Link>
+                                )}
                                 {(record.classification !== 'unclassified' ||
                                     record.embargo_until) && (
                                     <span className="mt-1.5 ml-12 flex flex-wrap gap-1.5">
@@ -112,6 +129,9 @@ export default function RecordsTable({
                             )}
                             <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                                 {formatDate(record.created_at)}
+                            </td>
+                            <td className="px-2 py-3 text-right">
+                                <RecordRowActions record={record} />
                             </td>
                         </tr>
                     ))}

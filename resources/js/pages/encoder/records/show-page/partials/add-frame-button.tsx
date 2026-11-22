@@ -44,7 +44,7 @@ export default function AddFrameButton({ recordId, onAdded }: Props) {
             onClick={add}
             disabled={!player || addFrame.isPending}
             title="Add the frame the player shows now as a key frame"
-            className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-neutral-400 ring-1 ring-white/10 transition hover:text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+            className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
         >
             <ImagePlus className="size-3" aria-hidden />
             {addFrame.isPending ? 'Adding…' : 'Add frame'}

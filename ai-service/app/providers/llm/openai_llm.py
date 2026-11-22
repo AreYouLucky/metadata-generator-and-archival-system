@@ -5,23 +5,38 @@ then the transcript, then the per-request part (preset, custom prompt). A re-run
 same transcript then bills most input tokens at the cached rate.
 """
 
+import json
 from typing import Any
 
 import openai
 from openai import OpenAI
 from openai.types.responses import (
     EasyInputMessageParam,
+    FunctionToolParam,
+    ResponseFunctionToolCallParam,
     ResponseInputImageParam,
     ResponseInputMessageContentListParam,
     ResponseInputParam,
     ResponseInputTextParam,
 )
+from openai.types.responses.response_input_param import FunctionCallOutput
 from openai.types.shared_params import Reasoning
 from pydantic import ValidationError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import ReasoningEffort, Settings, get_settings
-from app.providers.llm.base import ImageInput, LlmError, LlmUsage, T
+from app.providers.llm.base import (
+    ChatTurn,
+    FunctionSpec,
+    ImageInput,
+    LlmError,
+    LlmUsage,
+    RequestedToolCall,
+    T,
+    ToolChoice,
+    TurnMessage,
+    TurnToolCall,
+)
 
 _TRANSIENT = (
     openai.APIConnectionError,
@@ -81,6 +96,105 @@ class OpenAILlmProvider:
                 )
         raise LlmError("unreachable")  # pragma: no cover
 
+    def converse(
+        self,
+        *,
+        model: str,
+        instructions: str,
+        turns: list[ChatTurn],
+        tools: list[FunctionSpec],
+        tool_choice: ToolChoice,
+        schema: type[T],
+        reasoning_effort: ReasoningEffort,
+        max_output_tokens: int,
+    ) -> tuple[list[RequestedToolCall] | T, LlmUsage]:
+        """One step of a function-calling loop (Responses API, strict function tools).
+
+        Earlier calls are replayed as `function_call` items without their item ids, so no
+        reasoning items are needed and nothing is stored at OpenAI (`store=False`)."""
+        usage = LlmUsage(model=model)
+        conversation: ResponseInputParam = [
+            EasyInputMessageParam(role="system", content=instructions),
+            *(_turn(turn) for turn in turns),
+        ]
+        function_tools = [
+            FunctionToolParam(
+                type="function",
+                name=tool.name,
+                description=tool.description,
+                parameters=tool.parameters,
+                strict=True,
+            )
+            for tool in tools
+        ]
+
+        for attempt in range(2):
+            response = self._send_with_tools(
+                model,
+                conversation,
+                function_tools,
+                tool_choice,
+                schema,
+                reasoning_effort,
+                max_output_tokens,
+            )
+            _add_usage(usage, response)
+            calls = [
+                item
+                for item in getattr(response, "output", None) or []
+                if getattr(item, "type", None) == "function_call"
+            ]
+            if calls and tool_choice != "none":
+                return [
+                    RequestedToolCall(
+                        call_id=str(call.call_id),
+                        name=str(call.name),
+                        arguments=_arguments(getattr(call, "arguments", None)),
+                    )
+                    for call in calls
+                ], usage
+            try:
+                return _parsed(response, schema), usage
+            except (LlmError, ValidationError) as error:
+                if attempt == 1:
+                    raise LlmError(f"The model did not return a valid answer: {error}") from error
+                conversation.append(
+                    EasyInputMessageParam(
+                        role="user",
+                        content="Your previous answer could not be used "
+                        f"({str(error)[:300]}). Answer again with valid JSON only.",
+                    )
+                )
+        raise LlmError("unreachable")  # pragma: no cover
+
+    @retry(
+        retry=retry_if_exception_type(_TRANSIENT),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, max=20),
+        reraise=True,
+    )
+    def _send_with_tools(
+        self,
+        model: str,
+        conversation: ResponseInputParam,
+        tools: list[FunctionToolParam],
+        tool_choice: ToolChoice,
+        schema: type[T],
+        reasoning_effort: ReasoningEffort,
+        max_output_tokens: int,
+    ) -> Any:
+        return self.client.responses.parse(
+            model=model,
+            input=conversation,
+            tools=tools,
+            tool_choice=tool_choice,
+            parallel_tool_calls=True,
+            text_format=schema,
+            reasoning=Reasoning(effort=reasoning_effort),
+            max_output_tokens=max_output_tokens,
+            store=False,
+        )
+
     @retry(
         retry=retry_if_exception_type(_TRANSIENT),
         stop=stop_after_attempt(4),
@@ -116,6 +230,30 @@ def _content(text: str, images: list[ImageInput]) -> str | ResponseInputMessageC
         for image in images
     )
     return parts
+
+
+def _turn(
+    turn: ChatTurn,
+) -> EasyInputMessageParam | ResponseFunctionToolCallParam | FunctionCallOutput:
+    if isinstance(turn, TurnMessage):
+        return EasyInputMessageParam(role=turn.role, content=turn.content)
+    if isinstance(turn, TurnToolCall):
+        return ResponseFunctionToolCallParam(
+            type="function_call", call_id=turn.call_id, name=turn.name, arguments=turn.arguments
+        )
+    return FunctionCallOutput(type="function_call_output", call_id=turn.call_id, output=turn.output)
+
+
+def _arguments(raw: object) -> dict[str, Any]:
+    """The call's JSON arguments; anything unreadable becomes {} (Laravel's validation then
+    tells the model what is missing)."""
+    if not isinstance(raw, str):
+        return {}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def _parsed(response: Any, schema: type[T]) -> T:

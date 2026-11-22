@@ -59,14 +59,14 @@ export default function AddRecordFileForm({ recordId }: { recordId: string }) {
     };
 
     return (
-        <div className="grid gap-3 rounded-lg bg-white/5 p-3">
+        <div className="grid gap-3 rounded-lg bg-muted/60 p-3">
             <h4 className="text-sm font-medium">Add a file</h4>
             <input
                 ref={input}
                 type="file"
                 accept="video/*,.mxf"
                 aria-label="Video file"
-                className="text-xs file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-foreground"
+                className="text-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:text-foreground"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
             <div className="grid gap-3 @md:grid-cols-2">
@@ -95,7 +95,7 @@ export default function AddRecordFileForm({ recordId }: { recordId: string }) {
             </div>
             <div className="flex items-center justify-end gap-3">
                 {add.isPending && (
-                    <span className="text-xs text-neutral-400 tabular-nums">
+                    <span className="text-xs text-muted-foreground tabular-nums">
                         {Math.round(progress * 100)}%
                     </span>
                 )}

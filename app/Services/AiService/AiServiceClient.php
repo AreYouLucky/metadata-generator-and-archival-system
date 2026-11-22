@@ -25,7 +25,10 @@ class AiServiceClient
      * Never throws: an unreachable or unhealthy service is reported in the result.
      * `gpu` / `gpu_name` describe the transcription worker's GPU, not the API's.
      *
-     * @return array{reachable: bool, status: string|null, version: string|null, gpu: bool|null, gpu_name: string|null, latency_ms: int|null, error: string|null}
+     * `transcription_provider` / `diarization_provider` say which providers
+     * hear the audio (local, openai, assemblyai, pyannote).
+     *
+     * @return array{reachable: bool, status: string|null, version: string|null, gpu: bool|null, gpu_name: string|null, transcription_provider: string|null, diarization_provider: string|null, latency_ms: int|null, error: string|null}
      */
     public function health(): array
     {
@@ -45,6 +48,8 @@ class AiServiceClient
             'version' => is_string($response->json('version')) ? $response->json('version') : null,
             'gpu' => is_bool($response->json('gpu')) ? $response->json('gpu') : null,
             'gpu_name' => is_string($response->json('gpu_name')) ? $response->json('gpu_name') : null,
+            'transcription_provider' => is_string($response->json('transcription_provider')) ? $response->json('transcription_provider') : null,
+            'diarization_provider' => is_string($response->json('diarization_provider')) ? $response->json('diarization_provider') : null,
             'latency_ms' => (int) round((hrtime(true) - $startedAt) / 1_000_000),
             'error' => null,
         ];
@@ -66,7 +71,7 @@ class AiServiceClient
      * Queue the processing pipeline for a record's master file. Returns the job id;
      * results arrive later on the signed /internal callbacks.
      *
-     * @param  array{record_id: string, record_file_id: string, video_path: string, options: array<string, mixed>}  $payload
+     * @param  array{record_id: string, record_file_id: string, video_path: string, options: array<string, mixed>, seed?: array<string, mixed>}  $payload
      *
      * @throws ConnectionException
      * @throws RequestException
@@ -74,6 +79,22 @@ class AiServiceClient
     public function process(array $payload): string
     {
         return (string) $this->send('POST', '/jobs/process', $payload)->throw()->json('job_id');
+    }
+
+    /**
+     * Download a web address into the record's master folder (yt-dlp).
+     * Returns the job id, which also cancels the download; progress arrives
+     * on /internal/records/{record}/progress (stage `import`) and the file
+     * on /internal/imports/{record}/done.
+     *
+     * @param  array{record_id: string, record_file_id: string, url: string, output_dir: string, max_bytes: int, max_duration_seconds: int}  $payload
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function importUrl(array $payload): string
+    {
+        return (string) $this->send('POST', '/import-url', $payload)->throw()->json('job_id');
     }
 
     /**
@@ -134,6 +155,41 @@ class AiServiceClient
     }
 
     /**
+     * One step of the chat tool loop (Phase 7): the model asks for tool calls
+     * or answers. The AI service never reads the database; the tools run here.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{type?: string, tool_calls?: list<array{id: string, name: string, arguments: array<string, mixed>}>, answer?: array{answer: string, grounded: bool, citations: list<array{start: float, end: float}>}|null, model?: string, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>}
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function chat(array $payload): array
+    {
+        /** @var array{type?: string, tool_calls?: list<array{id: string, name: string, arguments: array<string, mixed>}>, answer?: array{answer: string, grounded: bool, citations: list<array{start: float, end: float}>}|null, model?: string, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>} */
+        return $this->send('POST', '/chat', $payload, timeoutSeconds: 120)->throw()->json();
+    }
+
+    /**
+     * Embeddings for transcript passages or a chat question (Phase 7).
+     *
+     * @param  list<string>  $texts
+     * @return array{model?: string, dimensions?: int, vectors?: list<list<float>>, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>}
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function embed(array $texts, int $dimensions, ?string $recordId = null): array
+    {
+        /** @var array{model?: string, dimensions?: int, vectors?: list<list<float>>, usage?: list<array{kind: string, quantity: float, estimated_cost?: float|null}>} */
+        return $this->send('POST', '/embed', [
+            'record_id' => $recordId,
+            'texts' => $texts,
+            'dimensions' => $dimensions,
+        ], timeoutSeconds: 60)->throw()->json();
+    }
+
+    /**
      * One frame of the master saved as the record's thumbnail ("use current
      * frame"). Synchronous: a single frame takes about a second. Returns the
      * stored path (relative to the media root).
@@ -160,6 +216,21 @@ class AiServiceClient
     public function exportAudio(array $payload): string
     {
         return (string) $this->send('POST', '/jobs/export-audio', $payload)->throw()->json('job_id');
+    }
+
+    /**
+     * Cut a clip from the master (Phase 7): re-encoded to H.264/AAC MP4, then
+     * checksummed and probed. Returns the job id; the result arrives on
+     * /internal/records/{record}/clips/{clip}.
+     *
+     * @param  array{record_id: string, clip_id: int, video_path: string, start: float, end: float, output_path: string, max_height: int}  $payload
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function cutClip(array $payload): string
+    {
+        return (string) $this->send('POST', '/clips', $payload)->throw()->json('job_id');
     }
 
     /**
@@ -227,7 +298,7 @@ class AiServiceClient
     }
 
     /**
-     * @return array{reachable: false, status: null, version: null, gpu: null, gpu_name: null, latency_ms: null, error: string}
+     * @return array{reachable: false, status: null, version: null, gpu: null, gpu_name: null, transcription_provider: null, diarization_provider: null, latency_ms: null, error: string}
      */
     private function unreachable(string $error): array
     {
@@ -237,6 +308,8 @@ class AiServiceClient
             'version' => null,
             'gpu' => null,
             'gpu_name' => null,
+            'transcription_provider' => null,
+            'diarization_provider' => null,
             'latency_ms' => null,
             'error' => $error,
         ];

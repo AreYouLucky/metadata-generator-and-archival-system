@@ -137,7 +137,7 @@ export default function CreditRow({
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7 text-red-300 hover:text-red-200"
+                    className="size-7 text-red-700 hover:text-red-800"
                     disabled={disabled}
                     onClick={onRemove}
                     aria-label={`Remove ${contributor.name}`}

@@ -28,9 +28,9 @@ export default function EditorPanel({
             aria-label={title}
             className={cn('flex h-full min-h-0 flex-col', className)}
         >
-            <header className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3">
+            <header className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
                 {heading ?? (
-                    <h2 className="flex min-w-0 items-center gap-2 truncate text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
+                    <h2 className="flex min-w-0 items-center gap-2 truncate text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                         {icon}
                         {title}
                     </h2>

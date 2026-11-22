@@ -8,9 +8,17 @@ use App\Enums\ProcessingStatus;
 use App\Enums\StageStatus;
 use App\Jobs\StartProcessingJob;
 use App\Models\Record;
+use App\Models\RecordFile;
+use App\Models\RecordFrame;
+use App\Models\RecordSegment;
+use App\Models\RecordStage;
+use App\Models\RecordTranscript;
 use App\Models\User;
+use App\Services\Records\PipelineOptions;
 use App\Services\Records\PipelineRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -106,6 +114,74 @@ class RetryProcessingTest extends TestCase
             ->postJson(route('records.retry', $record), ['preset' => 'myspace'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('preset');
+    }
+
+    public function test_one_failed_stage_is_retried_with_the_stages_that_read_its_results(): void
+    {
+        Queue::fake([StartProcessingJob::class]);
+        $record = $this->processedRecord(failed: PipelineStage::Transcribe);
+
+        $this->actingAs($record->creator)
+            ->postJson(route('records.retry', $record), ['preset' => 'generic', 'diarization' => true, 'stage' => 'transcribe'])
+            ->assertAccepted()
+            ->assertJsonPath('stages', ['transcribe', 'diarize', 'generate_metadata']);
+
+        $statuses = $record->stages()->get()->mapWithKeys(fn (RecordStage $stage): array => [$stage->stage->value => $stage->status]);
+        $this->assertSame(StageStatus::Pending, $statuses['transcribe']);
+        $this->assertSame(StageStatus::Pending, $statuses['generate_metadata']);
+        $this->assertSame(StageStatus::Done, $statuses['probe']);
+        $this->assertSame(StageStatus::Done, $statuses['frames']);
+        // The other stages are done, so the record counts as processing again.
+        $this->assertSame(ProcessingStatus::Processing, $record->refresh()->processing_status);
+        $this->assertTrue($record->pipeline_options['diarization']);
+        Queue::assertPushed(StartProcessingJob::class, fn (StartProcessingJob $job): bool => $job->stages === [PipelineStage::Transcribe, PipelineStage::Diarize, PipelineStage::GenerateMetadata]
+            && $job->options->diarization);
+    }
+
+    public function test_a_stage_whose_input_is_missing_or_that_succeeded_cannot_be_retried_alone(): void
+    {
+        Queue::fake([StartProcessingJob::class]);
+        $record = $this->processedRecord(failed: PipelineStage::ExtractAudio);
+        $record->stages()->where('stage', PipelineStage::Transcribe)->update(['status' => StageStatus::Skipped]);
+        $this->actingAs($record->creator);
+
+        $this->postJson(route('records.retry', $record), ['preset' => 'generic', 'stage' => 'transcribe'])
+            ->assertConflict()->assertJsonPath('message', 'Retry the Audio extraction step first: Transcription needs its result.');
+        $this->postJson(route('records.retry', $record), ['preset' => 'generic', 'stage' => 'probe'])
+            ->assertConflict();
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_partial_run_sends_the_stored_results_the_rerun_stages_need(): void
+    {
+        Http::fake(['*/jobs/process' => Http::response(['job_id' => 'run-2'], 202)]);
+        $record = $this->processedRecord(failed: PipelineStage::GenerateMetadata);
+        $transcript = RecordTranscript::factory()->for($record)->create(['language' => 'fil']);
+        RecordSegment::factory()->for($transcript, 'transcript')->create(['position' => 1, 'start' => 1, 'end' => 2, 'text' => 'Magandang umaga.']);
+        RecordFrame::factory()->for($record)->create(['time_sec' => 3, 'description' => 'A podium', 'ocr_text' => 'WELCOME']);
+
+        StartProcessingJob::dispatchSync($record, new PipelineOptions, [PipelineStage::GenerateMetadata]);
+
+        Http::assertSent(fn (Request $request): bool => $request['options']['stages'] === ['generate_metadata']
+            && $request['seed']['language'] === 'fil'
+            && $request['seed']['segments'] == [['start' => 1, 'end' => 2, 'text' => 'Magandang umaga.']]
+            && $request['seed']['frames'][0]['ocr_text'] === 'WELCOME'
+            && ! array_key_exists('shots', $request['seed']));
+    }
+
+    /**
+     * A record that finished processing with one stage failed.
+     */
+    private function processedRecord(PipelineStage $failed): Record
+    {
+        $record = Record::factory()->create();
+        RecordFile::factory()->for($record)->create();
+        $record->stages()->createMany(array_map(fn (PipelineStage $stage): array => ['stage' => $stage, 'status' => StageStatus::Done, 'progress' => 100], PipelineStage::active()));
+        $record->stages()->where('stage', $failed)->update(['status' => StageStatus::Failed, 'message' => 'Broken.']);
+        app(PipelineRecorder::class)->refreshStatus($record);
+
+        return $record->refresh();
     }
 
     private function failedRecord(): Record

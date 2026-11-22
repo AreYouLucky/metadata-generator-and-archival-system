@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     replay_guard: Literal["redis", "memory"] = "memory"
 
     # Transcription
-    transcription_provider: Literal["local", "openai"] = "local"
+    transcription_provider: Literal["local", "openai", "assemblyai"] = "local"
     local_whisper_model: str = "large-v3-turbo"
     local_whisper_device: str = "cuda"
     local_whisper_compute_type: str = "int8_float16"
@@ -87,6 +87,40 @@ class Settings(BaseSettings):
     models_dir: str = "/srv/models"
     # On-screen content sent with the transcript to the metadata model, at most.
     visual_context_max_chars: int = Field(default=6000, ge=500, le=30000)
+
+    # AssemblyAI (Phase 6): optional hosted transcription and/or diarization. The audio is
+    # uploaded to AssemblyAI. Models in order of preference (their fallback list).
+    assemblyai_api_key: SecretStr = Field(default=SecretStr(""))
+    assemblyai_base_url: str = "https://api.assemblyai.com"
+    assemblyai_speech_models: str = "assemblyai-stt-3-7,universal-2"
+    assemblyai_poll_seconds: float = Field(default=5.0, ge=1, le=60)
+    # Give up waiting for a transcript after this long.
+    assemblyai_max_wait_seconds: int = Field(default=4 * 60 * 60, ge=60)
+
+    # Speaker diarization (Phase 6): pyannote on this machine (needs HF_TOKEN and the
+    # model's terms accepted on Hugging Face), or AssemblyAI. pyannote runs on the CPU by
+    # default so the 6 GB GPU stays with Whisper; "cuda" sends the stage to the GPU queue
+    # (needs a CUDA build of torch in the image).
+    diarization_provider: Literal["pyannote", "assemblyai"] = "pyannote"
+    diarization_model: str = "pyannote/speaker-diarization-community-1"
+    diarization_device: Literal["cpu", "cuda"] = "cpu"
+    hf_token: SecretStr = Field(default=SecretStr(""))
+
+    # URL import with yt-dlp (Phase 6). Only yt-dlp's site extractors are allowed: the
+    # generic one would fetch any address (direct file links), so it is off unless asked.
+    import_allow_generic: bool = False
+    import_max_height: int = Field(default=1080, ge=240, le=4320)
+    import_socket_timeout_seconds: float = Field(default=30.0, ge=5, le=300)
+
+    # Chat with the video (Phase 7). The model only calls the function tools Laravel lists
+    # and answers from their results; Laravel runs the tools (this service has no database).
+    llm_chat_model: str = "gpt-6.2-sol"
+    llm_chat_reasoning_effort: ReasoningEffort = "low"
+    llm_chat_max_output_tokens: int = Field(default=2000, ge=200, le=8000)
+    # Transcript passages for semantic search. The size is chosen by Laravel per request
+    # (EMBEDDING_DIMENSIONS), so both sides always agree.
+    embedding_provider: Literal["openai"] = "openai"
+    embedding_model: str = "text-embedding-3-small"
 
     openai_api_key: SecretStr = Field(default=SecretStr(""))
     openai_timeout_seconds: float = 180.0

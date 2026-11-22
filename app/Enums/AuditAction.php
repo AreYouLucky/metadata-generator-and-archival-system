@@ -26,4 +26,6 @@ enum AuditAction: string
     case ChecksumVerified = 'checksum_verified';
     case ChecksumFailed = 'checksum_failed';
     case Exported = 'exported';
+    // Sent to an outside platform (YouTube, Phase 7).
+    case Published = 'published';
 }

@@ -44,7 +44,7 @@ class ProcessingCanceller
             }
 
             $stopped = $record->stages()
-                ->whereIn('stage', PipelineStage::active())
+                ->whereIn('stage', PipelineStage::tracked())
                 ->whereIn('status', [StageStatus::Pending, StageStatus::Running])
                 ->update([
                     'status' => StageStatus::Cancelled,

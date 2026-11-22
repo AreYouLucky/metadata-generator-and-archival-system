@@ -29,6 +29,7 @@ class RecordStageResultController extends Controller
             PipelineStage::Checksum => $recorder->storeChecksum($record, $this->master($record), $request->checksumResult()),
             PipelineStage::Probe => $recorder->storeProbe($record, $this->master($record), $request->validated()),
             PipelineStage::Transcribe => $recorder->storeTranscript($record, $request->transcriptResult()),
+            PipelineStage::Diarize => $recorder->storeSpeakers($record, $request->speakersResult()),
             PipelineStage::GenerateMetadata => $recorder->storeMetadata($record, $request->metadataResult()),
             PipelineStage::Proxy => $recorder->storeProxy($record, $request->proxyResult()),
             PipelineStage::Scenes => $recorder->storeShots($record, $request->shotsResult()),

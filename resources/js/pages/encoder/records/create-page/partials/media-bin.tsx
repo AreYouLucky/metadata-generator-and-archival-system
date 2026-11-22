@@ -1,82 +1,95 @@
-import { Film, FolderOpen, Import } from 'lucide-react';
+import { FolderOpen, Import } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import EditorPanel from '@/components/encoder/editor-panel';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import type { LocalVideo } from '@/hooks/use-local-video';
-import { formatBytes, formatTimestamp } from '@/lib/utilities';
+import type { BinItem } from '@/hooks/use-import-media';
+import { formatBytes } from '@/lib/utilities';
 import { cn } from '@/lib/utils';
+import BinItemCard from './bin-item-card';
+import UrlImportForm from './url-import-form';
 
 const ACCEPT = 'video/*,.mxf,.mts,.m2ts';
 
 type Props = {
-    file: File | null;
-    video: LocalVideo;
-    onFile: (file: File) => void;
+    items: BinItem[];
+    selectedId: string | null;
+    /** Ids of items over the size or duration limit. */
+    invalidIds: Set<string>;
+    onAddFiles: (files: File[]) => void;
+    onAddUrl: (url: string) => void;
+    onSelect: (id: string) => void;
+    onRemove: (id: string) => void;
+    onMeasured: (id: string, duration: number | null) => void;
     disabled: boolean;
     maxUploadMb: number;
     maxVideoMinutes: number;
-    tooLarge: boolean;
-    tooLong: boolean;
+    maxBatchSize: number;
 };
 
 /**
- * The media bin: drop a video, paste it (Ctrl+V anywhere on the page) or
- * browse for it. The chosen clip shows as a thumbnail card. The server
- * re-checks the real file type after upload.
+ * The media bin: drop videos, paste them (Ctrl+V anywhere on the page),
+ * browse for them, or add web addresses. One clip makes one record; several
+ * make a batch. The server re-checks each file's real type after upload.
  */
 export default function MediaBin({
-    file,
-    video,
-    onFile,
+    items,
+    selectedId,
+    invalidIds,
+    onAddFiles,
+    onAddUrl,
+    onSelect,
+    onRemove,
+    onMeasured,
     disabled,
     maxUploadMb,
     maxVideoMinutes,
-    tooLarge,
-    tooLong,
+    maxBatchSize,
 }: Props) {
     const input = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
+    const full = items.length >= maxBatchSize;
+    const locked = disabled || full;
 
     useEffect(() => {
         const onPaste = (event: ClipboardEvent) => {
-            const pasted = Array.from(event.clipboardData?.files ?? []).find(
+            const pasted = Array.from(event.clipboardData?.files ?? []).filter(
                 isVideo,
             );
 
-            if (pasted && !disabled) {
+            if (pasted.length > 0 && !locked) {
                 event.preventDefault();
-                onFile(pasted);
+                onAddFiles(pasted);
             }
         };
 
         window.addEventListener('paste', onPaste);
 
         return () => window.removeEventListener('paste', onPaste);
-    }, [disabled, onFile]);
+    }, [locked, onAddFiles]);
 
     const onDrop = (event: DragEvent<HTMLDivElement>) => {
         event.preventDefault();
         setDragging(false);
 
-        const dropped = Array.from(event.dataTransfer.files).find(isVideo);
+        const dropped = Array.from(event.dataTransfer.files).filter(isVideo);
 
-        if (dropped && !disabled) {
-            onFile(dropped);
+        if (dropped.length > 0 && !locked) {
+            onAddFiles(dropped);
         }
     };
 
     return (
         <EditorPanel
-            title="Media bin"
+            title={`Media bin${items.length > 0 ? ` · ${items.length}` : ''}`}
             icon={<FolderOpen className="size-3.5" aria-hidden />}
             actions={
                 <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs"
-                    disabled={disabled}
+                    disabled={locked}
                     onClick={() => input.current?.click()}
                 >
                     <Import aria-hidden />
@@ -96,89 +109,73 @@ export default function MediaBin({
                     dragging && 'bg-brand/10 ring-2 ring-brand ring-inset',
                 )}
             >
-                {file ? (
-                    <figure
-                        className={cn(
-                            'overflow-hidden rounded-md bg-neutral-800 ring-1',
-                            tooLarge || tooLong
-                                ? 'ring-red-500/60'
-                                : 'ring-brand/60',
-                        )}
-                    >
-                        <div className="relative flex aspect-video items-center justify-center bg-black">
-                            {video.thumbnail ? (
-                                <img
-                                    src={video.thumbnail}
-                                    alt=""
-                                    className="h-full w-full object-cover"
-                                />
-                            ) : (
-                                <Film
-                                    className="size-8 text-neutral-600"
-                                    aria-hidden
-                                />
-                            )}
-                            {video.duration !== null && (
-                                <span className="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1 font-mono text-[10px] text-white">
-                                    {formatTimestamp(video.duration)}
-                                </span>
-                            )}
-                        </div>
-                        <figcaption className="space-y-0.5 p-2">
-                            <p className="truncate text-xs font-medium text-neutral-100">
-                                {file.name}
-                            </p>
-                            <p className="text-[11px] text-neutral-400">
-                                {formatBytes(file.size)}
-                                {file.type && ` · ${file.type}`}
-                            </p>
-                        </figcaption>
-                    </figure>
+                {items.length > 0 ? (
+                    <ul className="grid gap-1.5" aria-label="Clips to import">
+                        {items.map((item) => (
+                            <BinItemCard
+                                key={item.id}
+                                item={item}
+                                selected={item.id === selectedId}
+                                invalid={invalidIds.has(item.id)}
+                                disabled={disabled}
+                                onSelect={() => onSelect(item.id)}
+                                onRemove={() => onRemove(item.id)}
+                                onMeasured={(duration) =>
+                                    onMeasured(item.id, duration)
+                                }
+                            />
+                        ))}
+                    </ul>
                 ) : (
                     <button
                         type="button"
-                        disabled={disabled}
+                        disabled={locked}
                         onClick={() => input.current?.click()}
-                        className="flex flex-1 flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-white/15 p-6 text-center text-neutral-400 hover:border-brand/60 hover:text-neutral-200 focus-visible:border-brand focus-visible:outline-none"
+                        className="flex min-h-40 flex-1 flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border p-6 text-center text-muted-foreground hover:border-brand/60 hover:text-foreground focus-visible:border-brand focus-visible:outline-none"
                     >
                         <Import className="size-8" aria-hidden />
                         <span className="text-sm font-medium">
-                            Drop a video here
+                            Drop videos here
                         </span>
                         <span className="text-xs">
-                            or paste it, or click to browse
+                            or paste them, or click to browse
                         </span>
                     </button>
                 )}
 
-                {tooLarge && (
+                {invalidIds.size > 0 && (
                     <InputError
-                        message={`This file is larger than the ${maxUploadMb} MB limit.`}
+                        message={`Red clips are over the ${maxUploadMb} MB or ${maxVideoMinutes}-minute limit. Remove them to continue.`}
                     />
                 )}
-                {tooLong && (
-                    <InputError
-                        message={`This video is longer than the ${maxVideoMinutes}-minute limit.`}
-                    />
+                {full && (
+                    <p className="text-xs text-amber-700">
+                        A batch holds at most {maxBatchSize} videos.
+                    </p>
                 )}
-                <p className="mt-auto text-[11px] text-neutral-500">
+
+                <UrlImportForm disabled={locked} onAdd={onAddUrl} />
+
+                <p className="mt-auto text-[11px] text-muted-foreground">
                     MP4, MOV, MXF, MKV, WebM and other common formats. Up to{' '}
                     {formatBytes(maxUploadMb * 1024 * 1024)} and{' '}
-                    {maxVideoMinutes} minutes. One clip per record.
+                    {maxVideoMinutes} minutes each. One clip makes a record;
+                    several make a batch of up to {maxBatchSize}.
                 </p>
             </div>
             <input
                 ref={input}
                 type="file"
                 accept={ACCEPT}
+                multiple
                 className="sr-only"
                 tabIndex={-1}
-                aria-label="Video file"
+                aria-label="Video files"
                 onChange={(event) => {
-                    const chosen = event.target.files?.[0];
+                    const chosen = Array.from(event.target.files ?? []);
 
-                    if (chosen) {
-                        onFile(chosen);
+                    if (chosen.length > 0) {
+                        onAddFiles(chosen);
                     }
 
                     event.target.value = '';

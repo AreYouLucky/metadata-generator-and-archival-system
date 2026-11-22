@@ -1,6 +1,8 @@
 import { Head } from '@inertiajs/react';
 import { useCallback, useRef, useState } from 'react';
 import RecordGrid from '@/components/user/record-grid';
+import { useAskMePage } from '@/hooks/use-ask-me-page';
+import { useStartTime } from '@/hooks/use-start-time';
 import { formatDate, languageName } from '@/lib/utilities';
 import { captions as captionsRoute } from '@/routes/catalogue';
 import type {
@@ -38,6 +40,7 @@ export default function Watch({
     mediaUrl,
 }: Props) {
     const video = useRef<HTMLVideoElement>(null);
+    const [player, setPlayer] = useState<HTMLVideoElement | null>(null);
     const [currentTime, setCurrentTime] = useState(0);
 
     const seek = useCallback((seconds: number) => {
@@ -49,6 +52,10 @@ export default function Watch({
         void video.current.play().catch(() => undefined);
     }, []);
 
+    // "Ask me": this record is the chat's "this video"; ?t= opens a cited moment.
+    useAskMePage(record.id, seek);
+    useStartTime(player);
+
     return (
         <>
             <Head title={record.title} />
@@ -57,7 +64,10 @@ export default function Watch({
                     <div className="grid content-start gap-4">
                         <div className="overflow-hidden rounded-xl bg-black">
                             <video
-                                ref={video}
+                                ref={(element) => {
+                                    video.current = element;
+                                    setPlayer(element);
+                                }}
                                 src={mediaUrl}
                                 poster={record.thumbnail ?? undefined}
                                 controls

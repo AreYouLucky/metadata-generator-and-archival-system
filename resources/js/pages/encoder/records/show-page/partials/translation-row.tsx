@@ -62,11 +62,11 @@ export default function TranslationRow({
     }[translation.status];
 
     return (
-        <li className="grid gap-2 rounded-lg border border-white/10 p-3">
+        <li className="grid gap-2 rounded-lg border border-border p-3">
             <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{name}</p>
-                    <p className="text-xs text-neutral-500">{status}</p>
+                    <p className="text-xs text-muted-foreground">{status}</p>
                 </div>
 
                 {busy && <Spinner />}
@@ -162,7 +162,7 @@ export default function TranslationRow({
 
             {translation.status === 'processing' && (
                 <div
-                    className="h-1 overflow-hidden rounded-full bg-white/10"
+                    className="h-1 overflow-hidden rounded-full bg-muted"
                     role="progressbar"
                     aria-valuenow={translation.progress}
                     aria-valuemin={0}
@@ -177,7 +177,7 @@ export default function TranslationRow({
             )}
 
             {translation.status === 'failed' && translation.error && (
-                <p className="text-xs text-red-300">{translation.error}</p>
+                <p className="text-xs text-red-700">{translation.error}</p>
             )}
         </li>
     );

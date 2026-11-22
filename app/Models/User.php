@@ -10,11 +10,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * @property int $id
@@ -23,6 +25,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property UserRole $role
  * @property bool $is_active
  * @property int|null $daily_processing_minutes_limit
+ * @property string|null $webhook_secret
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -33,11 +36,11 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $updated_at
  */
 #[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'webhook_secret'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
      * Defaults mirrored from the migration. `role` and `is_active` are deliberately
@@ -64,6 +67,8 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'daily_processing_minutes_limit' => 'integer',
+            // Signs public-API webhooks (Phase 7); set explicitly, never mass-assigned.
+            'webhook_secret' => 'encrypted',
         ];
     }
 
@@ -98,5 +103,15 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function exportSchemas(): HasMany
     {
         return $this->hasMany(ExportSchema::class);
+    }
+
+    /**
+     * The YouTube channel this user connected (Phase 7).
+     *
+     * @return HasOne<YoutubeAccount, $this>
+     */
+    public function youtubeAccount(): HasOne
+    {
+        return $this->hasOne(YoutubeAccount::class);
     }
 }

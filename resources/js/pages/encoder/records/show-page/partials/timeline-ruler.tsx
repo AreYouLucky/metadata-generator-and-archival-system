@@ -41,7 +41,7 @@ export default function TimelineRuler({
 
     return (
         <div
-            className="relative h-7 cursor-ew-resize touch-none border-b border-white/10 bg-neutral-950/60 select-none"
+            className="relative h-7 cursor-ew-resize touch-none border-b border-border bg-background/60 select-none"
             onPointerDown={(event) => {
                 event.currentTarget.setPointerCapture(event.pointerId);
                 scrub(event);
@@ -71,7 +71,7 @@ export default function TimelineRuler({
                             }
                         />
                         {major && (
-                            <span className="absolute bottom-3 left-1 font-mono text-[10px] whitespace-nowrap text-neutral-400">
+                            <span className="absolute bottom-3 left-1 font-mono text-[10px] whitespace-nowrap text-muted-foreground">
                                 {formatTimestamp(time)}
                             </span>
                         )}

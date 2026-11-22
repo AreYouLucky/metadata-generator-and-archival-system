@@ -45,9 +45,11 @@ export default function CreditAddForm({ roles, disabled, onAdd }: Props) {
     return (
         <form
             onSubmit={submit}
-            className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-2"
+            className="space-y-2 rounded-lg border border-border bg-white/[0.02] p-2"
         >
-            <p className="text-xs font-medium text-neutral-400">Add a credit</p>
+            <p className="text-xs font-medium text-muted-foreground">
+                Add a credit
+            </p>
             <div className="flex items-center gap-1.5">
                 <Select
                     value={role}

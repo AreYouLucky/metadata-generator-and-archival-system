@@ -8,10 +8,14 @@
 
 use App\Http\Controllers\Encoder\AgencyController;
 use App\Http\Controllers\Encoder\AgencyOptionsController;
+use App\Http\Controllers\Encoder\ApiTokenController;
 use App\Http\Controllers\Encoder\AttachmentController;
 use App\Http\Controllers\Encoder\AudioExportController;
+use App\Http\Controllers\Encoder\BatchController;
+use App\Http\Controllers\Encoder\BatchZipController;
 use App\Http\Controllers\Encoder\CancelProcessingController;
 use App\Http\Controllers\Encoder\CaptionController;
+use App\Http\Controllers\Encoder\ClipController;
 use App\Http\Controllers\Encoder\ConfirmSuggestionsController;
 use App\Http\Controllers\Encoder\ContributorController;
 use App\Http\Controllers\Encoder\DescriptiveSuggestionController;
@@ -43,6 +47,8 @@ use App\Http\Controllers\Encoder\TitleController;
 use App\Http\Controllers\Encoder\TranslationController;
 use App\Http\Controllers\Encoder\UploadController;
 use App\Http\Controllers\Encoder\WorkController;
+use App\Http\Controllers\Encoder\YouTubeConnectionController;
+use App\Http\Controllers\Encoder\YouTubePublicationController;
 use Illuminate\Support\Facades\Route;
 
 // `catalogue.refresh` clears the public catalogue cache after an admin edits an
@@ -57,6 +63,12 @@ Route::middleware(['auth', 'verified', 'role:encoder,admin', 'catalogue.refresh'
         Route::get('{upload}', [UploadController::class, 'show'])->whereUuid('upload')->name('show');
         Route::post('{upload}/chunks', [UploadController::class, 'chunk'])->whereUuid('upload')->name('chunk');
     });
+
+    // Batches (Phase 6): many files or web addresses at once, and a ZIP of their exports.
+    Route::post('batches', [BatchController::class, 'store'])->middleware('throttle:ai')->name('batches.store');
+    Route::get('batches/{batch}', [BatchController::class, 'show'])->name('batches.show');
+    Route::post('batches/{batch}/zip', [BatchZipController::class, 'store'])->middleware('throttle:6,1')->name('batches.zip.store');
+    Route::get('batches/{batch}/download', [BatchZipController::class, 'show'])->name('batches.download');
 
     Route::get('records/{record}', [RecordController::class, 'show'])->name('records.show');
     Route::patch('records/{record}', [RecordController::class, 'update'])->middleware('throttle:60,1')->name('records.update');
@@ -122,6 +134,27 @@ Route::middleware(['auth', 'verified', 'role:encoder,admin', 'catalogue.refresh'
     Route::post('records/{record}/translations', [TranslationController::class, 'store'])->middleware('throttle:ai')->name('records.translations.store');
     Route::get('records/{record}/translations/{language}', [TranslationController::class, 'show'])->name('records.translations.show');
     Route::get('records/{record}/captions/{language}', CaptionController::class)->name('records.captions');
+
+    // Clips (Phase 7): cut in the background by the AI service, then downloaded.
+    Route::post('records/{record}/clips', [ClipController::class, 'store'])->middleware('throttle:20,1')->name('records.clips.store');
+    Route::get('records/{record}/clips/{clip}', [ClipController::class, 'show'])->scopeBindings()->name('records.clips.show');
+    Route::delete('records/{record}/clips/{clip}', [ClipController::class, 'destroy'])->middleware('throttle:60,1')->scopeBindings()->name('records.clips.destroy');
+
+    // YouTube (Phase 7): publish in the background to the user's own channel. Each
+    // upload costs a large share of the daily YouTube API quota, hence the low limit.
+    Route::post('records/{record}/youtube', [YouTubePublicationController::class, 'store'])->middleware('throttle:youtube')->name('records.youtube.store');
+    Route::post('records/{record}/youtube/{youtubePublication}/status', [YouTubePublicationController::class, 'status'])->middleware('throttle:6,1')->scopeBindings()->name('records.youtube.status');
+
+    Route::get('settings/youtube', [YouTubeConnectionController::class, 'index'])->name('youtube.index');
+    Route::get('settings/youtube/connect', [YouTubeConnectionController::class, 'redirect'])->middleware('throttle:10,1')->name('youtube.connect');
+    Route::get('settings/youtube/callback', [YouTubeConnectionController::class, 'callback'])->middleware('throttle:10,1')->name('youtube.callback');
+    Route::delete('settings/youtube', [YouTubeConnectionController::class, 'destroy'])->middleware('throttle:10,1')->name('youtube.destroy');
+
+    // Public API tokens (Phase 7) and the secret that signs API webhooks.
+    Route::get('settings/api-tokens', [ApiTokenController::class, 'index'])->name('api-tokens.index');
+    Route::post('settings/api-tokens', [ApiTokenController::class, 'store'])->middleware('throttle:10,1')->name('api-tokens.store');
+    Route::delete('settings/api-tokens/{token}', [ApiTokenController::class, 'destroy'])->whereNumber('token')->middleware('throttle:30,1')->name('api-tokens.destroy');
+    Route::post('settings/api-tokens/webhook-secret', [ApiTokenController::class, 'webhookSecret'])->middleware('throttle:6,1')->name('api-tokens.webhook-secret');
 
     Route::get('settings/export-schemas', [ExportSchemaController::class, 'index'])->name('export-schemas.index');
     Route::post('settings/export-schemas', [ExportSchemaController::class, 'store'])->middleware('throttle:30,1')->name('export-schemas.store');

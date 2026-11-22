@@ -1,3 +1,7 @@
+# Deno runs the JavaScript yt-dlp needs for YouTube (yt-dlp-ejs; 2.3.0 or newer).
+ARG DENO_VERSION=2.5.6
+FROM denoland/deno:bin-${DENO_VERSION} AS deno
+
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -23,6 +27,11 @@ ARG LOCAL_WHISPER=true
 # several GB of CUDA libraries); the GPU stays with Whisper. --build-arg VISION=false
 # builds without them, and the visual stages then fail with a clear message.
 ARG VISION=true
+# Speaker identification (pyannote, Phase 6) on the same CPU build of torch, and URL
+# import (yt-dlp, Phase 6). --build-arg DIARIZATION=false / IMPORT=false leave them
+# out; those stages then fail with a clear message.
+ARG DIARIZATION=true
+ARG IMPORT=true
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 
 # Dependencies first, against a stub package, so code changes don't
@@ -33,10 +42,12 @@ COPY pyproject.toml ./
 RUN mkdir -p app && touch app/__init__.py \
     && extras="dev" \
     && if [ "$LOCAL_WHISPER" = "true" ]; then extras="$extras,local"; fi \
-    && if [ "$VISION" = "true" ]; then \
-        pip install torch torchvision --index-url "$TORCH_INDEX_URL" \
-        && extras="$extras,vision"; \
+    && if [ "$VISION" = "true" ] || [ "$DIARIZATION" = "true" ]; then \
+        pip install torch torchvision torchaudio --index-url "$TORCH_INDEX_URL"; \
     fi \
+    && if [ "$VISION" = "true" ]; then extras="$extras,vision"; fi \
+    && if [ "$DIARIZATION" = "true" ]; then extras="$extras,diarization"; fi \
+    && if [ "$IMPORT" = "true" ]; then extras="$extras,import"; fi \
     && pip install ".[$extras]" \
     && if [ "$VISION" = "true" ]; then \
         version="$(python -c 'import importlib.metadata as m; print(m.version("opencv-python-headless"))')" \
@@ -44,6 +55,7 @@ RUN mkdir -p app && touch app/__init__.py \
         && pip install --force-reinstall --no-deps "opencv-python-headless==$version"; \
     fi \
     && rm -rf app build *.egg-info
+COPY --from=deno /deno /usr/local/bin/deno
 COPY app ./app
 
 # CTranslate2 loads cuBLAS and cuDNN from the pip wheels (faster-whisper README).

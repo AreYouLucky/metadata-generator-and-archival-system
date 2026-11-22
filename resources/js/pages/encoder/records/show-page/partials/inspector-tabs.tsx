@@ -13,7 +13,9 @@ const ORDER: InspectorTab[] = [
     'chapters',
     'credits',
     'translations',
+    'clips',
     'export',
+    'publish',
 ];
 
 /**

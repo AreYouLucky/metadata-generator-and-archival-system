@@ -159,3 +159,53 @@ def test_progress_stops_a_long_stage_once_its_run_is_cancelled() -> None:
     with pytest.raises(cancellation.PipelineCancelled):
         progress(20)
     assert ticks == [10]
+
+
+def partial(stages_to_run: list[str], **seed: Any) -> dict[str, Any]:
+    """A retry of one stage: only `stages_to_run` run; the seed holds stored results."""
+    data = context()
+    data["request"]["options"]["stages"] = stages_to_run
+    data["request"]["seed"] = seed
+    return data
+
+
+def test_a_stage_left_out_of_a_partial_run_restores_its_results_silently(
+    reported: list[tuple[str, ...]],
+) -> None:
+    seed_segments = [{"start": 0.0, "end": 2.0, "text": "Hello."}]
+
+    out = tasks.run_stage(
+        "transcribe",
+        partial(["generate_metadata"], segments=seed_segments, language="en"),
+        lambda ctx, progress: pytest.fail("ran"),
+    )
+
+    assert reported == []
+    assert out["segments"] == seed_segments
+    assert out["language"] == "en"
+
+
+def test_a_stage_in_a_partial_run_runs_and_reports(reported: list[tuple[str, ...]]) -> None:
+    tasks.run_stage("generate_metadata", partial(["generate_metadata"]), lambda c, p: {"ok": 1})
+
+    assert reported == [
+        ("progress", "generate_metadata", "running", ""),
+        ("result", "generate_metadata"),
+    ]
+
+
+def test_a_restore_that_fails_skips_the_stages_that_needed_it(
+    reported: list[tuple[str, ...]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(stage: str, ctx: PipelineContext) -> None:
+        raise ProbeError("gone")
+
+    monkeypatch.setattr(tasks.stages, "restore", broken)
+
+    out = tasks.run_stage("probe", partial(["extract_audio"]), lambda c, p: pytest.fail("ran"))
+    tasks.run_stage("extract_audio", out, lambda c, p: pytest.fail("ran"))
+
+    assert out["failed"] == ["probe"]
+    assert reported == [
+        ("progress", "extract_audio", "skipped", "Skipped because the probe step did not finish.")
+    ]

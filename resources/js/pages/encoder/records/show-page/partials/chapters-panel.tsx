@@ -46,7 +46,7 @@ export default function ChaptersPanel({
                             onChange={setChapters}
                         />
                         {canEdit && (
-                            <p className="text-xs text-neutral-500">
+                            <p className="text-xs text-muted-foreground">
                                 Tip: double-click the chapters track on the
                                 timeline to add one there, and drag a chapter to
                                 move it.

@@ -48,17 +48,17 @@ export default function AttachmentList({
                     {attachments.map((attachment) => (
                         <li
                             key={attachment.id}
-                            className="flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-2 text-sm"
+                            className="flex items-center gap-2 rounded-md bg-muted/60 px-2.5 py-2 text-sm"
                         >
                             <FileText
-                                className="size-4 shrink-0 text-neutral-400"
+                                className="size-4 shrink-0 text-muted-foreground"
                                 aria-hidden
                             />
                             <div className="min-w-0 flex-1">
                                 <p className="wrap-anywhere">
                                     {attachment.original_filename}
                                 </p>
-                                <p className="text-xs wrap-anywhere text-neutral-500">
+                                <p className="text-xs wrap-anywhere text-muted-foreground">
                                     {formatEnumLabel(attachment.kind)} ·{' '}
                                     {formatBytes(attachment.file_size)}
                                     {attachment.description &&
@@ -85,7 +85,7 @@ export default function AttachmentList({
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="size-7 text-red-300"
+                                    className="size-7 text-red-700"
                                     aria-label={`Delete ${attachment.original_filename}`}
                                     onClick={() => {
                                         if (
@@ -107,13 +107,13 @@ export default function AttachmentList({
                 </ul>
             )}
             {canEdit && (
-                <div className="grid gap-2 rounded-lg bg-white/5 p-3">
+                <div className="grid gap-2 rounded-lg bg-muted/60 p-3">
                     <input
                         ref={input}
                         type="file"
                         aria-label="Attachment"
                         accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.csv,.xml,.json,.srt,.vtt,.doc,.docx,.xls,.xlsx,.odt,.ods"
-                        className="w-full min-w-0 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-foreground"
+                        className="w-full min-w-0 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:text-foreground"
                         onChange={(event) =>
                             setFile(event.target.files?.[0] ?? null)
                         }
@@ -166,7 +166,7 @@ export default function AttachmentList({
                             <Upload aria-hidden />
                         </Button>
                     </div>
-                    <p className="text-xs wrap-anywhere text-neutral-500">
+                    <p className="text-xs wrap-anywhere text-muted-foreground">
                         PDF, images, documents, subtitles or sidecars, up to{' '}
                         {maxMb} MB. Stored privately.
                     </p>

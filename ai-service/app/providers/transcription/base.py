@@ -2,9 +2,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.schemas.common import TranscriptSegment, Usage
+from app.schemas.common import SpeakerTurn, TranscriptSegment, Usage
 
 
 class TranscriptionResult(BaseModel):
@@ -15,6 +15,9 @@ class TranscriptionResult(BaseModel):
     duration: float
     segments: list[TranscriptSegment]
     usage: list[Usage]
+    # Speakers, when the provider labels them itself (AssemblyAI). Kept in the pipeline
+    # context for the diarize stage, not sent with the transcript.
+    speaker_turns: list[SpeakerTurn] = Field(default=[], exclude=True)
 
 
 class TranscriptionProvider(Protocol):

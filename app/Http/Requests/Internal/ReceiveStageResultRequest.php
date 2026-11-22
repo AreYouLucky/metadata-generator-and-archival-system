@@ -32,6 +32,11 @@ class ReceiveStageResultRequest extends FormRequest
 
     public const int MAX_FRAMES = 200;
 
+    /**
+     * Speaker turns from diarization (about one per sentence at most).
+     */
+    public const int MAX_TURNS = 50000;
+
     public function authorize(): bool
     {
         return true;
@@ -62,6 +67,15 @@ class ReceiveStageResultRequest extends FormRequest
                 'segments.*.start' => ['required', 'numeric', 'min:0'],
                 'segments.*.end' => ['required', 'numeric', 'min:0'],
                 'segments.*.text' => ['required', 'string', 'max:5000'],
+                ...$this->usageRules(),
+            ],
+            PipelineStage::Diarize => [
+                'provider' => ['required', 'string', 'max:32'],
+                'model' => ['nullable', 'string', 'max:255'],
+                'turns' => ['present', 'array', 'max:'.self::MAX_TURNS],
+                'turns.*.start' => ['required', 'numeric', 'min:0'],
+                'turns.*.end' => ['required', 'numeric', 'min:0'],
+                'turns.*.speaker' => ['required', 'string', 'max:32'],
                 ...$this->usageRules(),
             ],
             PipelineStage::Proxy => [
@@ -234,6 +248,26 @@ class ReceiveStageResultRequest extends FormRequest
                 'end' => (float) $segment['end'],
                 'text' => $segment['text'],
             ], $segments)),
+            'usage' => $this->usage(),
+        ];
+    }
+
+    /**
+     * Speaker turns from the `diarize` stage (end never before start).
+     *
+     * @return array{turns: list<array{start: float, end: float, speaker: string}>, usage: list<array{kind: string, quantity: float, estimated_cost: float|null}>}
+     */
+    public function speakersResult(): array
+    {
+        /** @var array<int, array{start: float|int|string, end: float|int|string, speaker: string}> $turns */
+        $turns = $this->validated('turns');
+
+        return [
+            'turns' => array_values(array_map(fn (array $turn): array => [
+                'start' => (float) $turn['start'],
+                'end' => max((float) $turn['start'], (float) $turn['end']),
+                'speaker' => $turn['speaker'],
+            ], $turns)),
             'usage' => $this->usage(),
         ];
     }

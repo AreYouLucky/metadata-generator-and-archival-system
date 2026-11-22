@@ -23,7 +23,7 @@ export default function FixityHistory({ recordId, entries }: Props) {
     const run = useRunFixity(recordId);
 
     return (
-        <section className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
+        <section className="grid grid-cols-1 gap-2 border-t border-border pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-medium">Fixity checks</h3>
                 <Button
@@ -69,14 +69,14 @@ export default function FixityHistory({ recordId, entries }: Props) {
                                     aria-label="Did not match"
                                 />
                             )}
-                            <span className="text-neutral-300">
+                            <span className="text-foreground/80">
                                 {formatEnumLabel(entry.role ?? 'file')} ·{' '}
                                 {entry.algorithm.toUpperCase()}
                             </span>
-                            <span className="text-neutral-500">
+                            <span className="text-muted-foreground">
                                 {formatEnumLabel(entry.triggered_by)}
                             </span>
-                            <span className="ml-auto text-neutral-500 tabular-nums">
+                            <span className="ml-auto text-muted-foreground tabular-nums">
                                 {formatDateTime(entry.checked_at)}
                             </span>
                         </li>
