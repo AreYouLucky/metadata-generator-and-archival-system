@@ -14,6 +14,13 @@ import {
 import { UserInfo } from '@/components/user-info';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useIsMobile } from '@/hooks/use-mobile';
+import type { UserRole } from '@/types';
+
+const roleLabels: Record<UserRole, string> = {
+    admin: 'Admin',
+    encoder: 'Encoder',
+    user: 'Viewer',
+};
 
 export function NavUser() {
     const { auth } = usePage().props;
@@ -31,11 +38,14 @@ export function NavUser() {
                     <DropdownMenuTrigger asChild>
                         <SidebarMenuButton
                             size="lg"
-                            className="group text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent"
+                            className="group text-sidebar-foreground data-[state=open]:bg-sidebar-accent"
                             data-test="sidebar-menu-button"
                         >
-                            <UserInfo user={auth.user} />
-                            <ChevronsUpDown className="ml-auto size-4" />
+                            <UserInfo
+                                user={auth.user}
+                                caption={roleLabels[auth.user.role]}
+                            />
+                            <ChevronsUpDown className="ml-auto size-4 opacity-70" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent

@@ -1,13 +1,13 @@
-import { Link, router, usePage } from '@inertiajs/react';
-import { Search } from 'lucide-react';
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import BrandLogo from '@/components/all/brand-logo';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { dashboard, login, logout, register } from '@/routes';
-import { browse, home } from '@/routes/catalogue';
-import { edit as profile } from '@/routes/profile';
+import { Link, router, usePage } from "@inertiajs/react";
+import { Search } from "lucide-react";
+import { useState } from "react";
+import type { FormEvent } from "react";
+import BrandLogo from "@/components/all/brand-logo";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { dashboard, login, logout, register } from "@/routes";
+import { browse, home } from "@/routes/catalogue";
+import { edit as profile } from "@/routes/profile";
 
 /**
  * The public catalogue's header: name, browse, a search box (to /browse?q=),
@@ -15,9 +15,9 @@ import { edit as profile } from '@/routes/profile';
  */
 export default function CatalogueHeader() {
     const { auth, name, canRegister } = usePage().props;
-    const [query, setQuery] = useState('');
+    const [query, setQuery] = useState("");
     const isStaff =
-        auth.user?.role === 'admin' || auth.user?.role === 'encoder';
+        auth.user?.role === "admin" || auth.user?.role === "encoder";
 
     const search = (event: FormEvent) => {
         event.preventDefault();
@@ -26,7 +26,7 @@ export default function CatalogueHeader() {
 
     return (
         <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-xl">
-            <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
+            <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-10 2xl:px-14">
                 <Link
                     href={home()}
                     className="flex min-w-0 items-center gap-2.5 font-semibold"
@@ -52,7 +52,7 @@ export default function CatalogueHeader() {
                 <form
                     onSubmit={search}
                     role="search"
-                    className="relative ml-auto w-full max-w-xs"
+                    className="relative ml-auto w-full max-w-xs 2xl:max-w-md"
                 >
                     <Search
                         className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -79,7 +79,7 @@ export default function CatalogueHeader() {
                                 asChild
                             >
                                 <Link href={isStaff ? dashboard() : profile()}>
-                                    {isStaff ? 'Workspace' : 'Account'}
+                                    {isStaff ? "Workspace" : "Account"}
                                 </Link>
                             </Button>
                             <Button variant="ghost" size="sm" asChild>

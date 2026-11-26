@@ -73,7 +73,7 @@ export default function Project({
                             {project.agency && <span>{project.agency}</span>}
                         </p>
                         {project.description && (
-                            <p className="max-w-3xl whitespace-pre-line">
+                            <p className="max-w-3xl text-justify hyphens-auto whitespace-pre-line">
                                 {project.description}
                             </p>
                         )}

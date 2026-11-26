@@ -1,14 +1,13 @@
-import { Form, Head } from '@inertiajs/react';
-import { Info } from 'lucide-react';
-import InputError from '@/components/input-error';
-import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
-import { login } from '@/routes';
-import { store } from '@/routes/register';
+import { Form, Head } from "@inertiajs/react";
+import InputError from "@/components/input-error";
+import PasswordInput from "@/components/password-input";
+import TextLink from "@/components/text-link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
+import { login } from "@/routes";
+import { store } from "@/routes/register";
 
 type Props = {
     passwordRules: string;
@@ -20,7 +19,7 @@ export default function Register({ passwordRules }: Props) {
             <Head title="Create account" />
             <Form
                 {...store.form()}
-                resetOnSuccess={['password', 'password_confirmation']}
+                resetOnSuccess={["password", "password_confirmation"]}
                 disableWhileProcessing
                 className="flex flex-col gap-6"
             >
@@ -58,51 +57,46 @@ export default function Register({ passwordRules }: Props) {
                                 <InputError message={errors.email} />
                             </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="password">Password</Label>
-                                <PasswordInput
-                                    className="h-11 pl-3.5 md:text-base"
-                                    id="password"
-                                    required
-                                    tabIndex={3}
-                                    autoComplete="new-password"
-                                    name="password"
-                                    placeholder="Choose a password"
-                                    passwordrules={passwordRules}
-                                />
-                                <InputError message={errors.password} />
-                            </div>
+                            <div className="grid gap-5">
+                                <div className="grid content-start gap-2">
+                                    <Label htmlFor="password">Password</Label>
+                                    <PasswordInput
+                                        className="h-11 pl-3.5 md:text-base"
+                                        id="password"
+                                        required
+                                        tabIndex={3}
+                                        autoComplete="new-password"
+                                        name="password"
+                                        placeholder="Choose a password"
+                                        passwordrules={passwordRules}
+                                    />
+                                    <InputError message={errors.password} />
+                                </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="password_confirmation">
-                                    Confirm password
-                                </Label>
-                                <PasswordInput
-                                    className="h-11 pl-3.5 md:text-base"
-                                    id="password_confirmation"
-                                    required
-                                    tabIndex={4}
-                                    autoComplete="new-password"
-                                    name="password_confirmation"
-                                    placeholder="Type it again"
-                                    passwordrules={passwordRules}
-                                />
-                                <InputError
-                                    message={errors.password_confirmation}
-                                />
+                                <div className="grid content-start gap-2">
+                                    <Label htmlFor="password_confirmation">
+                                        Confirm password
+                                    </Label>
+                                    <PasswordInput
+                                        className="h-11 pl-3.5 md:text-base"
+                                        id="password_confirmation"
+                                        required
+                                        tabIndex={4}
+                                        autoComplete="new-password"
+                                        name="password_confirmation"
+                                        placeholder="Type it again"
+                                        passwordrules={passwordRules}
+                                    />
+                                    <InputError
+                                        message={errors.password_confirmation}
+                                    />
+                                </div>
                             </div>
-
-                            <p className="flex gap-2.5 rounded-lg bg-muted px-3 py-2.5 text-xs text-muted-foreground">
-                                <Info className="mt-px size-4 shrink-0" />
-                                This creates a viewer account for browsing the
-                                public catalogue. Encoder and admin accounts are
-                                set up by an administrator.
-                            </p>
 
                             <Button
                                 type="submit"
                                 size="lg"
-                                className="h-11 w-full text-base"
+                                className="mt-1 h-11 w-full text-base"
                                 tabIndex={5}
                                 data-test="register-user-button"
                             >
@@ -112,7 +106,7 @@ export default function Register({ passwordRules }: Props) {
                         </div>
 
                         <p className="text-center text-sm text-muted-foreground">
-                            Already have an account?{' '}
+                            Already have an account?{" "}
                             <TextLink href={login()} tabIndex={6}>
                                 Log in
                             </TextLink>
@@ -125,6 +119,7 @@ export default function Register({ passwordRules }: Props) {
 }
 
 Register.layout = {
-    title: 'Create your account',
-    description: 'Sign up to browse the published recordings.',
+    title: "Create your account",
+    description: "A free account to browse published recordings.",
+    clip: "birthday",
 };

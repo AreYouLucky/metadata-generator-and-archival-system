@@ -3,32 +3,45 @@ import {
     FileLock2,
     Fingerprint,
     History,
+    Layers,
     Loader2,
     Scale,
+    Timer,
 } from 'lucide-react';
+import FoldHeading from './fold-heading';
 import Reveal from './reveal';
 import WelcomeFold from './welcome-fold';
 
 const FEATURES = [
     {
         icon: Fingerprint,
-        title: 'Fixity checks',
-        text: 'MD5 and SHA-256 checksums are recorded on upload and re-checked on a schedule.',
+        title: 'Fixity you can prove',
+        text: 'MD5 and SHA-256 recorded at upload and re-verified on a schedule.',
+    },
+    {
+        icon: Layers,
+        title: 'Versions kept together',
+        text: 'Master, mezzanine and proxy copies, multi-reel works and sidecar files.',
     },
     {
         icon: Scale,
         title: 'Rights and embargoes',
-        text: 'Copyright, licence, release consent and embargo dates travel with each record.',
+        text: 'Copyright, licence, release forms and embargo dates travel with each record.',
     },
     {
         icon: History,
-        title: 'Provenance and audit trail',
-        text: 'Where a recording came from, and every action taken on it, is kept permanently.',
+        title: 'Append-only audit trail',
+        text: 'Where every file came from, and everything done to it, kept for good.',
     },
     {
         icon: FileLock2,
         title: 'Classification and retention',
-        text: 'Restricted material never reaches the public catalogue, and disposal dates are tracked.',
+        text: 'Restricted material never reaches the public, and disposal dates are tracked.',
+    },
+    {
+        icon: Timer,
+        title: 'Frame-accurate segments',
+        text: 'Shots and scenes logged with SMPTE timecode in and out.',
     },
 ];
 
@@ -42,26 +55,16 @@ const FIXITY_LOG = [
 export default function WelcomeArchival() {
     return (
         <WelcomeFold id="preservation" className="bg-ink text-white">
-            <div
-                aria-hidden
-                className="pointer-events-none absolute -bottom-32 -left-32 size-[28rem] animate-aurora rounded-full bg-brand/30 blur-3xl"
-            />
-            <div className="relative grid items-center gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
+            <div className="relative grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-16 xl:gap-24">
                 <div>
-                    <Reveal className="max-w-2xl space-y-3">
-                        <p className="text-sm font-medium text-brand-glow">
-                            Preservation
-                        </p>
-                        <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-                            Built for long-term preservation
-                        </h2>
-                        <p className="text-lg text-white/70">
-                            Records follow archival practice, so they stay
-                            trustworthy long after the event.
-                        </p>
-                    </Reveal>
+                    <FoldHeading
+                        eyebrow="Preservation"
+                        title="Kept safe today. Still there for the next generation."
+                        description="Every record follows archival practice, with the evidence to prove it has not changed."
+                        tone="dark"
+                    />
 
-                    <ul className="mt-10 grid gap-x-8 gap-y-7 sm:grid-cols-2">
+                    <ul className="mt-8 grid grid-cols-1 gap-x-10 gap-y-6 sm:mt-10 sm:grid-cols-2 sm:gap-y-7 fold-short:mt-6 fold-short:gap-y-5">
                         {FEATURES.map((feature, index) => (
                             <li key={feature.title}>
                                 <Reveal
@@ -88,7 +91,7 @@ export default function WelcomeArchival() {
                 <Reveal delay={200}>
                     <div
                         aria-hidden
-                        className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur"
+                        className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6"
                     >
                         <div className="flex items-center justify-between text-sm">
                             <span className="font-medium">

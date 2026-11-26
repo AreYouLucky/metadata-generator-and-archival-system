@@ -57,7 +57,7 @@ export default function Series({ series, project, records }: Props) {
                         )}
                     </p>
                     {series.description && (
-                        <p className="max-w-3xl whitespace-pre-line">
+                        <p className="max-w-3xl text-justify hyphens-auto whitespace-pre-line">
                             {series.description}
                         </p>
                     )}

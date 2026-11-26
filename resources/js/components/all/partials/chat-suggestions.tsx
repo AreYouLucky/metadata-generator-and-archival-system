@@ -1,4 +1,4 @@
-import { MessageSquareText } from 'lucide-react';
+import AskMeMascot from '../ask-me-mascot';
 
 const ON_RECORD = [
     'What is this video about?',
@@ -28,27 +28,27 @@ export default function ChatSuggestions({
     onPick,
 }: Props) {
     return (
-        <div className="grid gap-3 p-2 text-sm">
-            <div className="flex items-start gap-2 text-muted-foreground">
-                <MessageSquareText
-                    className="mt-0.5 size-4 shrink-0"
-                    aria-hidden
-                />
-                <p>
+        <div className="grid gap-5 text-sm">
+            <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-3 text-muted-foreground">
+                <AskMeMascot className="size-16" />
+                <p className="leading-relaxed">
                     Ask about the archive’s approved videos: what was said, what
                     is shown, who speaks, or their catalogue details. Answers
-                    use only what your account may see and link to the moments
-                    they come from.
+                    use only what your account may see, and every time they
+                    mention is a link to that moment.
                 </p>
             </div>
-            <ul className="grid gap-1.5">
+            <p className="-mb-3 px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                Try asking
+            </p>
+            <ul className="grid gap-2">
                 {(onRecordPage ? ON_RECORD : ANYWHERE).map((suggestion) => (
                     <li key={suggestion}>
                         <button
                             type="button"
                             disabled={disabled}
                             onClick={() => onPick(suggestion)}
-                            className="w-full rounded-md border border-border px-3 py-1.5 text-left text-xs text-foreground/80 transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+                            className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-left text-sm text-foreground/85 transition-colors hover:border-brand/50 hover:bg-brand/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
                         >
                             {suggestion}
                         </button>

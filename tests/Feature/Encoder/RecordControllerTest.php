@@ -198,7 +198,7 @@ class RecordControllerTest extends TestCase
         $this->actingAs($encoder)
             ->get(route('records.index'))
             ->assertInertia(fn (Assert $page) => $page
-                ->component('encoder/dashboard-page/dashboard')
+                ->component('encoder/records/index-page/index')
                 ->where('showCreator', false)
                 ->has('records.data', 1)
                 ->where('records.data.0.id', $own->id));

@@ -17,7 +17,7 @@ export default function ProjectCard({
     return (
         <Link
             href={show(project.id)}
-            className="group flex gap-4 rounded-xl border p-3 transition hover:border-brand/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="group flex gap-4 rounded-xl border bg-white/85 p-3 transition hover:border-brand/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
             <div className="aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-muted">
                 {project.thumbnail ? (

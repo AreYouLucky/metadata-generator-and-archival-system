@@ -18,8 +18,8 @@ export default function WelcomeFooter({ canRegister }: Props) {
 
     return (
         <footer className="relative mt-4 snap-end rounded-3xl border bg-card p-6 sm:p-10 lg:mt-6 lg:scroll-mb-10">
-            <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
-                <div className="max-w-sm space-y-3">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-[2fr_1fr_1fr]">
+                <div className="col-span-2 max-w-sm space-y-3 lg:col-span-1">
                     <Link
                         href={home()}
                         className="flex items-center gap-2.5 font-semibold"
@@ -31,8 +31,9 @@ export default function WelcomeFooter({ canRegister }: Props) {
                         />
                     </Link>
                     <p className="text-sm text-muted-foreground">
-                        A video archive where every recording is described,
-                        checked by people and preserved for the long term.
+                        Every moment is meant to be remembered. We help you
+                        describe it, protect it and find it again, years from
+                        now.
                     </p>
                 </div>
 
@@ -88,7 +89,7 @@ export default function WelcomeFooter({ canRegister }: Props) {
                 <p>
                     © {new Date().getFullYear()} {name}
                 </p>
-                <p>Recordings are published only after review.</p>
+                <p>Nothing is shared until a person has reviewed it.</p>
             </div>
         </footer>
     );

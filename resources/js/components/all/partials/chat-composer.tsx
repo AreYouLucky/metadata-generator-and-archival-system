@@ -56,9 +56,9 @@ export default function ChatComposer({ busy, active, onAsk }: Props) {
     return (
         <form
             onSubmit={submit}
-            className="grid gap-1.5 border-t border-border p-3"
+            className="grid gap-2 border-t border-border bg-card px-4 pt-3 pb-4"
         >
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2 rounded-xl border border-input bg-background p-1.5 shadow-xs transition-shadow focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
                 <Textarea
                     ref={box}
                     value={question}
@@ -68,22 +68,18 @@ export default function ChatComposer({ busy, active, onAsk }: Props) {
                     rows={1}
                     placeholder="Ask about the archive…"
                     aria-label="Question about the archive"
-                    className="max-h-32 min-h-9 resize-none text-sm"
+                    className="max-h-32 min-h-9 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
                 />
                 <Button
                     type="submit"
                     size="icon"
+                    className="shrink-0 rounded-lg"
                     disabled={busy || trimmed.length < 2}
                     aria-label="Ask"
                 >
                     {busy ? <Spinner /> : <SendHorizontal />}
                 </Button>
             </div>
-            <p className="text-[11px] text-muted-foreground">
-                Answers come only from approved videos your account may see.
-                Your question and the parts of those videos it needs are sent to
-                OpenAI.
-            </p>
         </form>
     );
 }

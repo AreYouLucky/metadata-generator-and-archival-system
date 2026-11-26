@@ -13,9 +13,13 @@ export type FlashToast = {
     message: string;
 };
 
+/** The looping sample clip shown in the auth showcase. */
+export type AuthShowcaseClip = 'meeting' | 'wedding' | 'birthday';
+
 export type AuthLayoutProps = {
     children?: ReactNode;
     name?: string;
     title?: string;
     description?: string;
+    clip?: AuthShowcaseClip;
 };

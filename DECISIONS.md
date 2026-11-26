@@ -5,6 +5,20 @@ phase first.
 
 ## Phase 7 — Advanced (built)
 
+### Workspace dashboard (owner's request)
+
+- **`/dashboard` is now a real page for encoders and admins** instead of a redirect to `/records`
+  (viewers still go to the catalogue). It shows headline numbers, records added over 30 days, the
+  review pipeline, what needs attention (failed processing, changes requested), what is processing
+  now, processed drafts, projects and, for encoders, today's processing allowance. Encoders see
+  their own records, admins every record, the same scope as the record history.
+- **The page is `pages/encoder/dashboard-page/`**, because admins reach encoder pages through
+  `role:encoder,admin`. The record history moved to `pages/encoder/records/index-page/` to free the
+  name. The admin Overview stays separate: it is about approvals, the queue and AI cost.
+- **No cache:** every section is a lazy Inertia prop, and while something is processing the page
+  polls every 10 s for just stats, processing, attention and drafts. These are indexed, scoped
+  counts. Cache them if the archive grows large enough that they become slow.
+
 ### Public API
 
 - **Laravel Sanctum, bearer tokens only** (installed with the owner's approval). `sanctum.guard`

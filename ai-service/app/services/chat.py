@@ -32,6 +32,8 @@ from app.services.metadata import render, usage_records
 
 MAX_ANSWER_CHARS = 4000
 MAX_CITATIONS = 6
+MAX_FOLLOW_UPS = 3
+MAX_FOLLOW_UP_CHARS = 140
 
 
 class VideoChat:
@@ -109,7 +111,8 @@ def listed_calls(calls: list[RequestedToolCall], listed: set[str]) -> list[ChatT
 
 
 def clean(answer: ChatAnswer) -> ChatAnswer:
-    """Trim the text; keep valid, distinct citations (none for an ungrounded answer)."""
+    """Trim the text; keep valid, distinct citations (none for an ungrounded answer) and a
+    few short, distinct follow-up questions."""
     text = answer.answer.strip()[:MAX_ANSWER_CHARS]
     citations: list[ChatCitation] = []
     seen: set[tuple[str, float, float]] = set()
@@ -123,4 +126,18 @@ def clean(answer: ChatAnswer) -> ChatAnswer:
             citations.append(ChatCitation(record_id=key[0], start=start, end=end))
             if len(citations) == MAX_CITATIONS:
                 break
-    return ChatAnswer(answer=text, grounded=answer.grounded, citations=citations)
+    follow_ups: list[str] = []
+    for follow_up in answer.follow_ups:
+        line = " ".join(follow_up.split())
+        if (
+            not line
+            or len(line) > MAX_FOLLOW_UP_CHARS
+            or line.lower() in map(str.lower, follow_ups)
+        ):
+            continue
+        follow_ups.append(line)
+        if len(follow_ups) == MAX_FOLLOW_UPS:
+            break
+    return ChatAnswer(
+        answer=text, grounded=answer.grounded, citations=citations, follow_ups=follow_ups
+    )

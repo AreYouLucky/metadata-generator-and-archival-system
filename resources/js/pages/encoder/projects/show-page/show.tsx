@@ -103,7 +103,7 @@ export default function ProjectShow({
                                 )}
                             </div>
                             {project.description && (
-                                <p className="max-w-3xl text-sm whitespace-pre-line">
+                                <p className="max-w-3xl text-justify text-sm hyphens-auto whitespace-pre-line">
                                     {project.description}
                                 </p>
                             )}
