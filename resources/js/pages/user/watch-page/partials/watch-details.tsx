@@ -89,11 +89,11 @@ export default function WatchDetails({ record }: { record: WatchRecord }) {
     }
 
     return (
-        <div className="grid gap-6">
-            <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+        <div className="grid gap-8">
+            <dl className="grid gap-x-8 gap-y-5 text-sm sm:grid-cols-2">
                 {rows.map(([label, value]) => (
                     <div key={label}>
-                        <dt className="text-xs text-muted-foreground">
+                        <dt className="mb-1 text-xs text-muted-foreground">
                             {label}
                         </dt>
                         <dd>{value}</dd>
@@ -102,9 +102,9 @@ export default function WatchDetails({ record }: { record: WatchRecord }) {
             </dl>
 
             {record.credits.length > 0 && (
-                <section className="grid gap-2">
+                <section className="grid gap-3">
                     <h2 className="text-sm font-medium">Credits</h2>
-                    <ul className="grid gap-1 text-sm sm:grid-cols-2">
+                    <ul className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
                         {record.credits.map((credit, index) => (
                             <li key={index}>
                                 <span className="text-muted-foreground">
@@ -118,7 +118,7 @@ export default function WatchDetails({ record }: { record: WatchRecord }) {
             )}
 
             {record.subjects.length + record.keywords.length > 0 && (
-                <section className="grid gap-2">
+                <section className="grid gap-3">
                     <h2 className="text-sm font-medium">
                         Subjects and keywords
                     </h2>
@@ -150,7 +150,7 @@ export default function WatchDetails({ record }: { record: WatchRecord }) {
             )}
 
             {(record.license || record.usage_restrictions) && (
-                <section className="grid gap-1 rounded-xl border p-4 text-sm">
+                <section className="grid gap-1.5 rounded-xl border bg-muted/30 p-5 text-sm">
                     <h2 className="font-medium">Licence and use</h2>
                     {record.license && (
                         <p>

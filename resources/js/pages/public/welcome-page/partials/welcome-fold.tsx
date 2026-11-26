@@ -8,14 +8,12 @@ type Props = {
 };
 
 /**
- * One full-screen panel of the welcome page. On large, tall screens each fold
- * sticks below the header and the next one slides up over it; elsewhere the
- * folds simply stack.
+ * One panel of the welcome page, shown as a frame of the film reel on large,
+ * tall screens (see WelcomeReel) and stacked elsewhere.
  *
- * The empty anchor before the panel marks where the fold sits in the flow. It
- * carries the scroll-snap point and the section `id`, because snapping or
- * jumping to a sticky element uses its stuck position instead. Its negative
- * margin cancels the extra gap it adds to the parent's flex layout.
+ * The empty anchor before the panel carries the section `id` and scroll-snap
+ * point for the stacked layout. In the reel it is hidden, because the panel
+ * moves sideways; WelcomeReel handles snapping and links there.
  */
 export default function WelcomeFold({ id, className, children }: Props) {
     return (
@@ -23,12 +21,12 @@ export default function WelcomeFold({ id, className, children }: Props) {
             <div
                 id={id}
                 aria-hidden
-                className="-mb-4 snap-start scroll-mt-24 lg:-mb-6"
+                className="snap-start scroll-mt-20 lg:scroll-mt-24 fold:hidden"
             />
             <section
                 className={cn(
                     'relative overflow-hidden rounded-3xl p-6 sm:p-10',
-                    'fold:sticky fold:top-24 fold:flex fold:h-[calc(100svh-7rem)] fold:flex-col fold:justify-center fold:shadow-[0_-24px_60px_-30px_oklch(0_0_0/0.35)]',
+                    'fold:flex fold:h-full fold:flex-col fold:justify-center fold:rounded-xl fold:border-0 fold:px-14 fold:py-12 fold-short:px-10 fold-short:py-8',
                     className,
                 )}
             >

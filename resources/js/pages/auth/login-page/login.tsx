@@ -94,14 +94,14 @@ export default function Login({
                                     htmlFor="remember"
                                     className="font-normal"
                                 >
-                                    Keep me logged in on this device
+                                    Remember me
                                 </Label>
                             </div>
 
                             <Button
                                 type="submit"
                                 size="lg"
-                                className="mt-2 h-11 w-full text-base"
+                                className="mt-1 h-11 w-full text-base"
                                 tabIndex={4}
                                 disabled={processing}
                                 data-test="login-button"
@@ -113,9 +113,9 @@ export default function Login({
 
                         {canRegister && (
                             <p className="text-center text-sm text-muted-foreground">
-                                New here?{' '}
+                                No account yet?{' '}
                                 <TextLink href={register()} tabIndex={6}>
-                                    Create a viewer account
+                                    Create one
                                 </TextLink>
                             </p>
                         )}
@@ -128,5 +128,6 @@ export default function Login({
 
 Login.layout = {
     title: 'Welcome back',
-    description: 'Log in to browse, upload and manage archived recordings.',
+    description: 'Log in to continue to your archive.',
+    clip: 'meeting',
 };

@@ -91,7 +91,7 @@ def test_a_call_to_a_tool_laravel_did_not_offer_is_refused() -> None:
 
 
 def test_history_question_and_earlier_tool_results_are_replayed_in_order() -> None:
-    llm = FakeToolLlm(ChatAnswer(answer="ok", grounded=True, citations=[]))
+    llm = FakeToolLlm(ChatAnswer(answer="ok", grounded=True, citations=[], follow_ups=[]))
 
     chat(llm).step(
         request(
@@ -122,7 +122,7 @@ def test_history_question_and_earlier_tool_results_are_replayed_in_order() -> No
 
 
 def test_the_page_context_comes_right_before_the_question() -> None:
-    llm = FakeToolLlm(ChatAnswer(answer="ok", grounded=True, citations=[]))
+    llm = FakeToolLlm(ChatAnswer(answer="ok", grounded=True, citations=[], follow_ups=[]))
 
     chat(llm).step(request(context='On the page of record X, titled "Fair".'))
 
@@ -142,10 +142,12 @@ def test_an_ungrounded_answer_keeps_no_citations_and_duplicates_are_dropped() ->
     ]
 
     grounded = chat(
-        FakeToolLlm(ChatAnswer(answer="  Yes.  ", grounded=True, citations=cited))
+        FakeToolLlm(ChatAnswer(answer="  Yes.  ", grounded=True, citations=cited, follow_ups=[]))
     ).step(request())
     ungrounded = chat(
-        FakeToolLlm(ChatAnswer(answer="Not in this record.", grounded=False, citations=cited))
+        FakeToolLlm(
+            ChatAnswer(answer="Not in this record.", grounded=False, citations=cited, follow_ups=[])
+        )
     ).step(request())
 
     assert grounded.answer is not None
@@ -157,6 +159,29 @@ def test_an_ungrounded_answer_keeps_no_citations_and_duplicates_are_dropped() ->
     ]
     assert ungrounded.answer is not None
     assert ungrounded.answer.citations == []
+
+
+def test_follow_ups_are_trimmed_distinct_short_and_at_most_three() -> None:
+    suggested = [
+        "  Who else   spoke? ",
+        "who else spoke?",
+        "x" * 141,
+        "",
+        "What is shown at the start?",
+        "Which videos are related?",
+        "One too many?",
+    ]
+
+    response = chat(
+        FakeToolLlm(ChatAnswer(answer="Yes.", grounded=True, citations=[], follow_ups=suggested))
+    ).step(request())
+
+    assert response.answer is not None
+    assert response.answer.follow_ups == [
+        "Who else spoke?",
+        "What is shown at the start?",
+        "Which videos are related?",
+    ]
 
 
 def test_a_request_naming_an_unlisted_tool_in_its_steps_is_invalid() -> None:
@@ -230,7 +255,7 @@ def test_openai_replays_calls_without_item_ids_and_stores_nothing() -> None:
 
 
 def test_openai_answers_when_tools_are_switched_off() -> None:
-    parsed = ChatAnswer(answer="Done.", grounded=True, citations=[])
+    parsed = ChatAnswer(answer="Done.", grounded=True, citations=[], follow_ups=[])
     call = SimpleNamespace(type="function_call", call_id="c2", name="x", arguments="{}")
     responses = FakeResponses(
         SimpleNamespace(output=[call], output_parsed=parsed, status="completed", usage=None)
@@ -302,7 +327,9 @@ def test_the_chat_endpoint_needs_a_signature(client: TestClient) -> None:
 def test_the_chat_endpoint_returns_one_step(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    llm = FakeToolLlm(ChatAnswer(answer="Nothing about that.", grounded=False, citations=[]))
+    llm = FakeToolLlm(
+        ChatAnswer(answer="Nothing about that.", grounded=False, citations=[], follow_ups=[])
+    )
     monkeypatch.setattr(chat_api, "VideoChat", lambda: chat(llm))
 
     response = post_signed(client, "/chat", request().model_dump())
@@ -313,6 +340,7 @@ def test_the_chat_endpoint_returns_one_step(
         "answer": "Nothing about that.",
         "grounded": False,
         "citations": [],
+        "follow_ups": [],
     }
 
 

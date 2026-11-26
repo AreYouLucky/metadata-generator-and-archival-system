@@ -1,12 +1,14 @@
-import { Head } from '@inertiajs/react';
-import AskMe from '@/components/all/ask-me';
-import WelcomeArchival from './partials/welcome-archival';
-import WelcomeBrowse from './partials/welcome-browse';
-import WelcomeFooter from './partials/welcome-footer';
-import WelcomeGenerated from './partials/welcome-generated';
-import WelcomeHeader from './partials/welcome-header';
-import WelcomeHero from './partials/welcome-hero';
-import WelcomeSteps from './partials/welcome-steps';
+import { Head } from "@inertiajs/react";
+import AskMe from "@/components/all/ask-me";
+import WelcomeArchival from "./partials/welcome-archival";
+import WelcomeAskShare from "./partials/welcome-ask-share";
+import WelcomeBrowse from "./partials/welcome-browse";
+import WelcomeFooter from "./partials/welcome-footer";
+import WelcomeGenerated from "./partials/welcome-generated";
+import WelcomeHeader from "./partials/welcome-header";
+import WelcomeHero from "./partials/welcome-hero";
+import WelcomeReel from "./partials/welcome-reel";
+import WelcomeSteps from "./partials/welcome-steps";
 
 type Props = {
     canRegister: boolean;
@@ -15,22 +17,21 @@ type Props = {
 export default function Welcome({ canRegister }: Props) {
     return (
         <>
-            <Head title="Video archive" />
+            <Head title="Every moment, remembered" />
             <div
                 data-scroll-snap
-                className="min-h-svh w-full bg-background px-4 pb-4 text-foreground sm:px-6 sm:pb-6 lg:px-10 lg:pb-10"
+                className="min-h-svh w-full px-4 pb-4 text-foreground sm:px-6 sm:pb-6 lg:px-10 lg:pb-8"
             >
                 <WelcomeHeader canRegister={canRegister} />
-                <main className="flex flex-col gap-4 lg:gap-6">
-                    {/* The folds stick only within this wrapper, so the last
-                        one scrolls away before the call to action arrives. */}
-                    <div className="flex flex-col gap-4 lg:gap-6">
+                <main>
+                    <WelcomeReel>
                         <WelcomeHero />
                         <WelcomeSteps />
                         <WelcomeGenerated />
                         <WelcomeBrowse />
+                        <WelcomeAskShare />
                         <WelcomeArchival />
-                    </div>
+                    </WelcomeReel>
                 </main>
                 <WelcomeFooter canRegister={canRegister} />
             </div>

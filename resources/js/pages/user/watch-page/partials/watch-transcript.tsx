@@ -30,14 +30,14 @@ export default function WatchTranscript({ lines, currentTime, onSeek }: Props) {
 
     if (lines.length === 0) {
         return (
-            <p className="p-4 text-sm text-muted-foreground">
+            <p className="p-5 text-sm text-muted-foreground">
                 No transcript for this video.
             </p>
         );
     }
 
     return (
-        <div ref={scroller} className="h-96 overflow-y-auto lg:h-[32rem]">
+        <div ref={scroller} className="h-96 overflow-y-auto lg:h-128">
             <ol
                 className="relative w-full"
                 style={{ height: virtualizer.getTotalSize() }}
@@ -56,12 +56,24 @@ export default function WatchTranscript({ lines, currentTime, onSeek }: Props) {
                             <button
                                 type="button"
                                 onClick={() => onSeek(line.start)}
+                                aria-current={
+                                    item.index === active ? 'true' : undefined
+                                }
                                 className={cn(
-                                    'flex w-full gap-3 px-4 py-2 text-left text-sm transition hover:bg-muted focus-visible:bg-muted focus-visible:outline-none',
-                                    item.index === active && 'bg-brand-muted',
+                                    'flex w-full gap-4 px-5 py-3 text-left leading-relaxed text-sm transition focus-visible:outline-none',
+                                    item.index === active
+                                        ? 'bg-sky-600 text-white'
+                                        : 'hover:bg-muted focus-visible:bg-muted',
                                 )}
                             >
-                                <span className="w-12 shrink-0 pt-0.5 text-xs text-muted-foreground tabular-nums">
+                                <span
+                                    className={cn(
+                                        'w-12 shrink-0 pt-0.5 text-xs tabular-nums',
+                                        item.index === active
+                                            ? 'text-white/80'
+                                            : 'text-muted-foreground',
+                                    )}
+                                >
                                     {formatTimestamp(line.start)}
                                 </span>
                                 <span>

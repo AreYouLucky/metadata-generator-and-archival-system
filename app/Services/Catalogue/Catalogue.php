@@ -36,7 +36,8 @@ class Catalogue
 {
     public const int PER_PAGE = 24;
 
-    private const int HOME_LATEST = 8;
+    /** One featured in the hero plus twelve, which fill 2, 3, 4 or 6 columns evenly. */
+    private const int HOME_LATEST = 13;
 
     private const int HOME_PROJECTS = 6;
 

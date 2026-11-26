@@ -1,10 +1,11 @@
 import { Link } from '@inertiajs/react';
-import { LogIn, MessageCircleQuestion } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useChatUser } from '@/hooks/use-chat';
 import { cn } from '@/lib/utils';
 import { login } from '@/routes';
 import { useAskMeStore } from '@/stores/ask-me-store';
+import AskMeMascot from './ask-me-mascot';
 import ChatPanel from './partials/chat-panel';
 
 /**
@@ -13,7 +14,7 @@ import ChatPanel from './partials/chat-panel';
  * closes). It answers only from approved records this account may see.
  * Guests are asked to log in. The window stays mounted once opened, so a
  * half-typed question survives closing it; the conversation loads the first
- * time it opens.
+ * time it opens, carrying on with the most recent saved chat.
  */
 export default function AskMe() {
     const user = useChatUser();
@@ -41,8 +42,8 @@ export default function AskMe() {
                         }
                     }}
                     className={cn(
-                        'pointer-events-auto w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-sky-900/15',
-                        user ? 'h-[min(36rem,calc(100dvh-7rem))]' : 'h-auto',
+                        'pointer-events-auto w-[min(27rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-sky-900/15',
+                        user ? 'h-[min(42rem,calc(100dvh-7rem))]' : 'h-auto',
                     )}
                 >
                     {user ? (
@@ -53,10 +54,7 @@ export default function AskMe() {
                         />
                     ) : (
                         <div className="flex flex-col items-center justify-center gap-4 p-6 text-center text-sm text-foreground/80">
-                            <MessageCircleQuestion
-                                className="size-8 text-brand"
-                                aria-hidden
-                            />
+                            <AskMeMascot className="size-36" />
                             <p>
                                 Log in to ask about the archive’s videos: what
                                 was said, what is shown, who speaks.
@@ -77,9 +75,12 @@ export default function AskMe() {
                 onClick={() => setOpen(!open)}
                 aria-expanded={open}
                 title="Ask me about the archive"
-                className="pointer-events-auto flex items-center gap-2 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground shadow-lg shadow-sky-900/15 transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                className="pointer-events-auto flex items-center gap-2 rounded-full bg-brand py-2.5 pr-4 pl-2 text-sm font-semibold text-brand-foreground shadow-lg shadow-sky-900/15 transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
             >
-                <MessageCircleQuestion className="size-4" aria-hidden />
+                <AskMeMascot
+                    waving={!open}
+                    className="-my-8 -ml-2 size-20 -translate-y-4 drop-shadow-md"
+                />
                 {open ? 'Close' : 'Ask me'}
             </button>
         </div>

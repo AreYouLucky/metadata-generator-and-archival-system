@@ -6,6 +6,7 @@ use App\Enums\ChatMessageStatus;
 use App\Enums\ChatRole;
 use App\Events\ChatAnswered;
 use App\Jobs\AnswerChatQuestionJob;
+use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\Record;
 use App\Models\RecordSegment;
@@ -59,6 +60,7 @@ class AnswerChatQuestionJobTest extends TestCase
             'url' => route('records.show', ['record' => $record->id, 't' => 3]),
         ]], $reply->citations);
         $this->assertSame(['search_transcript'], $reply->tools);
+        $this->assertSame(['record_id' => $record->id, 'title' => 'Budget hearing', 'url' => route('records.show', $record->id)], $reply->link);
         $this->assertFalse(Cache::has(AnswerChatQuestionJob::lockKey($question->user_id)));
         Event::assertDispatched(ChatAnswered::class, fn (ChatAnswered $event): bool => $event->userId === $question->user_id);
 
@@ -120,6 +122,7 @@ class AnswerChatQuestionJobTest extends TestCase
         $this->assertSame('Technical file details are not public for this record.', $results['c2']['reason']);
         $this->assertSame('Welcome, everyone.', $results['c3']['lines'][0]['text']);
         $this->assertSame(route('catalogue.watch', ['record' => $record->id, 't' => 1]), $this->reply()->citations[0]['url']);
+        $this->assertSame(route('catalogue.watch', $record->id), $this->reply()->link['url']);
     }
 
     public function test_search_records_finds_visible_records_by_catalogue_and_spoken_words(): void
@@ -144,6 +147,7 @@ class AnswerChatQuestionJobTest extends TestCase
         $this->assertSame('The flood waters reached the plaza.', $found['records'][1]['spoken_lines'][0]['text']);
         $this->assertNotContains($hidden->id, array_column($found['records'], 'record_id'));
         $this->assertSame($public->id, $this->reply()->citations[0]['record_id']);
+        $this->assertSame(route('catalogue.watch', $public->id), $this->reply()->link['url']);
     }
 
     public function test_bad_arguments_and_unknown_tools_get_an_error_result_instead_of_running(): void
@@ -174,14 +178,14 @@ class AnswerChatQuestionJobTest extends TestCase
         $admin = User::factory()->admin()->create();
         $search = $this->toolCalls([['id' => 'c', 'name' => 'search_records', 'arguments' => ['query' => null, 'limit' => null]]]);
         Record::factory()->approved()->create();
-        Http::fake(['http://ai-api.test/chat' => Http::sequence()->push($search)->push($search)->push($search)->push($search)
+        Http::fake(['http://ai-api.test/chat' => Http::sequence()->push($search)->push($search)->push($search)->push($search)->push($search)
             ->push($this->answer('There is one video.', true, []))]);
 
         AnswerChatQuestionJob::dispatchSync($this->question('What videos are there?', $admin));
 
-        $last = $this->chatRequests()[4];
+        $last = $this->chatRequests()[5];
         $this->assertSame('none', $last['tool_choice']);
-        $this->assertCount(4, $last['steps']);
+        $this->assertCount(5, $last['steps']);
         $this->assertSame(ChatMessageStatus::Answered, $this->reply()->status);
         $this->assertSame([$admin->id], UsageRecord::query()->distinct()->pluck('user_id')->all());
     }
@@ -196,15 +200,45 @@ class AnswerChatQuestionJobTest extends TestCase
             ->push($this->answer('Nothing yet.', false, [])),
         ]);
         $user = User::factory()->create();
+        $conversation = ChatConversation::factory()->for($user)->create();
 
-        AnswerChatQuestionJob::dispatchSync($this->question('Who spoke?', $user));
+        AnswerChatQuestionJob::dispatchSync($this->question('Who spoke?', $user, conversation: $conversation));
 
         $this->assertSame('OpenAI rejected the API key.', $this->reply()->content);
         $this->assertSame(ChatMessageStatus::Failed, $this->reply()->status);
 
-        AnswerChatQuestionJob::dispatchSync($this->question('What videos are there?', $user));
+        AnswerChatQuestionJob::dispatchSync($this->question('What videos are there?', $user, conversation: $conversation));
 
         $this->assertSame([], $this->chatRequests()[1]['history']);
+    }
+
+    public function test_follow_ups_use_only_the_same_conversation_and_the_records_it_cited(): void
+    {
+        Event::fake([ChatAnswered::class]);
+        Http::preventStrayRequests();
+        $user = User::factory()->create();
+        $record = Record::factory()->approved()->create(['title' => 'Town fiesta']);
+        $conversation = ChatConversation::factory()->for($user)->create(['updated_at' => now()->subDay()]);
+        ChatMessage::factory()->in($conversation)->create(['content' => 'Which videos show the fiesta?']);
+        ChatMessage::factory()->answer()->in($conversation)->create([
+            'content' => 'Town fiesta shows the parade (0:30).',
+            'citations' => [['record_id' => $record->id, 'title' => 'Town fiesta', 'start' => 30.0, 'end' => 35.0, 'url' => 'http://localhost/watch/x?t=30']],
+        ]);
+        ChatMessage::factory()->for($user)->create(['content' => 'A question in another chat']);
+        Http::fake(['http://ai-api.test/chat' => Http::sequence()
+            ->push($this->toolCalls([['id' => 'c1', 'name' => 'get_record_overview', 'arguments' => ['record_id' => $record->id]]]))
+            ->push($this->answer('It was published this year.', true, [], [' Who organised it? ', 'who organised it?', 'And what else did they say?', str_repeat('x', 141), 'Where is it held?', 'One too many?'])),
+        ]);
+
+        AnswerChatQuestionJob::dispatchSync($this->question('When was it published?', $user, conversation: $conversation));
+
+        $first = $this->chatRequests()[0];
+        $this->assertSame(['Which videos show the fiesta?', 'Town fiesta shows the parade (0:30).'], array_column($first['history'], 'content'));
+        $this->assertStringContainsString("Records cited earlier in this conversation, most recent first: {$record->id} (\"Town fiesta\")", $first['context']);
+        $reply = $this->reply();
+        $this->assertSame($conversation->id, $reply->chat_conversation_id);
+        $this->assertSame(['Who organised it?', 'And what else did they say?', 'Where is it held?'], $reply->follow_ups);
+        $this->assertTrue($conversation->fresh()->updated_at->isToday());
     }
 
     public function test_a_deactivated_account_gets_no_answer(): void
@@ -219,11 +253,12 @@ class AnswerChatQuestionJobTest extends TestCase
         $this->assertSame(ChatMessageStatus::Failed, $this->reply()->status);
     }
 
-    private function question(string $text, User $user, ?Record $page = null): ChatMessage
+    private function question(string $text, User $user, ?Record $page = null, ?ChatConversation $conversation = null): ChatMessage
     {
         $question = new ChatMessage(['role' => ChatRole::User, 'content' => $text]);
         $question->record_id = $page?->id;
         $question->user_id = $user->id;
+        $question->chat_conversation_id = ($conversation ?? ChatConversation::factory()->for($user)->create())->id;
         $question->status = ChatMessageStatus::Pending;
         $question->save();
 
@@ -272,11 +307,12 @@ class AnswerChatQuestionJobTest extends TestCase
 
     /**
      * @param  list<array{record_id: string, start: float, end: float}>  $citations
+     * @param  list<string>  $followUps
      * @return array<string, mixed>
      */
-    private function answer(string $text, bool $grounded, array $citations): array
+    private function answer(string $text, bool $grounded, array $citations, array $followUps = []): array
     {
-        return ['type' => 'answer', 'tool_calls' => [], 'answer' => ['answer' => $text, 'grounded' => $grounded, 'citations' => $citations], 'model' => 'gpt-6.2-sol', 'usage' => [
+        return ['type' => 'answer', 'tool_calls' => [], 'answer' => ['answer' => $text, 'grounded' => $grounded, 'citations' => $citations, 'follow_ups' => $followUps], 'model' => 'gpt-6.2-sol', 'usage' => [
             ['kind' => 'llm_input_tokens', 'quantity' => 1200, 'estimated_cost' => 0.0024],
             ['kind' => 'llm_output_tokens', 'quantity' => 40, 'estimated_cost' => 0.0004],
         ]];

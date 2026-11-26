@@ -1,132 +1,124 @@
 import {
+    BadgeCheck,
     CalendarDays,
     Clock,
-    Languages,
     MapPin,
-    Play,
-    ShieldCheck,
-} from 'lucide-react';
+    MessageCircleQuestion,
+} from "lucide-react";
+import HeroDetectChip from "./hero-detect-chip";
+import HeroMemories from "./hero-memories";
+import HeroVideo from "./hero-video";
 
-const TRANSCRIPT = [
-    {
-        time: '00:12:41',
-        speaker: 'S1',
-        text: 'Good morning, and welcome to this year’s Regional Science and Technology Week.',
-    },
-    {
-        time: '00:12:47',
-        speaker: 'S2',
-        text: 'Magandang umaga po sa ating mga bisita mula sa iba’t ibang probinsya.',
-    },
+const WAVEFORM = [0.4, 0.9, 0.6, 1, 0.5, 0.8, 0.35];
+
+const FACTS = [
+    { label: "Speakers", value: "2 labelled" },
+    { label: "Chapters", value: "6 drafted" },
+    { label: "Fixity", value: "SHA-256 ✓" },
 ];
 
-const TAGS = ['science week', 'opening ceremony', 'innovation', 'Cebu'];
-
 /**
- * Illustration of an archived record: a frame, its metadata and transcript.
- * Purely decorative sample content.
+ * Illustration of an archived record: the playing clip, its metadata and an
+ * "Ask me" answer. Purely decorative sample content.
  */
 export default function RecordPreview() {
     return (
-        <div className="relative mx-auto w-full max-w-lg" aria-hidden>
-            <div className="absolute -inset-4 rounded-3xl bg-brand/25 blur-2xl" />
+        <div
+            className="relative mx-auto w-full max-w-xl lg:mx-0 lg:max-w-[36rem] rotate-3"
+            aria-hidden
+        >
+            <HeroMemories />
 
-            <div className="relative overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-2xl shadow-black/30">
+            <div className="relative overflow-hidden rounded-2xl border border-sky-500 bg-white text-card-foreground">
                 <div className="relative aspect-video bg-ink">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_35%,rgb(14_165_233/0.45),transparent_55%),radial-gradient(circle_at_75%_70%,rgb(250_204_21/0.3),transparent_50%)]" />
-                    <div className="absolute inset-x-0 top-0 h-1/4 animate-scan bg-linear-to-b from-transparent via-brand-glow/20 to-transparent" />
-                    <div className="absolute inset-x-0 top-0 flex justify-between p-3 font-mono text-[11px] text-white/80">
-                        <span className="flex items-center gap-1.5">
-                            <span className="size-1.5 rounded-full bg-red-500" />
-                            MASTER · 1920×1080 · 29.97 fps
-                        </span>
-                        <span>00:12:47:08</span>
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="relative flex size-12 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/30 backdrop-blur">
-                            <span className="absolute inset-0 animate-ping rounded-full bg-white/20 [animation-duration:2.5s]" />
-                            <Play className="size-5 translate-x-0.5 fill-current" />
-                        </span>
-                    </div>
-                    <div className="absolute inset-x-3 bottom-3 h-1 overflow-hidden rounded-full bg-white/20">
-                        <div className="h-full animate-progress rounded-full bg-brand-glow [animation-duration:12s]" />
-                    </div>
+                    <HeroVideo />
                 </div>
 
-                <div className="space-y-4 p-5">
-                    <div className="space-y-2">
-                        <p className="font-mono text-[11px] tracking-wide text-muted-foreground">
-                            ACC-2026-00148
-                        </p>
-                        <h2 className="leading-snug font-semibold">
-                            Regional Science and Technology Week: Opening
-                            Ceremony
-                        </h2>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                                <MapPin className="size-3.5" /> Cebu City,
-                                Region VII
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <CalendarDays className="size-3.5" /> 14 Nov
-                                2026
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <Clock className="size-3.5" /> 1 h 12 min
-                            </span>
+                <div className="space-y-4 bg-black p-4 text-white sm:p-5">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 space-y-1.5">
+                            <p className="font-mono text-[11px] tracking-wide text-white/60">
+                                ACC-2026-00148 · Wedding
+                            </p>
+                            <h2 className="leading-snug font-semibold">
+                                Santos–Reyes Wedding: Exchange of Vows
+                            </h2>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
+                                <span className="flex items-center gap-1">
+                                    <MapPin className="size-3.5" /> Tagaytay
+                                    City
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <CalendarDays className="size-3.5" /> 14 Nov
+                                    2026
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <Clock className="size-3.5" /> 2 h 05 min
+                                </span>
+                            </div>
                         </div>
+                        <span className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                            <BadgeCheck className="size-3.5" />
+                            Approved
+                        </span>
                     </div>
 
-                    <ul className="space-y-2 rounded-lg bg-muted/60 p-3 text-xs">
-                        {TRANSCRIPT.map((line) => (
-                            <li key={line.time} className="flex gap-2.5">
-                                <span className="shrink-0 font-mono text-brand">
-                                    {line.time}
-                                </span>
-                                <span className="shrink-0 font-medium text-muted-foreground">
-                                    {line.speaker}
-                                </span>
-                                <span className="text-foreground/90">
-                                    {line.text}
-                                </span>
-                            </li>
+                    <dl className="grid grid-cols-3 divide-x divide-white/15 border-y border-white/15 text-xs">
+                        {FACTS.map((fact) => (
+                            <div
+                                key={fact.label}
+                                className="px-3 py-2.5 first:pl-0"
+                            >
+                                <dt className="text-white/60">{fact.label}</dt>
+                                <dd className="mt-0.5 font-medium">
+                                    {fact.value}
+                                </dd>
+                            </div>
                         ))}
-                    </ul>
+                    </dl>
 
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap gap-1.5">
-                            {TAGS.map((tag) => (
-                                <span
-                                    key={tag}
-                                    className="rounded-md border px-2 py-0.5 text-[11px] text-muted-foreground"
-                                >
-                                    {tag}
-                                </span>
-                            ))}
-                        </div>
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                            <ShieldCheck className="size-3.5" /> SHA-256
-                            verified
+                    <div className="flex items-center gap-2.5 text-xs">
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-tertiary text-tertiary-foreground">
+                            <MessageCircleQuestion className="size-3.5" />
+                        </span>
+                        <p className="min-w-0 flex-1 truncate text-white/60">
+                            <span className="font-medium text-white">
+                                When are the vows?
+                            </span>{" "}
+                            From 42:10, right after the readings.
+                        </p>
+                        <span className="shrink-0 rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 font-mono text-[11px] font-medium text-brand">
+                            ▶ 42:10
                         </span>
                     </div>
                 </div>
             </div>
 
-            <div className="absolute -top-4 -right-3 hidden animate-float items-center gap-2 rounded-xl border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-lg sm:flex">
-                <span className="flex size-6 items-center justify-center rounded-md bg-brand-muted text-brand">
-                    <Languages className="size-3.5" />
+            <div className="absolute top-[30%] -left-8 hidden animate-float items-center gap-2.5 rounded-xl border bg-white px-3 py-2 text-xs sm:flex">
+                <span className="flex h-6 items-center gap-0.5">
+                    {WAVEFORM.map((height, index) => (
+                        <span
+                            key={index}
+                            className="w-1 animate-wave rounded-full bg-brand"
+                            style={{
+                                height: `${height * 100}%`,
+                                animationDelay: `${index * -0.15}s`,
+                            }}
+                        />
+                    ))}
                 </span>
-                Transcribed · EN / FIL
+                <span>
+                    <span className="block text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                        Transcribing
+                    </span>
+                    <span className="block font-semibold">
+                        Speaker 1 · EN / FIL
+                    </span>
+                </span>
             </div>
 
-            <div className="absolute -bottom-5 -left-3 hidden w-52 animate-float rounded-xl border bg-card p-3 text-foreground shadow-lg [animation-delay:-3s] sm:block">
-                <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">Generating chapters</span>
-                    <span className="flex size-2 animate-pulse rounded-full bg-brand" />
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full animate-progress rounded-full bg-brand" />
-                </div>
+            <div className="absolute top-[40%] -right-4 hidden animate-float [animation-delay:-3s] sm:block">
+                <HeroDetectChip />
             </div>
         </div>
     );

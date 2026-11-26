@@ -2,10 +2,10 @@ import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const QUERIES = [
-    'Science week opening ceremony',
-    'Town hall meetings in Iloilo',
-    'Interviews recorded in 2025',
-    'Disaster drill highlights',
+    'Town hall meeting, March 2026',
+    'Keynote speeches at the leadership forum',
+    'Awards night program highlights',
+    'Lola Remy’s 80th birthday',
 ];
 
 /**
@@ -30,7 +30,7 @@ export default function SearchPreview() {
     return (
         <div
             aria-hidden
-            className="flex h-14 items-center gap-3 rounded-2xl border bg-background px-4 shadow-lg shadow-brand/5"
+            className="flex h-14 items-center gap-3 rounded-2xl border bg-white px-4 shadow-lg shadow-brand/5"
         >
             <Search className="size-5 shrink-0 text-brand" />
             <span className="flex min-w-0 flex-1 items-center">

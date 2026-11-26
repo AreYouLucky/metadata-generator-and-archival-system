@@ -1,60 +1,80 @@
-import { Link, usePage } from '@inertiajs/react';
-import RecordPreview from './record-preview';
-import WelcomeFold from './welcome-fold';
-import WelcomeMarquee from './welcome-marquee';
-import { Sparkles } from 'lucide-react';
-
-type Props = {
-    canRegister: boolean;
-};
+import { Link } from "@inertiajs/react";
+import {
+    ArrowRight,
+    BadgeCheck,
+    Fingerprint,
+    Languages,
+    ScanEye,
+} from "lucide-react";
+import ScribbleUnderline from "@/components/all/scribble-underline";
+import { Button } from "@/components/ui/button";
+import { home as catalogue } from "@/routes/catalogue";
+import RecordPreview from "./record-preview";
+import WelcomeFold from "./welcome-fold";
+import WelcomeMarquee from "./welcome-marquee";
 
 const HIGHLIGHTS = [
-    { value: 'EN · FIL', label: 'Transcripts' },
-    { value: 'SHA-256', label: 'Fixity checks' },
-    { value: '4 steps', label: 'From upload to publish' },
-    { value: '100%', label: 'Human-reviewed' },
+    { icon: Languages, value: "EN · FIL", label: "Transcripts with speakers" },
+    { icon: ScanEye, value: "Every frame", label: "Scenes, text and objects" },
+    {
+        icon: Fingerprint,
+        value: "SHA-256",
+        label: "Fixity, checked on schedule",
+    },
+    { icon: BadgeCheck, value: "100%", label: "Approved by a person" },
 ];
 
 export default function WelcomeHero() {
-    const { auth } = usePage().props;
-
     return (
-        <WelcomeFold className="bg-ink text-white">
-            <div aria-hidden className="pointer-events-none absolute inset-0">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,oklch(1_0_0/0.05)_1px,transparent_1px),linear-gradient(to_bottom,oklch(1_0_0/0.05)_1px,transparent_1px)] mask-[radial-gradient(ellipse_at_center,black_35%,transparent_80%)] bg-size-[56px_56px]" />
-                <div className="absolute -top-40 -left-24 size-[28rem] animate-aurora rounded-full bg-sky-400/30 blur-3xl" />
-                <div className="absolute -right-24 -bottom-40 size-[30rem] animate-aurora rounded-full bg-yellow-400/20 blur-3xl [animation-delay:-6s]" />
-                <div className="absolute top-1/3 left-1/2 size-72 animate-aurora rounded-full bg-sky-300/15 blur-3xl [animation-delay:-11s]" />
-            </div>
+        <WelcomeFold className="bg-linear-to-b from-white via-white to-yellow-50 fold:p-8 fold-short:p-6">
+            <div className="grid w-full flex-1 grid-cols-1 items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,40rem)] lg:gap-35">
+                <div className="space-y-6 lg:max-w-3xl lg:justify-self-center fold-short:space-y-5">
+                    <div className="space-y-5">
+                        <h1 className="max-w-3xl animate-in text-4xl leading-[1.05] font-semibold tracking-tight text-balance delay-100 duration-700 fill-mode-both fade-in slide-in-from-bottom-4 sm:text-5xl xl:text-6xl fold-short:text-5xl">
+                            Every moment is meant to be{" "}
+                            <span className="relative inline-block whitespace-nowrap text-brand">
+                                remembered.
+                                <ScribbleUnderline />
+                            </span>
+                        </h1>
 
-            <div className="relative grid flex-1 items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
-                <div className="space-y-7">
-                    <p className="inline-flex animate-in items-center gap-2 py-1 text-xs font-medium text-brand-glow backdrop-blur duration-700 fill-mode-both fade-in slide-in-from-bottom-3">
-                        <Sparkles className="size-3.5" />
-                        Video archive and AI-assisted metadata
-                    </p>
+                        <p className="max-w-2xl animate-in text-base leading-relaxed sm:text-lg text-pretty text-muted-foreground delay-200 duration-700 fill-mode-both fade-in slide-in-from-bottom-4 fold-short:text-base">
+                            Meetings and speeches, event programs and
+                            celebrations, the moments your team and your family
+                            never want to lose. Each video is transcribed, read
+                            frame by frame and carefully described, then checked
+                            by a person before it is shared, so you can find it
+                            again years from now.
+                        </p>
+                    </div>
 
-                    <h1 className="animate-in text-4xl font-semibold tracking-tight text-balance delay-100 duration-700 fill-mode-both fade-in slide-in-from-bottom-4 sm:text-5xl xl:text-6xl">
-                        Every recording described, preserved and{' '}
-                        <span className="animate-gradient-x bg-linear-to-r from-brand-glow via-amber-200 to-brand-glow bg-size-[200%_auto] bg-clip-text text-transparent">
-                            easy to find.
-                        </span>
-                    </h1>
+                    <div className="flex animate-in flex-wrap gap-3 delay-300 duration-700 fill-mode-both fade-in slide-in-from-bottom-4 ">
+                        <Button
+                            asChild
+                            size="lg"
+                            className="group h-12 w-full rounded-full bg-sky-600 px-6 shadow-none sm:w-auto"
+                        >
+                            <Link href={catalogue()}>
+                                Explore the catalogue
+                                <ArrowRight className="transition-transform group-hover:translate-x-1" />
+                            </Link>
+                        </Button>
+                    </div>
 
-                    <p className="max-w-xl animate-in text-lg text-pretty text-white/70 delay-200 duration-700 fill-mode-both fade-in slide-in-from-bottom-4">
-                        Videos are transcribed and described automatically, then
-                        checked by an archivist before they are published.
-                        Browse events, programmes and places with confidence.
-                    </p>
-
-                    <dl className="grid animate-in grid-cols-2 gap-4 border-t border-white/10 pt-6 delay-500 duration-700 fill-mode-both fade-in sm:grid-cols-4">
+                    <dl className="grid max-w-3xl animate-in grid-cols-2 gap-x-6 gap-y-4 border-t pt-6 delay-500 duration-700 fill-mode-both fade-in sm:grid-cols-4 fold-short:pt-4">
                         {HIGHLIGHTS.map((highlight) => (
                             <div key={highlight.label}>
+                                <span
+                                    aria-hidden
+                                    className="mb-2 flex size-8 items-center justify-center rounded-lg bg-sky-50 text-brand fold-short:hidden"
+                                >
+                                    <highlight.icon className="size-4" />
+                                </span>
                                 <dt className="sr-only">{highlight.label}</dt>
-                                <dd className="text-lg font-semibold tracking-tight">
+                                <dd className="text-base font-semibold tracking-tight">
                                     {highlight.value}
                                 </dd>
-                                <dd className="text-xs text-white/55">
+                                <dd className="mt-0.5 text-xs text-muted-foreground">
                                     {highlight.label}
                                 </dd>
                             </div>
@@ -62,12 +82,17 @@ export default function WelcomeHero() {
                     </dl>
                 </div>
 
-                <div className="animate-in delay-300 duration-1000 fill-mode-both zoom-in-95 fade-in">
+                <div className="order-first animate-in delay-100 duration-1000 fill-mode-both fade-in slide-in-from-bottom-4 lg:order-none lg:pr-20 lg:delay-300">
                     <RecordPreview />
                 </div>
             </div>
 
-            <WelcomeMarquee className="relative mt-10" />
+            <div className="mt-10 flex w-full items-center gap-6 fold:hidden">
+                <p className="hidden shrink-0 text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase sm:block">
+                    Recently archived
+                </p>
+                <WelcomeMarquee className="min-w-0 flex-1" />
+            </div>
         </WelcomeFold>
     );
 }

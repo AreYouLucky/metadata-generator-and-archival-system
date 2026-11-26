@@ -1,6 +1,6 @@
 import { router } from '@inertiajs/react';
 import { Play } from 'lucide-react';
-import { formatTimestamp } from '@/lib/utilities';
+import { formatTimestamp, withStartTime } from '@/lib/utilities';
 import { useAskMeStore } from '@/stores/ask-me-store';
 import type { ChatCitation as Citation } from '@/types/chat';
 
@@ -20,7 +20,9 @@ export default function ChatCitation({ citation }: Props) {
         <button
             type="button"
             onClick={() =>
-                here ? page.seek(citation.start) : router.visit(citation.url)
+                here
+                    ? page.seek(citation.start)
+                    : router.visit(withStartTime(citation.url, citation.start))
             }
             className="inline-flex max-w-full items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[11px] text-brand transition-colors hover:bg-brand/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             aria-label={`Play ${citation.title} from ${time}`}

@@ -413,6 +413,23 @@ export function formatNumber(value: number, maximumFractionDigits = 0): string {
 }
 
 /**
+ * A total running time in words, e.g. 5400 → "1 h 30 min", 300 → "5 min".
+ */
+export function formatRunningTime(seconds: number): string {
+    const totalMinutes = Math.round(Math.max(0, seconds) / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours === 0) {
+        return `${minutes} min`;
+    }
+
+    return minutes === 0
+        ? `${formatNumber(hours)} h`
+        : `${formatNumber(hours)} h ${minutes} min`;
+}
+
+/**
  * An estimated cost in US dollars, e.g. 0.4213 → "$0.42"; tiny amounts keep
  * more digits so they don't read as zero.
  */
@@ -423,4 +440,118 @@ export function formatCost(value: number): string {
         minimumFractionDigits: 2,
         maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2,
     });
+}
+
+/** A piece of chat text, and the video position it names if it is a time. */
+export type TimestampPart = { text: string; seconds: number | null };
+
+/** "1:05", "12:30" or "1:02:05", not part of a longer number or a clock time ("10:30 AM"). */
+const TIMESTAMP_PATTERN =
+    /(?<![\d:.])(?:\d{1,2}:)?\d{1,2}:[0-5]\d(?![\d:])(?!\s?[AaPp]\.?[Mm]\b)/g;
+
+/**
+ * Splits text at the video positions it mentions, e.g. "Opens (0:42)." →
+ * ["Opens (", "0:42" (42 s), ")."], so the times can be clickable.
+ */
+export function splitTimestamps(text: string): TimestampPart[] {
+    const parts: TimestampPart[] = [];
+    let last = 0;
+
+    for (const match of text.matchAll(TIMESTAMP_PATTERN)) {
+        const index = match.index ?? 0;
+
+        if (index > last) {
+            parts.push({ text: text.slice(last, index), seconds: null });
+        }
+
+        parts.push({ text: match[0], seconds: parseTimestamp(match[0]) });
+        last = index + match[0].length;
+    }
+
+    if (last < text.length) {
+        parts.push({ text: text.slice(last), seconds: null });
+    }
+
+    return parts;
+}
+
+/**
+ * The cited moment a time in an answer belongs to: the citation it falls in
+ * (give or take a couple of seconds), else the only record cited, else none.
+ */
+export function findCitationAt<
+    T extends { record_id: string; start: number; end: number },
+>(seconds: number, citations: T[]): T | null {
+    const covering = citations.find(
+        (citation) =>
+            seconds >= citation.start - 2 && seconds <= citation.end + 2,
+    );
+
+    if (covering) {
+        return covering;
+    }
+
+    const records = new Set(citations.map((citation) => citation.record_id));
+
+    return records.size === 1 ? citations[0] : null;
+}
+
+/**
+ * An app link as a path on this site with `?t=` set to the whole second,
+ * e.g. to open a video there. Links the server stored carry APP_URL's host,
+ * which may differ from the one in the address bar (localhost vs 127.0.0.1),
+ * and Inertia cannot visit another origin, so only the path is kept.
+ */
+export function withStartTime(url: string, seconds: number): string {
+    const link = new URL(url, window.location.origin);
+    link.searchParams.set('t', String(Math.max(0, Math.floor(seconds))));
+
+    return `${link.pathname}${link.search}${link.hash}`;
+}
+
+/**
+ * How long ago, in words, e.g. "just now", "5 min ago", "3 h ago",
+ * "yesterday"; older dates as "21 Nov 2026".
+ */
+export function formatTimeAgo(value: string | null): string {
+    if (!value) {
+        return '';
+    }
+
+    const minutes = Math.floor(
+        (Date.now() - new Date(value).getTime()) / 60_000,
+    );
+
+    if (minutes < 1) {
+        return 'just now';
+    }
+
+    if (minutes < 60) {
+        return `${minutes} min ago`;
+    }
+
+    if (minutes < 24 * 60) {
+        return `${Math.floor(minutes / 60)} h ago`;
+    }
+
+    if (minutes < 48 * 60) {
+        return 'yesterday';
+    }
+
+    return formatDate(value);
+}
+
+/**
+ * Whether a navigation link points at the current page, or (unless `exact`)
+ * at a page above it: "/projects" is active on "/projects/5".
+ */
+export function isNavHrefActive(
+    href: string,
+    currentPath: string,
+    exact = false,
+): boolean {
+    const path = new URL(href, 'http://localhost').pathname.replace(/\/$/, '');
+    const current = currentPath.replace(/\/$/, '');
+
+    return current === path || (!exact && current.startsWith(`${path}/`));
 }

@@ -11,4 +11,15 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /**
+     * Highlight only on the exact URL. By default the item also stays active
+     * on the pages under it (Projects on `/projects/5`).
+     */
+    exact?: boolean;
+};
+
+/** A titled section of the sidebar navigation. */
+export type NavGroup = {
+    label: string;
+    items: NavItem[];
 };

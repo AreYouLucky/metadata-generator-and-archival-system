@@ -13,23 +13,23 @@ type Props = {
  */
 export default function WatchFrames({ frames, onSeek }: Props) {
     return (
-        <div className="overflow-x-auto rounded-xl border">
+        <div className="max-h-128 overflow-auto">
             <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground shadow-[inset_0_-1px_0_var(--border)]">
                     <tr>
-                        <th scope="col" className="w-20 px-4 py-2 font-medium">
+                        <th scope="col" className="w-20 px-5 py-3 font-medium">
                             Time
                         </th>
-                        <th scope="col" className="w-40 px-4 py-2 font-medium">
+                        <th scope="col" className="w-40 px-5 py-3 font-medium">
                             Frame
                         </th>
-                        <th scope="col" className="px-4 py-2 font-medium">
+                        <th scope="col" className="px-5 py-3 font-medium">
                             What it shows
                         </th>
-                        <th scope="col" className="px-4 py-2 font-medium">
+                        <th scope="col" className="px-5 py-3 font-medium">
                             Text on screen
                         </th>
-                        <th scope="col" className="w-44 px-4 py-2 font-medium">
+                        <th scope="col" className="w-44 px-5 py-3 font-medium">
                             Objects
                         </th>
                     </tr>
@@ -37,7 +37,7 @@ export default function WatchFrames({ frames, onSeek }: Props) {
                 <tbody className="divide-y">
                     {frames.map((frame) => (
                         <tr key={frame.id} className="align-top">
-                            <td className="px-4 py-2">
+                            <td className="px-5 py-4">
                                 <button
                                     type="button"
                                     onClick={() => onSeek(frame.time_sec)}
@@ -46,7 +46,7 @@ export default function WatchFrames({ frames, onSeek }: Props) {
                                     {formatTimestamp(frame.time_sec)}
                                 </button>
                             </td>
-                            <td className="px-4 py-2">
+                            <td className="px-5 py-4">
                                 <button
                                     type="button"
                                     onClick={() => onSeek(frame.time_sec)}
@@ -62,13 +62,13 @@ export default function WatchFrames({ frames, onSeek }: Props) {
                                     />
                                 </button>
                             </td>
-                            <td className="px-4 py-2">
+                            <td className="px-5 py-4">
                                 {frame.description ?? '—'}
                             </td>
-                            <td className="px-4 py-2 whitespace-pre-line">
+                            <td className="px-5 py-4 whitespace-pre-line">
                                 {frame.ocr_text ?? '—'}
                             </td>
-                            <td className="px-4 py-2 text-muted-foreground">
+                            <td className="px-5 py-4 text-muted-foreground">
                                 {frame.objects.length > 0
                                     ? frame.objects.join(', ')
                                     : '—'}

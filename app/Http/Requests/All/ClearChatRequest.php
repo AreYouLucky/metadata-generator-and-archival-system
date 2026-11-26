@@ -6,7 +6,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Clear the signed-in person's own "Ask me" conversation (nobody else's).
+ * Clear the signed-in person's whole "Ask me" history (nobody else's).
  */
 class ClearChatRequest extends FormRequest
 {

@@ -6,9 +6,11 @@ import {
     Building2,
     ClipboardCheck,
     Clapperboard,
+    FileVideo,
     FolderKanban,
     Gauge,
     Globe,
+    LayoutDashboard,
     ScrollText,
     Tags,
     Users,
@@ -24,6 +26,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarRail,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { overview } from '@/routes/admin';
@@ -38,142 +41,132 @@ import { index as videoTypes } from '@/routes/admin/video-types';
 import { index as agencies } from '@/routes/agencies';
 import { home as catalogue } from '@/routes/catalogue';
 import { index as projects } from '@/routes/projects';
+import { index as records } from '@/routes/records';
 import { index as reviews } from '@/routes/reviews';
-import type { NavItem } from '@/types';
+import type { NavGroup, NavItem } from '@/types';
 
-/** Public viewers mostly use the catalogue; the sidebar shows on their settings pages. */
-const viewerNavItems: NavItem[] = [
-    {
-        title: 'Catalogue',
-        href: catalogue(),
-        icon: Globe,
-    },
-];
+const catalogueItem: NavItem = {
+    title: 'Public catalogue',
+    href: catalogue(),
+    icon: Globe,
+};
+
+/** Encoders and admins land here after login. */
+const homeGroup: NavGroup = {
+    label: 'Home',
+    items: [{ title: 'Dashboard', href: dashboard(), icon: LayoutDashboard }],
+};
 
 /**
  * Encoders and admins. Videos are uploaded from inside a project or one of
  * its series, so there is no separate "New record" entry.
  */
-const archiveNavItems: NavItem[] = [
-    {
-        title: 'Projects',
-        href: projects(),
-        icon: FolderKanban,
-    },
-    {
-        title: 'Agencies',
-        href: agencies(),
-        icon: Building2,
-    },
-    {
-        title: 'Public catalogue',
-        href: catalogue(),
-        icon: Globe,
-    },
+const archiveItems: NavItem[] = [
+    { title: 'Records', href: records(), icon: FileVideo },
+    { title: 'Projects', href: projects(), icon: FolderKanban },
+    { title: 'Agencies', href: agencies(), icon: Building2 },
 ];
 
 /** Encoders follow their submissions here; admins review in Approvals. */
-const encoderNavItems: NavItem[] = [
+const encoderGroups: NavGroup[] = [
+    homeGroup,
     {
-        title: 'Pending reviews',
-        href: reviews(),
-        icon: ClipboardCheck,
+        label: 'Archive',
+        items: [
+            ...archiveItems,
+            { title: 'Pending reviews', href: reviews(), icon: ClipboardCheck },
+        ],
     },
 ];
 
-const adminNavItems: NavItem[] = [
+const adminGroups: NavGroup[] = [
+    homeGroup,
+    { label: 'Archive', items: archiveItems },
     {
-        title: 'Overview',
-        href: overview(),
-        icon: Gauge,
+        label: 'Review',
+        items: [
+            { title: 'Approvals', href: approvals(), icon: ClipboardCheck },
+            {
+                title: 'Disposition review',
+                href: dispositions(),
+                icon: Archive,
+            },
+        ],
     },
     {
-        title: 'Approvals',
-        href: approvals(),
-        icon: ClipboardCheck,
+        label: 'Monitoring',
+        items: [
+            // Every admin page sits under /admin, so only the exact URL counts.
+            { title: 'Overview', href: overview(), icon: Gauge, exact: true },
+            { title: 'Usage', href: usage(), icon: BarChart3 },
+            { title: 'Logs', href: logs(), icon: ScrollText },
+            { title: 'System status', href: systemStatus(), icon: Activity },
+        ],
     },
     {
-        title: 'Usage',
-        href: usage(),
-        icon: BarChart3,
-    },
-    {
-        title: 'Genres',
-        href: genres(),
-        icon: Tags,
-    },
-    {
-        title: 'Video types',
-        href: videoTypes(),
-        icon: Clapperboard,
-    },
-    {
-        title: 'Users',
-        href: users(),
-        icon: Users,
-    },
-    {
-        title: 'Logs',
-        href: logs(),
-        icon: ScrollText,
-    },
-    {
-        title: 'Disposition review',
-        href: dispositions(),
-        icon: Archive,
-    },
-    {
-        title: 'System status',
-        href: systemStatus(),
-        icon: Activity,
+        label: 'Setup',
+        items: [
+            { title: 'Users', href: users(), icon: Users },
+            { title: 'Genres', href: genres(), icon: Tags },
+            { title: 'Video types', href: videoTypes(), icon: Clapperboard },
+        ],
     },
 ];
 
+/**
+ * The staff workspace navigation, in the brand colour (tokens in app.css),
+ * with a section per area. Its header is as tall as the page header so the
+ * two bottom borders run in one line. Public viewers mostly use the
+ * catalogue; for them the sidebar only shows on their settings pages.
+ */
 export function AppSidebar() {
-    const { auth } = usePage().props;
-    const role = auth.user?.role;
-    const isStaff = role === 'admin' || role === 'encoder';
+    const role = usePage().props.auth.user?.role;
+    const groups =
+        role === 'admin'
+            ? adminGroups
+            : role === 'encoder'
+              ? encoderGroups
+              : [];
 
     return (
-        <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
+        <Sidebar collapsible="icon" className="border-r-sky-700">
+            <SidebarHeader className="h-16 justify-center border-b border-sidebar-border px-3 py-0 transition-[height] ease-linear group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:px-2">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
+                        <SidebarMenuButton
+                            size="lg"
+                            className="h-11 hover:bg-sidebar-accent"
+                            asChild
+                        >
                             <Link href={dashboard()} prefetch>
-                                <AppLogo />
+                                <AppLogo tone="white" />
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
-                {isStaff ? (
-                    <>
-                        <NavMain
-                            label="Archive"
-                            items={
-                                role === 'admin'
-                                    ? archiveNavItems
-                                    : [...archiveNavItems, ...encoderNavItems]
-                            }
-                        />
-                        {role === 'admin' && (
-                            <NavMain
-                                label="Administration"
-                                items={adminNavItems}
-                            />
-                        )}
-                    </>
-                ) : (
-                    <NavMain items={viewerNavItems} />
-                )}
+            <SidebarContent className="gap-6 py-5">
+                {groups.map((group) => (
+                    <NavMain
+                        key={group.label}
+                        label={group.label}
+                        items={group.items}
+                    />
+                ))}
+
+                {/* Staff: the way out to the public site, kept apart from the work pages. */}
+                <NavMain
+                    items={[catalogueItem]}
+                    className={groups.length > 0 ? 'mt-auto' : undefined}
+                />
             </SidebarContent>
 
-            <SidebarFooter>
+            <SidebarFooter className="border-t border-sidebar-border p-3">
                 <NavUser />
             </SidebarFooter>
+
+            <SidebarRail />
         </Sidebar>
     );
 }

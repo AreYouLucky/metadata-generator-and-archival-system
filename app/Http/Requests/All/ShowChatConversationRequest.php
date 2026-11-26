@@ -2,18 +2,21 @@
 
 namespace App\Http\Requests\All;
 
+use App\Models\ChatConversation;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * The signed-in person's own "Ask me" conversation, newest page first;
- * `before` pages back to older messages.
+ * One of the signed-in person's own "Ask me" conversations, newest page
+ * first; `before` pages back to older messages.
  */
-class IndexChatMessagesRequest extends FormRequest
+class ShowChatConversationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->is_active === true;
+        $conversation = $this->route('conversation');
+
+        return $conversation instanceof ChatConversation && $this->user()?->can('view', $conversation) === true;
     }
 
     /**

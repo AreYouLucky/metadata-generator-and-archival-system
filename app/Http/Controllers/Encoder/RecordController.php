@@ -111,7 +111,7 @@ class RecordController extends Controller
                 'can_delete' => $user->can('delete', $record),
             ]);
 
-        return Inertia::render('encoder/dashboard-page/dashboard', [
+        return Inertia::render('encoder/records/index-page/index', [
             'records' => $records,
             'filters' => [
                 'q' => $filters['q'] ?? '',

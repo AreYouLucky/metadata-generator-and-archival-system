@@ -12,19 +12,28 @@ type AskMeState = {
     open: boolean;
     /** The record page the person is on, if any: the chat's context. */
     page: AskMePage | null;
+    /**
+     * The saved conversation on screen: null is a new chat, undefined means
+     * none chosen yet (the most recent one opens).
+     */
+    conversationId: number | null | undefined;
     setOpen: (open: boolean) => void;
     toggle: () => void;
     setPage: (page: AskMePage | null) => void;
+    setConversationId: (conversationId: number | null) => void;
 };
 
 /**
  * "Ask me" floats on every page, so its state lives outside the workspace
- * store (which resets when the workspace closes).
+ * store (which resets when the workspace closes), and the open conversation
+ * survives moving between pages.
  */
 export const useAskMeStore = create<AskMeState>((set) => ({
     open: false,
     page: null,
+    conversationId: undefined,
     setOpen: (open) => set({ open }),
     toggle: () => set((state) => ({ open: !state.open })),
     setPage: (page) => set({ page }),
+    setConversationId: (conversationId) => set({ conversationId }),
 }));

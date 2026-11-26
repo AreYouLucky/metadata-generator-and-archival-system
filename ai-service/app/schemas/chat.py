@@ -107,6 +107,8 @@ class ChatAnswer(BaseModel):
     # True only when the answer is supported by what the tools returned.
     grounded: bool
     citations: list[ChatCitation]
+    # Up to three short questions the person could ask next (shown as buttons).
+    follow_ups: list[str]
 
 
 class ChatResponse(BaseModel):
